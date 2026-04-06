@@ -1,41 +1,72 @@
-
 data:
   data_path: "data/1h.csv"
-  lookback_window: 512
-  predict_window: 48
-  max_context: 512
+  lookback_window: 10
+  predict_window: 2
+  max_context: 12
   clip: 5.0
   train_ratio: 0.9
   val_ratio: 0.1
   test_ratio: 0.0
 
 training:
-
-  tokenizer_epochs: 30
-  basemodel_epochs: 20
-  batch_size: 32
+  tokenizer_epochs: 2
+  basemodel_epochs: 2
+  batch_size: 256
   log_interval: 50
   num_workers: 6
   seed: 42
-  
+
   tokenizer_learning_rate: 0.0002
   predictor_learning_rate: 0.000001
-  
+
+  # TIER 1 FIX 1: Adam betas now passed to BOTH optimizers (was missing from tokenizer)
   adam_beta1: 0.9
   adam_beta2: 0.95
+
   adam_weight_decay: 0.1
-  
+
+  # TIER 2 FIX 7: Adam epsilon (was using PyTorch default 1e-8 silently)
+  adam_eps: 1.0e-6
+
+  # TIER 1 FIX 2: Grad clipping (was hardcoded 2.0 and 3.0 in two files)
+  tokenizer_grad_clip: 2.0
+  basemodel_grad_clip: 3.0
+  grad_clip_norm_type: 2.0
+
+  # TIER 1 FIX 3 & 12: Scheduler params (were all hardcoded)
+  scheduler_type: "cosine_warmup"
+  scheduler_pct_start: 0.05
+  scheduler_div_factor: 25.0
+  scheduler_final_div_factor: 1000.0
+
+  # TIER 1 FIX 5: Loss weights (were all hardcoded 0.5)
+  tokenizer_recon_pre_weight: 1.0
+  tokenizer_recon_all_weight: 1.0
+  tokenizer_bsq_weight: 0.5
+  tokenizer_recon_weight: 0.5
+  basemodel_s1_weight: 0.5
+  basemodel_s2_weight: 0.5
+
+  # TIER 2 FIX 8: Label smoothing (was 0 hardcoded)
+  label_smoothing: 0.0
+
+  # TIER 2 FIX 9: BSQ inverse temperature (was hardcoded 1 in module.py)
+  bsq_inv_temperature: 1.0
+
+  # TIER 2 FIX 10: RoPE base (was hardcoded 10000)
+  rope_base: 50000
+
   accumulation_steps: 1
 
 model_paths:
   pretrained_tokenizer: "models/nos_tokenizer_2k"
   pretrained_predictor: "models/nos_mini"
-  
-  exp_name: "test_1h"
-  base_path: "/finetuned/"
 
-  base_save_path: "" 
-  finetuned_tokenizer: ""  
+  exp_name: "test_1h"
+  base_path: "finetuned"
+
+  base_save_path: ""
+  finetuned_tokenizer: ""
 
   tokenizer_save_name: "tokenizer"
   basemodel_save_name: "basemodel"
@@ -44,13 +75,67 @@ experiment:
   name: "Nos_custom_finetune"
   description: "Custom finetune for 1h stock data"
   use_comet: false
-
   train_tokenizer: true
   train_basemodel: true
-
   skip_existing: false
 
 device:
   use_cuda: true
   device_id: 0
-  
+
+distributed:
+  use_ddp: false
+  backend: "nccl"
+
+dynamic_tuning:
+  enabled: true
+  mode: "moderate"
+
+  # What the tuner is allowed to change
+  tune_learning_rate: true
+  tune_grad_clip: true
+  tune_betas: true
+  tune_loss_weights: true
+  tune_label_smoothing: true
+  tune_bsq_temperature: true
+  tune_scheduler_params: true
+  tune_weight_decay: true
+  tune_dropout: true
+  tune_adam_eps: true
+
+  # Bounds
+  lr_min: 1.0e-8
+  lr_max: 1.0e-3
+  beta1_min: 0.85
+  beta1_max: 0.95
+  beta2_min: 0.90
+  beta2_max: 0.999
+  grad_clip_min: 0.5
+  grad_clip_max: 10.0
+  loss_weight_min: 0.1
+  loss_weight_max: 2.0
+  label_smoothing_min: 0.0
+  label_smoothing_max: 0.15
+  bsq_inv_temp_min: 0.5
+  bsq_inv_temp_max: 5.0
+  weight_decay_min: 0.0
+  weight_decay_max: 0.5
+
+  # Detection thresholds
+  plateau_window_epochs: 4
+  plateau_threshold: 5.0e-4
+  overfit_gap_ratio: 0.10
+  severe_overfit_gap_ratio: 0.30
+  grad_explosion_threshold: 8.0
+
+  # Cooldown periods (epochs)
+  lr_cooldown_epochs: 2
+  beta_cooldown_epochs: 4
+  loss_weight_cooldown_epochs: 3
+  label_smooth_cooldown_epochs: 4
+  bsq_temp_cooldown_epochs: 5
+  grad_clip_cooldown_epochs: 1
+  scheduler_swap_cooldown_epochs: 5
+
+  # Warmup before tuning starts
+  tuning_warmup_epochs: 2
