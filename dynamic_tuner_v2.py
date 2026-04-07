@@ -248,10 +248,22 @@ class DynamicTunerV2:
         self.analyzer.add_epoch(avg_train_loss, avg_val_loss)
         changes: Dict[str, Any] = {}
 
+        # ── Always save state for monitoring ─────────────────
+        # Save BEFORE warmup check so monitor can see data
+        self._save_state(epoch)
+
         if epoch < self.cfg.dt_tuning_warmup:
             self._log(
                 f"[DynamicTunerV2] Epoch {epoch+1}: "
-                f"warmup phase — monitoring only")
+                f"warmup phase — monitoring only "
+                f"(tune starts epoch {self.cfg.dt_tuning_warmup + 1})")
+            # Still log the loss summary during warmup
+            self._log(
+                f"[DynamicTunerV2] Warmup | "
+                f"train={avg_train_loss:.6f} "
+                f"val={avg_val_loss:.6f} "
+                f"gap={avg_val_loss - avg_train_loss:.6f} "
+                f"gap_ratio={self.analyzer.get_gap_ratio():.4f}")
             return changes
 
         try:
@@ -265,7 +277,10 @@ class DynamicTunerV2:
 
         self._log_epoch_summary(
             epoch, avg_train_loss, avg_val_loss, changes)
+
+        # Save again after interventions with updated state
         self._save_state(epoch)
+
         return changes
 
     def track_loss_components(self,
@@ -583,7 +598,7 @@ class DynamicTunerV2:
         trend = self.analyzer.get_trend()
         gap_ratio = self.analyzer.get_gap_ratio()
 
-        # Update streak counters
+        # Update plateau streak
         if is_plateau:
             self.state['plateau_streak'] += 1
         else:
@@ -593,10 +608,11 @@ class DynamicTunerV2:
         if is_severe_of:
             new_lr = current_lr * 0.4
             reason = f'SEVERE overfit (gap={gap_ratio:.3f})'
+
         elif is_plateau:
             streak = self.state['plateau_streak']
             if streak >= 3:
-                # Warm restart: spike then let scheduler decay
+                # Warm restart
                 new_lr = min(current_lr * 2.0,
                              self.cfg.dt_lr_max)
                 self.state['plateau_streak'] = 0
@@ -604,23 +620,27 @@ class DynamicTunerV2:
             else:
                 new_lr = current_lr * 0.55
                 reason = f'plateau (streak={streak})'
+
         elif is_of:
             new_lr = current_lr * 0.72
             reason = f'moderate overfit (gap={gap_ratio:.3f})'
+
         elif (not is_of and train_loss > 2.0
               and trend != 'worsening'):
-            new_lr = min(current_lr * 1.2, self.cfg.dt_lr_max)
-            reason = 'underfitting → increase LR'
+            # ── Underfitting: be more aggressive ─────────────
+            new_lr = min(current_lr * 2.0, self.cfg.dt_lr_max)
+            reason = f'underfitting (loss={train_loss:.3f}) → ↑↑LR'
+
         elif trend == 'improving' and not is_of:
-            # Healthy: gentle boost
-            new_lr = min(current_lr * 1.03, self.cfg.dt_lr_max)
-            reason = 'healthy improving → gentle LR boost'
+            new_lr = min(current_lr * 1.05, self.cfg.dt_lr_max)
+            reason = 'healthy improving → gentle boost'
 
         new_lr = self._clamp(
             new_lr, self.cfg.dt_lr_min, self.cfg.dt_lr_max)
 
+        # Minimum relative change threshold
         if abs(new_lr - current_lr) / (current_lr + 1e-15) < 0.01:
-            return None  # < 1% change — not worth it
+            return None
 
         self._set_lr(new_lr)
         self.state['current_lr'] = new_lr
@@ -628,7 +648,6 @@ class DynamicTunerV2:
         self._log_intervention(epoch, 'learning_rate',
                                current_lr, new_lr, reason)
         return {'lr': (current_lr, new_lr, reason)}
-
     def _check_and_fix_loss_weights(
         self, epoch: int, train_loss: float, val_loss: float
     ) -> Optional[Dict]:
@@ -1185,27 +1204,59 @@ class DynamicTunerV2:
         self._log('\n'.join(lines))
 
     def _save_state(self, epoch: int):
+        """Save tuner state — always runs, even during warmup."""
         if not self.save_dir:
             return
         os.makedirs(self.save_dir, exist_ok=True)
         path = os.path.join(self.save_dir, 'tuner_state_v2.json')
+
+        # Safely serialize current_state
+        safe_state = {}
+        for k, v in self.state.items():
+            if k == 'intervention_history':
+                continue
+            if isinstance(v, dict):
+                safe_state[k] = {
+                    sk: (float(sv)
+                         if isinstance(sv, (int, float))
+                         else str(sv))
+                    for sk, sv in v.items()
+                }
+            elif isinstance(v, (int, float, bool, str)):
+                safe_state[k] = v
+            else:
+                safe_state[k] = str(v)
+
         out = {
             'epoch': epoch,
             'training_mode': self.training_mode,
-            'current_state': {
-                k: (v if not isinstance(v, dict) else str(v))
-                for k, v in self.state.items()
-                if k != 'intervention_history'
-            },
+            'in_warmup': epoch < self.cfg.dt_tuning_warmup,
+            'tuning_starts_epoch': self.cfg.dt_tuning_warmup,
+            'current_state': safe_state,
             'intervention_history': (
                 self.state['intervention_history'][-30:]),
             'loss_history': {
                 'train': list(self.analyzer.train_losses)[-50:],
                 'val': list(self.analyzer.val_losses)[-50:],
             },
-            'grad_norm_history': list(
-                self.analyzer.grad_norms)[-100:],
+            'grad_norm_stats': {
+                'count': len(self.analyzer.grad_norms),
+                'mean': float(np.mean(
+                    list(self.analyzer.grad_norms)))
+                    if self.analyzer.grad_norms else 0.0,
+                'p95': float(self.analyzer.get_grad_norm_percentile(
+                    95, 50))
+                    if len(self.analyzer.grad_norms) >= 5 else 0.0,
+                'max': float(max(self.analyzer.grad_norms))
+                    if self.analyzer.grad_norms else 0.0,
+            },
+            'component_history_means': {
+                k: float(np.mean(list(v)[-50:]))
+                for k, v in self.component_history.items()
+                if v
+            },
         }
+
         try:
             with open(path, 'w') as f:
                 json.dump(out, f, indent=2, default=str)
