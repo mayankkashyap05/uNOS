@@ -1542,7 +1542,7 @@ model_paths:
   pretrained_predictor: "models/nos_mini"
   
   exp_name: "test_1h"
-  base_path: "/finetuned/"
+  base_path: "finetuned"
 
   base_save_path: "" 
   finetuned_tokenizer: ""  

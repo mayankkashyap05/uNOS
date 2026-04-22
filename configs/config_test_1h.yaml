@@ -1,3 +1,4 @@
+
 data:
   data_path: "data/1h.csv"
   lookback_window: 512
@@ -9,65 +10,32 @@ data:
   test_ratio: 0.0
 
 training:
-  # ── Epochs: enough for tuner to actually fire ─────────────
+
   tokenizer_epochs: 30
   basemodel_epochs: 20
   batch_size: 32
   log_interval: 50
   num_workers: 6
   seed: 42
-
-  # ── Learning rates: basemodel was far too low ─────────────
+  
   tokenizer_learning_rate: 0.0002
-  predictor_learning_rate: 0.00004   # was 0.000001 — 40x increase
-
-  # TIER 1 FIX 1: betas passed to both optimizers
+  predictor_learning_rate: 0.000001
+  
   adam_beta1: 0.9
   adam_beta2: 0.95
   adam_weight_decay: 0.1
-
-  # TIER 2 FIX 7: Adam epsilon
-  adam_eps: 1.0e-6
-
-  # TIER 1 FIX 2: grad clipping
-  tokenizer_grad_clip: 2.0
-  basemodel_grad_clip: 3.0
-  grad_clip_norm_type: 2.0
-
-  # TIER 1 FIX 3: scheduler — div_factor lowered so warmup LR is reasonable
-  scheduler_type: "cosine_warmup"
-  scheduler_pct_start: 0.05
-  scheduler_div_factor: 5.0        # was 25 — start LR = max_lr/5 not max_lr/25
-  scheduler_final_div_factor: 100.0  # was 1000 — min LR = max_lr/100
-
-  # TIER 1 FIX 5: loss weights
-  tokenizer_recon_pre_weight: 1.0
-  tokenizer_recon_all_weight: 1.0
-  tokenizer_bsq_weight: 0.5
-  tokenizer_recon_weight: 0.5
-  basemodel_s1_weight: 0.5
-  basemodel_s2_weight: 0.5
-
-  # TIER 2 FIX 8: label smoothing
-  label_smoothing: 0.0
-
-  # TIER 2 FIX 9: BSQ temperature
-  bsq_inv_temperature: 1.0
-
-  # TIER 2 FIX 10: RoPE base
-  rope_base: 50000
-
+  
   accumulation_steps: 1
 
 model_paths:
   pretrained_tokenizer: "models/nos_tokenizer_2k"
   pretrained_predictor: "models/nos_mini"
-
+  
   exp_name: "test_1h"
   base_path: "finetuned"
 
-  base_save_path: ""
-  finetuned_tokenizer: ""
+  base_save_path: "" 
+  finetuned_tokenizer: ""  
 
   tokenizer_save_name: "tokenizer"
   basemodel_save_name: "basemodel"
@@ -76,66 +44,13 @@ experiment:
   name: "Nos_custom_finetune"
   description: "Custom finetune for 1h stock data"
   use_comet: false
+
   train_tokenizer: true
   train_basemodel: true
+
   skip_existing: false
 
 device:
   use_cuda: true
   device_id: 0
-
-distributed:
-  use_ddp: false
-  backend: "nccl"
-
-dynamic_tuning:
-  enabled: true
-  mode: "moderate"
-
-  tune_learning_rate: true
-  tune_grad_clip: true
-  tune_betas: true
-  tune_loss_weights: true
-  tune_label_smoothing: true
-  tune_bsq_temperature: true
-  tune_scheduler_params: true
-  tune_weight_decay: true
-  tune_dropout: true
-  tune_adam_eps: true
-
-  # Bounds
-  lr_min: 1.0e-8
-  lr_max: 1.0e-3
-  beta1_min: 0.85
-  beta1_max: 0.95
-  beta2_min: 0.90
-  beta2_max: 0.999
-  grad_clip_min: 0.5
-  grad_clip_max: 10.0
-  loss_weight_min: 0.1
-  loss_weight_max: 2.0
-  label_smoothing_min: 0.0
-  label_smoothing_max: 0.15
-  bsq_inv_temp_min: 0.5
-  bsq_inv_temp_max: 5.0
-  weight_decay_min: 0.0
-  weight_decay_max: 0.5
-
-  # Detection thresholds
-  plateau_window_epochs: 4
-  plateau_threshold: 5.0e-4
-  overfit_gap_ratio: 0.10
-  severe_overfit_gap_ratio: 0.30
-  grad_explosion_threshold: 8.0
-
-  # Cooldowns — kept short relative to total epochs
-  lr_cooldown_epochs: 2
-  beta_cooldown_epochs: 4
-  loss_weight_cooldown_epochs: 3
-  label_smooth_cooldown_epochs: 4
-  bsq_temp_cooldown_epochs: 5
-  grad_clip_cooldown_epochs: 1
-  scheduler_swap_cooldown_epochs: 5
-
-  # ── KEY FIX: warmup must be < total epochs ────────────────
-  tuning_warmup_epochs: 1          # was 2 — now tuner fires from epoch 2 onward
+  
