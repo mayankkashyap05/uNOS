@@ -236,131 +236,162 @@ def create_dataloaders(config):
     return train_loader, val_loader, train_dataset, val_dataset, train_sampler, val_sampler
 
 
+
 def train_model(model, tokenizer, device, config, save_dir, logger):
     logger.info("Starting training...")
     use_ddp = dist.is_available() and dist.is_initialized()
     rank = dist.get_rank() if use_ddp else 0
-    world_size = dist.get_world_size() if use_ddp else 1
-    
-    train_loader, val_loader, train_dataset, val_dataset, train_sampler, val_sampler = create_dataloaders(config)
+
+    train_loader, val_loader, train_dataset, val_dataset, \
+        train_sampler, val_sampler = create_dataloaders(config)
+
     optimizer = torch.optim.AdamW(
         model.parameters(),
         lr=config.predictor_learning_rate,
         betas=(config.adam_beta1, config.adam_beta2),
         weight_decay=config.adam_weight_decay
     )
-    
+
+    # ── Scheduler: read from config ───────────────────────────────
+    pct_start = getattr(config, 'basemodel_pct_start', 0.03)
+    div_factor = getattr(config, 'basemodel_div_factor', 10.0)
+
     scheduler = torch.optim.lr_scheduler.OneCycleLR(
         optimizer,
         max_lr=config.predictor_learning_rate,
         steps_per_epoch=len(train_loader),
         epochs=config.basemodel_epochs,
-        pct_start=0.03,
-        div_factor=10
+        pct_start=pct_start,
+        div_factor=div_factor
     )
-    
+
     if use_ddp:
         local_rank = int(os.environ.get("LOCAL_RANK", "0"))
-        model = DDP(model, device_ids=[local_rank], output_device=local_rank, find_unused_parameters=False)
+        model = DDP(model, device_ids=[local_rank],
+                    output_device=local_rank, find_unused_parameters=False)
+
+    # ── Grad clip: read from config ───────────────────────────────
+    max_grad_norm = getattr(config, 'basemodel_max_grad_norm', 3.0)
 
     best_val_loss = float('inf')
     batch_idx_global = 0
-    
+
     for epoch in range(config.basemodel_epochs):
         epoch_start_time = time.time()
         model.train()
-        
+
         train_dataset.set_epoch_seed(epoch * 10000)
         val_dataset.set_epoch_seed(0)
         if train_sampler is not None:
             train_sampler.set_epoch(epoch)
-        
+
         epoch_train_loss = 0.0
         train_batches = 0
-        
+
         for batch_idx, (batch_x, batch_x_stamp) in enumerate(train_loader):
             batch_x = batch_x.to(device, non_blocking=True)
             batch_x_stamp = batch_x_stamp.to(device, non_blocking=True)
-            
+
             with torch.no_grad():
                 token_seq_0, token_seq_1 = tokenizer.encode(batch_x, half=True)
-            
+
             token_in = [token_seq_0[:, :-1], token_seq_1[:, :-1]]
             token_out = [token_seq_0[:, 1:], token_seq_1[:, 1:]]
-            
-            logits = (model.module if use_ddp else model)(token_in[0], token_in[1], batch_x_stamp[:, :-1, :])
-            loss, s1_loss, s2_loss = (model.module if use_ddp else model).head.compute_loss(logits[0], logits[1], token_out[0], token_out[1])
-            
+
+            logits = (model.module if use_ddp else model)(
+                token_in[0], token_in[1], batch_x_stamp[:, :-1, :]
+            )
+            loss, s1_loss, s2_loss = (model.module if use_ddp else model).head.compute_loss(
+                logits[0], logits[1], token_out[0], token_out[1]
+            )
+
             optimizer.zero_grad()
             loss.backward()
-            torch.nn.utils.clip_grad_norm_((model.module if use_ddp else model).parameters(), max_norm=3.0)
+
+            # ── Grad clip from config ─────────────────────────
+            torch.nn.utils.clip_grad_norm_(
+                (model.module if use_ddp else model).parameters(),
+                max_norm=max_grad_norm
+            )
             optimizer.step()
             scheduler.step()
-            
+
             epoch_train_loss += loss.item()
             train_batches += 1
-            
+
             if (batch_idx_global + 1) % config.log_interval == 0:
                 lr = optimizer.param_groups[0]['lr']
-                log_msg = (f"[Epoch {epoch+1}/{config.basemodel_epochs}, Step {batch_idx+1}/{len(train_loader)}] "
-                          f"LR: {lr:.6f}, Loss: {loss.item():.4f}")
+                log_msg = (
+                    f"[Epoch {epoch+1}/{config.basemodel_epochs}, "
+                    f"Step {batch_idx+1}/{len(train_loader)}] "
+                    f"LR: {lr:.6f}, Loss: {loss.item():.4f}"
+                )
                 logger.info(log_msg)
                 if rank == 0:
                     print(log_msg)
-            
+
             batch_idx_global += 1
-        
+
+        # ── Validation ────────────────────────────────────────────
         model.eval()
         val_loss = 0.0
         val_batches = 0
-        
+
         with torch.no_grad():
             for batch_x, batch_x_stamp in val_loader:
                 batch_x = batch_x.to(device, non_blocking=True)
                 batch_x_stamp = batch_x_stamp.to(device, non_blocking=True)
-                
+
                 token_seq_0, token_seq_1 = tokenizer.encode(batch_x, half=True)
                 token_in = [token_seq_0[:, :-1], token_seq_1[:, :-1]]
                 token_out = [token_seq_0[:, 1:], token_seq_1[:, 1:]]
-                
-                logits = (model.module if use_ddp else model)(token_in[0], token_in[1], batch_x_stamp[:, :-1, :])
-                loss, _, _ = (model.module if use_ddp else model).head.compute_loss(logits[0], logits[1], token_out[0], token_out[1])
-                
+
+                logits = (model.module if use_ddp else model)(
+                    token_in[0], token_in[1], batch_x_stamp[:, :-1, :]
+                )
+                loss, _, _ = (model.module if use_ddp else model).head.compute_loss(
+                    logits[0], logits[1], token_out[0], token_out[1]
+                )
                 val_loss += loss.item()
                 val_batches += 1
-        
+
         if use_ddp:
-            tensor_sum = torch.tensor([epoch_train_loss, train_batches, val_loss, val_batches], dtype=torch.float64, device=device)
+            tensor_sum = torch.tensor(
+                [epoch_train_loss, train_batches, val_loss, val_batches],
+                dtype=torch.float64, device=device
+            )
             dist.all_reduce(tensor_sum, op=dist.ReduceOp.SUM)
-            epoch_train_loss_all = tensor_sum[0].item()
-            train_batches_all = int(tensor_sum[1].item())
-            val_loss_all = tensor_sum[2].item()
-            val_batches_all = int(tensor_sum[3].item())
-            avg_train_loss = (epoch_train_loss_all / train_batches_all) if train_batches_all > 0 else 0.0
-            avg_val_loss = (val_loss_all / val_batches_all) if val_batches_all > 0 else 0.0
+            avg_train_loss = (tensor_sum[0].item() / tensor_sum[1].item()
+                              if tensor_sum[1].item() > 0 else 0.0)
+            avg_val_loss = (tensor_sum[2].item() / tensor_sum[3].item()
+                            if tensor_sum[3].item() > 0 else 0.0)
         else:
-            avg_train_loss = epoch_train_loss / train_batches if train_batches > 0 else 0
+            avg_train_loss = (epoch_train_loss / train_batches
+                              if train_batches > 0 else 0)
             avg_val_loss = val_loss / val_batches if val_batches > 0 else 0
-        
+
         epoch_time = time.time() - epoch_start_time
-        epoch_summary = (f"\n--- Epoch {epoch+1}/{config.basemodel_epochs} Summary ---\n"
-                       f"Training Loss: {avg_train_loss:.4f}\n"
-                       f"Validation Loss: {avg_val_loss:.4f}\n"
-                       f"Epoch Time: {epoch_time:.2f} seconds\n")
+        epoch_summary = (
+            f"\n--- Epoch {epoch+1}/{config.basemodel_epochs} Summary ---\n"
+            f"Training Loss: {avg_train_loss:.4f}\n"
+            f"Validation Loss: {avg_val_loss:.4f}\n"
+            f"Epoch Time: {epoch_time:.2f} seconds\n"
+        )
         logger.info(epoch_summary)
         if rank == 0:
             print(epoch_summary)
-        
+
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
             if rank == 0:
                 model_save_path = os.path.join(save_dir, "best_model")
                 os.makedirs(model_save_path, exist_ok=True)
                 (model.module if use_ddp else model).save_pretrained(model_save_path)
-                save_msg = f"Best model saved to: {model_save_path} (validation loss: {best_val_loss:.4f})"
+                save_msg = (f"Best model saved: {model_save_path} "
+                            f"(val loss: {best_val_loss:.4f})")
                 logger.info(save_msg)
                 print(save_msg)
-    
+
     return best_val_loss
 
 

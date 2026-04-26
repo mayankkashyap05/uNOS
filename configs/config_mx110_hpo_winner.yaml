@@ -1,0 +1,94 @@
+data:
+  clip: 5.0
+  data_path: data/1h.csv
+  lookback_window: 3
+  max_context: 5
+  predict_window: 2
+  test_ratio: 0.0
+  train_ratio: 0.9
+  val_ratio: 0.1
+device:
+  device_id: 0
+  use_cuda: true
+experiment:
+  description: Testing Optuna HPO logic with tiny context
+  name: Nos_MX110_HPO_Test
+  pre_trained: true
+  skip_existing: false
+  train_basemodel: true
+  train_tokenizer: true
+  use_comet: false
+hpo:
+  direction: minimize
+  enabled: true
+  hpo_basemodel_epochs: 2
+  hpo_tokenizer_epochs: 2
+  n_trials: 3
+  optimize_basemodel: true
+  optimize_tokenizer: true
+  pruner: none
+  sampler: tpe
+  search_space:
+    accumulation_steps:
+      choices:
+      - 1
+      type: categorical
+    batch_size:
+      choices:
+      - 16
+      - 32
+      - 64
+      type: categorical
+    bsq_beta:
+      high: 0.1
+      log: false
+      low: 0.01
+      type: float
+    predictor_learning_rate:
+      high: 0.0001
+      log: true
+      low: 1.0e-06
+      type: float
+    tokenizer_learning_rate:
+      high: 0.001
+      log: true
+      low: 0.0001
+      type: float
+  storage: sqlite:///finetuned/run_mx110_hpo_test/hpo_results.db
+  study_name: mx110_full_hpo_test
+model_paths:
+  base_path: finetuned
+  base_save_path: ''
+  basemodel_save_name: basemodel
+  exp_name: run_mx110_hpo_test
+  finetuned_tokenizer: ''
+  pretrained_predictor: models/nos_mini
+  pretrained_tokenizer: models/nos_tokenizer_2k
+  tokenizer_save_name: tokenizer
+training:
+  accumulation_steps: 1
+  adam_beta1: 0.9
+  adam_beta2: 0.95
+  adam_weight_decay: 0.1
+  attn_dropout_p: null
+  basemodel_div_factor: 10.0
+  basemodel_epochs: 3
+  basemodel_max_grad_norm: 1.0
+  basemodel_pct_start: 0.05
+  batch_size: 16
+  bsq_beta: 0.02404167763981929
+  bsq_gamma: null
+  bsq_gamma0: null
+  bsq_zeta: null
+  ffn_dropout_p: null
+  log_interval: 1
+  num_workers: 0
+  predictor_learning_rate: 5.611516415334504e-06
+  resid_dropout_p: null
+  seed: 42
+  token_dropout_p: null
+  tokenizer_div_factor: 10.0
+  tokenizer_epochs: 3
+  tokenizer_learning_rate: 0.00023688639503640813
+  tokenizer_max_grad_norm: 2.0
+  tokenizer_pct_start: 0.05

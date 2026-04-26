@@ -1,0 +1,116 @@
+# configs/config_mx110_hpo_fulltest.yaml
+# EXTREME SMOKE TEST - USELESS MODEL, FULL HPO PIPELINE
+
+data:
+  data_path: "data/1h.csv"
+  lookback_window: 3        # Drastically reduced
+  predict_window: 2         # Drastically reduced
+  max_context: 5            # lookback + predict
+  clip: 5.0
+  train_ratio: 0.9
+  val_ratio: 0.1
+  test_ratio: 0.0
+
+training:
+  tokenizer_epochs: 3       # Just enough to verify it runs
+  basemodel_epochs: 3
+  batch_size: 32            # Higher batch size works now because context is tiny
+  log_interval: 1           # Log every step since there are very few steps
+  num_workers: 0            # Keep 0 to avoid RAM duplication on weak hardware
+  seed: 42
+
+  tokenizer_learning_rate: 0.0002
+  predictor_learning_rate: 0.000005
+
+  adam_beta1: 0.9
+  adam_beta2: 0.95
+  adam_weight_decay: 0.1
+  accumulation_steps: 1     # Forced to 1 as requested
+
+  tokenizer_pct_start: 0.05
+  tokenizer_div_factor: 10.0
+  basemodel_pct_start: 0.05
+  basemodel_div_factor: 10.0
+
+  tokenizer_max_grad_norm: 2.0
+  basemodel_max_grad_norm: 1.0
+
+  ffn_dropout_p: null
+  attn_dropout_p: null
+  resid_dropout_p: null
+  token_dropout_p: null
+
+  bsq_beta: null
+  bsq_gamma0: null
+  bsq_gamma: null
+  bsq_zeta: null
+
+model_paths:
+  pretrained_tokenizer: "models/nos_tokenizer_2k"
+  pretrained_predictor: "models/nos_mini"
+  exp_name: "run_mx110_hpo_test"
+  base_path: "finetuned"
+  base_save_path: ""
+  finetuned_tokenizer: ""
+  tokenizer_save_name: "tokenizer"
+  basemodel_save_name: "basemodel"
+
+experiment:
+  name: "Nos_MX110_HPO_Test"
+  description: "Testing Optuna HPO logic with tiny context"
+  use_comet: false
+  train_tokenizer: true
+  train_basemodel: true
+  skip_existing: false
+  pre_trained: true
+
+device:
+  use_cuda: true
+  device_id: 0
+
+# ── Hyperparameter Search Space ──────────────────────────────────
+hpo:
+  enabled: true
+  n_trials: 3               # 3 trials per phase is enough to test the search logic
+  direction: "minimize"
+  sampler: "tpe"
+  pruner: "none"            # Disabled pruner so all 3 trials finish completely
+  storage: "sqlite:///finetuned/run_mx110_hpo_test/hpo_results.db"
+  study_name: "mx110_full_hpo_test"
+
+  optimize_tokenizer: true
+  optimize_basemodel: true
+  
+  hpo_tokenizer_epochs: 2   # 2 epochs per trial
+  hpo_basemodel_epochs: 2
+
+  search_space:
+    # ── Tokenizer ──────────────────────────────────────────────
+    tokenizer_learning_rate:
+      type: float
+      low: 1.0e-4
+      high: 1.0e-3
+      log: true
+
+    # ── Predictor ──────────────────────────────────────────────
+    predictor_learning_rate:
+      type: float
+      low: 1.0e-6
+      high: 1.0e-4
+      log: true
+
+    # ── Batch & Accumulation ───────────────────────────────────
+    batch_size:
+      type: categorical
+      choices: [16, 32, 64] # Test higher batch sizes
+
+    accumulation_steps:
+      type: categorical
+      choices: [1]          # Locked to 1
+
+    # ── BSQ Weights ────────────────────────────────────────────
+    bsq_beta:
+      type: float
+      low: 0.01
+      high: 0.1
+      log: false

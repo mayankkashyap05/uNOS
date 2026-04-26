@@ -1,1511 +1,42 @@
-# Codebase
+# 🗂️ Codebase
+
+<!-- AUTO-GENERATED — do not edit by hand -->
+
+| Field | Value |
+| ----- | ----- |
+| **Generated** | `2026-04-26 21:28:20` |
+| **Source mode** | YAML config (`codebase.yaml`) |
+| **Base directory** | `C:\Users\kashy\OneDrive\Documents\uNOS` |
+| **Total files** | 6 |
+
+## 📑 Table of Contents
+
+1. [Project Structure](#-project-structure)
+2. [File Contents](#-file-contents)
+   - [configs/config.yaml](#configsconfigyaml)
+   - [model/module.py](#modelmodulepy)
+   - [model/nos.py](#modelnospy)
+   - [model/__init__.py](#model--init--py)
+   - [config_loader.py](#config-loaderpy)
+   - [hpo_tuner.py](#hpo-tunerpy)
 
 ## 📁 Project Structure
 
 ```
 .
-├── config_loader.py
-├── finetune_base_model.py
-├── finetune_tokenizer.py
-├── train_sequential.py
 ├── configs
-│   └── config_test_1h.yaml
-├── data
-│   └── 1h.csv
+│   └── config.yaml
 ├── model
-│   ├── __init__.py
 │   ├── module.py
-│   └── nos.py
-└── models
-    ├── nos_base
-    ├── nos_mini
-    ├── nos_small
-    ├── nos_tokenizer_2k
-    └── nos_tokenizer_base
+│   ├── nos.py
+│   └── __init__.py
+├── config_loader.py
+└── hpo_tuner.py
 ```
 
 ## 📄 File Contents
 
-### `config_loader.py`
-
-```python
-import os
-import yaml
-from typing import Dict, Any
-
-
-class ConfigLoader:
-    
-    def __init__(self, config_path: str):
-
-        self.config_path = config_path
-        self.config = self._load_config()
-    
-    def _load_config(self) -> Dict[str, Any]:
-
-        if not os.path.exists(self.config_path):
-            raise FileNotFoundError(f"config file not found: {self.config_path}")
-        
-        with open(self.config_path, 'r', encoding='utf-8') as f:
-            config = yaml.safe_load(f)
-        
-        config = self._resolve_dynamic_paths(config)
-        
-        return config
-    
-    def _resolve_dynamic_paths(self, config: Dict[str, Any]) -> Dict[str, Any]:
-
-        exp_name = config.get('model_paths', {}).get('exp_name', '')
-        if not exp_name:
-            return config
-        
-        base_path = config.get('model_paths', {}).get('base_path', '')
-        path_templates = {
-            'base_save_path': f"{base_path}/{exp_name}",
-            'finetuned_tokenizer': f"{base_path}/{exp_name}/tokenizer/best_model"
-        }
-        
-        if 'model_paths' in config:
-            for key, template in path_templates.items():
-                if key in config['model_paths']:
-                    # only use template when the original value is empty string
-                    current_value = config['model_paths'][key]
-                    if current_value == "" or current_value is None:
-                        config['model_paths'][key] = template
-                    else:
-                        # if the original value is not empty, use template to replace the {exp_name} placeholder
-                        if isinstance(current_value, str) and '{exp_name}' in current_value:
-                            config['model_paths'][key] = current_value.format(exp_name=exp_name)
-        
-        return config
-    
-    def get(self, key: str, default=None):
- 
-        keys = key.split('.')
-        value = self.config
-        
-        try:
-            for k in keys:
-                value = value[k]
-            return value
-        except (KeyError, TypeError):
-            return default
-    
-    def get_data_config(self) -> Dict[str, Any]:
-        return self.config.get('data', {})
-    
-    def get_training_config(self) -> Dict[str, Any]:
-        return self.config.get('training', {})
-    
-    def get_model_paths(self) -> Dict[str, str]:
-        return self.config.get('model_paths', {})
-    
-    def get_experiment_config(self) -> Dict[str, Any]:
-        return self.config.get('experiment', {})
-    
-    def get_device_config(self) -> Dict[str, Any]:
-        return self.config.get('device', {})
-    
-    def get_distributed_config(self) -> Dict[str, Any]:
-        return self.config.get('distributed', {})
-    
-    def update_config(self, updates: Dict[str, Any]):
-
-        def update_nested_dict(d, u):
-            for k, v in u.items():
-                if isinstance(v, dict):
-                    d[k] = update_nested_dict(d.get(k, {}), v)
-                else:
-                    d[k] = v
-            return d
-        
-        self.config = update_nested_dict(self.config, updates)
-    
-    def save_config(self, save_path: str = None):
-
-        if save_path is None:
-            save_path = self.config_path
-        
-        with open(save_path, 'w', encoding='utf-8') as f:
-            yaml.dump(self.config, f, default_flow_style=False, allow_unicode=True, indent=2)
-    
-    def print_config(self):
-        print("=" * 50)
-        print("Current configuration:")
-        print("=" * 50)
-        yaml.dump(self.config, default_flow_style=False, allow_unicode=True, indent=2)
-        print("=" * 50)
-
-
-class CustomFinetuneConfig:
-    
-    def __init__(self, config_path: str = None):
-
-        if config_path is None:
-            config_path = os.path.join(os.path.dirname(__file__), 'config.yaml')
-        
-        self.loader = ConfigLoader(config_path)
-        self._load_all_configs()
-    
-    def _load_all_configs(self):
-
-        data_config = self.loader.get_data_config()
-        self.data_path = data_config.get('data_path')
-        self.lookback_window = data_config.get('lookback_window', 512)
-        self.predict_window = data_config.get('predict_window', 48)
-        self.max_context = data_config.get('max_context', 512)
-        self.clip = data_config.get('clip', 5.0)
-        self.train_ratio = data_config.get('train_ratio', 0.9)
-        self.val_ratio = data_config.get('val_ratio', 0.1)
-        self.test_ratio = data_config.get('test_ratio', 0.0)
-        
-        # training configuration
-        training_config = self.loader.get_training_config()
-        # support training epochs of tokenizer and basemodel separately
-        self.tokenizer_epochs = training_config.get('tokenizer_epochs', 30)
-        self.basemodel_epochs = training_config.get('basemodel_epochs', 30)
-
-        if 'epochs' in training_config and 'tokenizer_epochs' not in training_config:
-            self.tokenizer_epochs = training_config.get('epochs', 30)
-        if 'epochs' in training_config and 'basemodel_epochs' not in training_config:
-            self.basemodel_epochs = training_config.get('epochs', 30)
-        
-        self.batch_size = training_config.get('batch_size', 160)
-        self.log_interval = training_config.get('log_interval', 50)
-        self.num_workers = training_config.get('num_workers', 6)
-        self.seed = training_config.get('seed', 100)
-        self.tokenizer_learning_rate = training_config.get('tokenizer_learning_rate', 2e-4)
-        self.predictor_learning_rate = training_config.get('predictor_learning_rate', 4e-5)
-        self.adam_beta1 = training_config.get('adam_beta1', 0.9)
-        self.adam_beta2 = training_config.get('adam_beta2', 0.95)
-        self.adam_weight_decay = training_config.get('adam_weight_decay', 0.1)
-        self.accumulation_steps = training_config.get('accumulation_steps', 1)
-        
-        model_paths = self.loader.get_model_paths()
-        self.exp_name = model_paths.get('exp_name', 'default_experiment')
-        self.pretrained_tokenizer_path = model_paths.get('pretrained_tokenizer')
-        self.pretrained_predictor_path = model_paths.get('pretrained_predictor')
-        self.base_save_path = model_paths.get('base_save_path')
-        self.tokenizer_save_name = model_paths.get('tokenizer_save_name', 'tokenizer')
-        self.basemodel_save_name = model_paths.get('basemodel_save_name', 'basemodel')
-        self.finetuned_tokenizer_path = model_paths.get('finetuned_tokenizer')
-        
-        experiment_config = self.loader.get_experiment_config()
-        self.experiment_name = experiment_config.get('name', 'Nos_custom_finetune')
-        self.experiment_description = experiment_config.get('description', '')
-        self.use_comet = experiment_config.get('use_comet', False)
-        self.train_tokenizer = experiment_config.get('train_tokenizer', True)
-        self.train_basemodel = experiment_config.get('train_basemodel', True)
-        self.skip_existing = experiment_config.get('skip_existing', False)
-
-        unified_pretrained = experiment_config.get('pre_trained', None)
-        self.pre_trained_tokenizer = experiment_config.get('pre_trained_tokenizer', unified_pretrained if unified_pretrained is not None else True)
-        self.pre_trained_predictor = experiment_config.get('pre_trained_predictor', unified_pretrained if unified_pretrained is not None else True)
-        
-        device_config = self.loader.get_device_config()
-        self.use_cuda = device_config.get('use_cuda', True)
-        self.device_id = device_config.get('device_id', 0)
-        
-        distributed_config = self.loader.get_distributed_config()
-        self.use_ddp = distributed_config.get('use_ddp', False)
-        self.ddp_backend = distributed_config.get('backend', 'nccl')
-        
-        self._compute_full_paths()
-    
-    def _compute_full_paths(self):
-
-        self.tokenizer_save_path = os.path.join(self.base_save_path, self.tokenizer_save_name)
-        self.tokenizer_best_model_path = os.path.join(self.tokenizer_save_path, 'best_model')
-        
-        self.basemodel_save_path = os.path.join(self.base_save_path, self.basemodel_save_name)
-        self.basemodel_best_model_path = os.path.join(self.basemodel_save_path, 'best_model')
-    
-    def get_tokenizer_config(self):
-
-        return {
-            'data_path': self.data_path,
-            'lookback_window': self.lookback_window,
-            'predict_window': self.predict_window,
-            'max_context': self.max_context,
-            'clip': self.clip,
-            'train_ratio': self.train_ratio,
-            'val_ratio': self.val_ratio,
-            'test_ratio': self.test_ratio,
-            'epochs': self.tokenizer_epochs,
-            'batch_size': self.batch_size,
-            'log_interval': self.log_interval,
-            'num_workers': self.num_workers,
-            'seed': self.seed,
-            'learning_rate': self.tokenizer_learning_rate,
-            'adam_beta1': self.adam_beta1,
-            'adam_beta2': self.adam_beta2,
-            'adam_weight_decay': self.adam_weight_decay,
-            'accumulation_steps': self.accumulation_steps,
-            'pretrained_model_path': self.pretrained_tokenizer_path,
-            'save_path': self.tokenizer_save_path,
-            'use_comet': self.use_comet
-        }
-    
-    def get_basemodel_config(self):
-
-        return {
-            'data_path': self.data_path,
-            'lookback_window': self.lookback_window,
-            'predict_window': self.predict_window,
-            'max_context': self.max_context,
-            'clip': self.clip,
-            'train_ratio': self.train_ratio,
-            'val_ratio': self.val_ratio,
-            'test_ratio': self.test_ratio,
-            'epochs': self.basemodel_epochs,
-            'batch_size': self.batch_size,
-            'log_interval': self.log_interval,
-            'num_workers': self.num_workers,
-            'seed': self.seed,
-            'predictor_learning_rate': self.predictor_learning_rate,
-            'tokenizer_learning_rate': self.tokenizer_learning_rate,
-            'adam_beta1': self.adam_beta1,
-            'adam_beta2': self.adam_beta2,
-            'adam_weight_decay': self.adam_weight_decay,
-            'pretrained_tokenizer_path': self.finetuned_tokenizer_path,
-            'pretrained_predictor_path': self.pretrained_predictor_path,
-            'save_path': self.basemodel_save_path,
-            'use_comet': self.use_comet
-        }
-    
-    def print_config_summary(self):
-
-        print("=" * 60)
-        print("Nos finetuning configuration summary")
-        print("=" * 60)
-        print(f"Experiment name: {self.exp_name}")
-        print(f"Data path: {self.data_path}")
-        print(f"Lookback window: {self.lookback_window}")
-        print(f"Predict window: {self.predict_window}")
-        print(f"Tokenizer training epochs: {self.tokenizer_epochs}")
-        print(f"Basemodel training epochs: {self.basemodel_epochs}")
-        print(f"Batch size: {self.batch_size}")
-        print(f"Tokenizer learning rate: {self.tokenizer_learning_rate}")
-        print(f"Predictor learning rate: {self.predictor_learning_rate}")
-        print(f"Train tokenizer: {self.train_tokenizer}")
-        print(f"Train basemodel: {self.train_basemodel}")
-        print(f"Skip existing: {self.skip_existing}")
-        print(f"Use pre-trained tokenizer: {self.pre_trained_tokenizer}")
-        print(f"Use pre-trained predictor: {self.pre_trained_predictor}")
-        print(f"Base save path: {self.base_save_path}")
-        print(f"Tokenizer save path: {self.tokenizer_save_path}")
-        print(f"Basemodel save path: {self.basemodel_save_path}")
-        print("=" * 60)
-
-```
-
-### `finetune_base_model.py`
-
-```python
-import os
-import sys
-import json
-import time
-import pickle
-import random
-import pandas as pd
-import numpy as np
-import torch
-import torch.nn as nn
-from torch.utils.data import Dataset, DataLoader
-from torch.utils.data.distributed import DistributedSampler
-from time import gmtime, strftime
-import logging
-from logging.handlers import RotatingFileHandler
-import datetime
-import torch.distributed as dist
-from torch.nn.parallel import DistributedDataParallel as DDP
-
-sys.path.append('../')
-from model import Nos, NosTokenizer, NosPredictor
-from config_loader import CustomFinetuneConfig
-
-
-class CustomKlineDataset(Dataset):
-    
-    def __init__(self, data_path, data_type='train', lookback_window=90, predict_window=10, 
-                 clip=5.0, seed=100, train_ratio=0.7, val_ratio=0.15, test_ratio=0.15):
-        self.data_path = data_path
-        self.data_type = data_type
-        self.lookback_window = lookback_window
-        self.predict_window = predict_window
-        self.window = lookback_window + predict_window + 1
-        self.clip = clip
-        self.seed = seed
-        self.train_ratio = train_ratio
-        self.val_ratio = val_ratio
-        self.test_ratio = test_ratio
-        
-        self.feature_list = ['open', 'high', 'low', 'close', 'volume', 'amount']
-        self.time_feature_list = ['minute', 'hour', 'weekday', 'day', 'month']
-        
-        self.py_rng = random.Random(seed)
-        
-        self._load_and_preprocess_data()
-        self._split_data_by_time()
-        
-        self.n_samples = len(self.data) - self.window + 1
-            
-        print(f"[{data_type.upper()}] Data length: {len(self.data)}, Available samples: {self.n_samples}")
-    
-    def _load_and_preprocess_data(self):
-        df = pd.read_csv(self.data_path)
-        
-        df['timestamps'] = pd.to_datetime(df['timestamps'])
-        df = df.sort_values('timestamps').reset_index(drop=True)
-        
-        self.timestamps = df['timestamps'].copy()
-        
-        df['minute'] = df['timestamps'].dt.minute
-        df['hour'] = df['timestamps'].dt.hour
-        df['weekday'] = df['timestamps'].dt.weekday
-        df['day'] = df['timestamps'].dt.day
-        df['month'] = df['timestamps'].dt.month
-        
-        self.data = df[self.feature_list + self.time_feature_list].copy()
-        
-        if self.data.isnull().any().any():
-            print("Warning: Missing values found in data, performing forward fill")
-            self.data = self.data.fillna(method='ffill')
-        
-        print(f"Original data time range: {self.timestamps.min()} to {self.timestamps.max()}")
-        print(f"Original data total length: {len(df)} records")
-    
-    def _split_data_by_time(self):
-        total_length = len(self.data)
-        
-        train_end = int(total_length * self.train_ratio)
-        val_end = int(total_length * (self.train_ratio + self.val_ratio))
-        
-        if self.data_type == 'train':
-            self.data = self.data.iloc[:train_end].copy()
-            self.timestamps = self.timestamps.iloc[:train_end].copy()
-            print(f"[{self.data_type.upper()}] Training set: first {train_end} time points ({self.train_ratio})")
-            print(f"[{self.data_type.upper()}] Training set time range: {self.timestamps.min()} to {self.timestamps.max()}")
-        elif self.data_type == 'val':
-            self.data = self.data.iloc[train_end:val_end].copy()
-            self.timestamps = self.timestamps.iloc[train_end:val_end].copy()
-            print(f"[{self.data_type.upper()}] Validation set: time points {train_end+1} to {val_end} ({self.val_ratio})")
-            print(f"[{self.data_type.upper()}] Validation set time range: {self.timestamps.min()} to {self.timestamps.max()}")
-        elif self.data_type == 'test':
-            self.data = self.data.iloc[val_end:].copy()
-            self.timestamps = self.timestamps.iloc[val_end:].copy()
-            print(f"[{self.data_type.upper()}] Test set: after time point {val_end+1}")
-            print(f"[{self.data_type.upper()}] Test set time range: {self.timestamps.min()} to {self.timestamps.max()}")
-        
-        print(f"[{self.data_type.upper()}] Data length after split: {len(self.data)} records")
-    
-    def set_epoch_seed(self, epoch):
-        epoch_seed = self.seed + epoch
-        self.py_rng.seed(epoch_seed)
-        self.current_epoch = epoch
-    
-    def __len__(self):
-        return self.n_samples
-    
-    def __getitem__(self, idx):
-        max_start = len(self.data) - self.window
-        if max_start <= 0:
-            raise ValueError("Data length insufficient to create samples")
-        
-        if self.data_type == 'train':
-            epoch = getattr(self, 'current_epoch', 0)
-            start_idx = (idx * 9973 + (epoch + 1) * 104729) % (max_start + 1)
-        else:
-            start_idx = idx % (max_start + 1)
-        
-        end_idx = start_idx + self.window
-        
-        window_data = self.data.iloc[start_idx:end_idx]
-        
-        x = window_data[self.feature_list].values.astype(np.float32)
-        x_stamp = window_data[self.time_feature_list].values.astype(np.float32)
-        
-        x_mean, x_std = np.mean(x, axis=0), np.std(x, axis=0)
-        x = (x - x_mean) / (x_std + 1e-5)
-        x = np.clip(x, -self.clip, self.clip)
-        
-        x_tensor = torch.from_numpy(x)
-        x_stamp_tensor = torch.from_numpy(x_stamp)
-        
-        return x_tensor, x_stamp_tensor
-
-
-
-
-def setup_logging(exp_name: str, log_dir: str, rank: int = 0) -> logging.Logger:
-    os.makedirs(log_dir, exist_ok=True)
-    
-    logger = logging.getLogger(f"basemodel_training_rank_{rank}")
-    logger.setLevel(logging.INFO)
-    
-    if logger.handlers:
-        return logger
-    
-    log_file = os.path.join(log_dir, f"basemodel_training_rank_{rank}.log")
-    file_handler = RotatingFileHandler(
-        log_file, 
-        maxBytes=10*1024*1024,
-        backupCount=5,
-        encoding='utf-8'
-    )
-    file_handler.setLevel(logging.INFO)
-    
-    console_handler = None
-    if rank == 0:
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.INFO)
-    
-    formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
-    file_handler.setFormatter(formatter)
-    if console_handler is not None:
-        console_handler.setFormatter(formatter)
-    
-    logger.addHandler(file_handler)
-    if console_handler is not None:
-        logger.addHandler(console_handler)
-    
-    logger.info(f"=== Basemodel Training Started ===")
-    logger.info(f"Experiment Name: {exp_name}")
-    logger.info(f"Log Directory: {log_dir}")
-    logger.info(f"Rank: {rank}")
-    logger.info(f"Timestamp: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    
-    return logger
-
-
-def create_dataloaders(config):
-    if not dist.is_available() or not dist.is_initialized() or dist.get_rank() == 0:
-        print("Creating data loaders...")
-    
-    train_dataset = CustomKlineDataset(
-        data_path=config.data_path,
-        data_type='train',
-        lookback_window=config.lookback_window,
-        predict_window=config.predict_window,
-        clip=config.clip,
-        seed=config.seed,
-        train_ratio=config.train_ratio,
-        val_ratio=config.val_ratio,
-        test_ratio=config.test_ratio
-    )
-    
-    val_dataset = CustomKlineDataset(
-        data_path=config.data_path,
-        data_type='val',
-        lookback_window=config.lookback_window,
-        predict_window=config.predict_window,
-        clip=config.clip,
-        seed=config.seed + 1,
-        train_ratio=config.train_ratio,
-        val_ratio=config.val_ratio,
-        test_ratio=config.test_ratio
-    )
-    
-    use_ddp = dist.is_available() and dist.is_initialized()
-    train_sampler = DistributedSampler(train_dataset, num_replicas=dist.get_world_size(), rank=dist.get_rank(), shuffle=True) if use_ddp else None
-    val_sampler = DistributedSampler(val_dataset, num_replicas=dist.get_world_size(), rank=dist.get_rank(), shuffle=False, drop_last=False) if use_ddp else None
-
-    train_loader = DataLoader(
-        train_dataset,
-        batch_size=config.batch_size,
-        shuffle=(train_sampler is None),
-        num_workers=config.num_workers,
-        pin_memory=True,
-        drop_last=True,
-        sampler=train_sampler
-    )
-    
-    val_loader = DataLoader(
-        val_dataset,
-        batch_size=config.batch_size,
-        shuffle=False,
-        num_workers=config.num_workers,
-        pin_memory=True,
-        drop_last=False,
-        sampler=val_sampler
-    )
-    
-    if not dist.is_available() or not dist.is_initialized() or dist.get_rank() == 0:
-        print(f"Training set size: {len(train_dataset)}, Validation set size: {len(val_dataset)}")
-    
-    return train_loader, val_loader, train_dataset, val_dataset, train_sampler, val_sampler
-
-
-def train_model(model, tokenizer, device, config, save_dir, logger):
-    logger.info("Starting training...")
-    use_ddp = dist.is_available() and dist.is_initialized()
-    rank = dist.get_rank() if use_ddp else 0
-    world_size = dist.get_world_size() if use_ddp else 1
-    
-    train_loader, val_loader, train_dataset, val_dataset, train_sampler, val_sampler = create_dataloaders(config)
-    optimizer = torch.optim.AdamW(
-        model.parameters(),
-        lr=config.predictor_learning_rate,
-        betas=(config.adam_beta1, config.adam_beta2),
-        weight_decay=config.adam_weight_decay
-    )
-    
-    scheduler = torch.optim.lr_scheduler.OneCycleLR(
-        optimizer,
-        max_lr=config.predictor_learning_rate,
-        steps_per_epoch=len(train_loader),
-        epochs=config.basemodel_epochs,
-        pct_start=0.03,
-        div_factor=10
-    )
-    
-    if use_ddp:
-        local_rank = int(os.environ.get("LOCAL_RANK", "0"))
-        model = DDP(model, device_ids=[local_rank], output_device=local_rank, find_unused_parameters=False)
-
-    best_val_loss = float('inf')
-    batch_idx_global = 0
-    
-    for epoch in range(config.basemodel_epochs):
-        epoch_start_time = time.time()
-        model.train()
-        
-        train_dataset.set_epoch_seed(epoch * 10000)
-        val_dataset.set_epoch_seed(0)
-        if train_sampler is not None:
-            train_sampler.set_epoch(epoch)
-        
-        epoch_train_loss = 0.0
-        train_batches = 0
-        
-        for batch_idx, (batch_x, batch_x_stamp) in enumerate(train_loader):
-            batch_x = batch_x.to(device, non_blocking=True)
-            batch_x_stamp = batch_x_stamp.to(device, non_blocking=True)
-            
-            with torch.no_grad():
-                token_seq_0, token_seq_1 = tokenizer.encode(batch_x, half=True)
-            
-            token_in = [token_seq_0[:, :-1], token_seq_1[:, :-1]]
-            token_out = [token_seq_0[:, 1:], token_seq_1[:, 1:]]
-            
-            logits = (model.module if use_ddp else model)(token_in[0], token_in[1], batch_x_stamp[:, :-1, :])
-            loss, s1_loss, s2_loss = (model.module if use_ddp else model).head.compute_loss(logits[0], logits[1], token_out[0], token_out[1])
-            
-            optimizer.zero_grad()
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_((model.module if use_ddp else model).parameters(), max_norm=3.0)
-            optimizer.step()
-            scheduler.step()
-            
-            epoch_train_loss += loss.item()
-            train_batches += 1
-            
-            if (batch_idx_global + 1) % config.log_interval == 0:
-                lr = optimizer.param_groups[0]['lr']
-                log_msg = (f"[Epoch {epoch+1}/{config.basemodel_epochs}, Step {batch_idx+1}/{len(train_loader)}] "
-                          f"LR: {lr:.6f}, Loss: {loss.item():.4f}")
-                logger.info(log_msg)
-                if rank == 0:
-                    print(log_msg)
-            
-            batch_idx_global += 1
-        
-        model.eval()
-        val_loss = 0.0
-        val_batches = 0
-        
-        with torch.no_grad():
-            for batch_x, batch_x_stamp in val_loader:
-                batch_x = batch_x.to(device, non_blocking=True)
-                batch_x_stamp = batch_x_stamp.to(device, non_blocking=True)
-                
-                token_seq_0, token_seq_1 = tokenizer.encode(batch_x, half=True)
-                token_in = [token_seq_0[:, :-1], token_seq_1[:, :-1]]
-                token_out = [token_seq_0[:, 1:], token_seq_1[:, 1:]]
-                
-                logits = (model.module if use_ddp else model)(token_in[0], token_in[1], batch_x_stamp[:, :-1, :])
-                loss, _, _ = (model.module if use_ddp else model).head.compute_loss(logits[0], logits[1], token_out[0], token_out[1])
-                
-                val_loss += loss.item()
-                val_batches += 1
-        
-        if use_ddp:
-            tensor_sum = torch.tensor([epoch_train_loss, train_batches, val_loss, val_batches], dtype=torch.float64, device=device)
-            dist.all_reduce(tensor_sum, op=dist.ReduceOp.SUM)
-            epoch_train_loss_all = tensor_sum[0].item()
-            train_batches_all = int(tensor_sum[1].item())
-            val_loss_all = tensor_sum[2].item()
-            val_batches_all = int(tensor_sum[3].item())
-            avg_train_loss = (epoch_train_loss_all / train_batches_all) if train_batches_all > 0 else 0.0
-            avg_val_loss = (val_loss_all / val_batches_all) if val_batches_all > 0 else 0.0
-        else:
-            avg_train_loss = epoch_train_loss / train_batches if train_batches > 0 else 0
-            avg_val_loss = val_loss / val_batches if val_batches > 0 else 0
-        
-        epoch_time = time.time() - epoch_start_time
-        epoch_summary = (f"\n--- Epoch {epoch+1}/{config.basemodel_epochs} Summary ---\n"
-                       f"Training Loss: {avg_train_loss:.4f}\n"
-                       f"Validation Loss: {avg_val_loss:.4f}\n"
-                       f"Epoch Time: {epoch_time:.2f} seconds\n")
-        logger.info(epoch_summary)
-        if rank == 0:
-            print(epoch_summary)
-        
-        if avg_val_loss < best_val_loss:
-            best_val_loss = avg_val_loss
-            if rank == 0:
-                model_save_path = os.path.join(save_dir, "best_model")
-                os.makedirs(model_save_path, exist_ok=True)
-                (model.module if use_ddp else model).save_pretrained(model_save_path)
-                save_msg = f"Best model saved to: {model_save_path} (validation loss: {best_val_loss:.4f})"
-                logger.info(save_msg)
-                print(save_msg)
-    
-    return best_val_loss
-
-
-def main():
-    import argparse
-    
-    parser = argparse.ArgumentParser(description='Nos Basemodel Fine-tuning Training')
-    parser.add_argument('--config', type=str, default='config.yaml', 
-                       help='Configuration file path (default: config.yaml)')
-    args = parser.parse_args()
-    
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device: {device}")
-    
-    config = CustomFinetuneConfig(args.config)
-    
-    os.makedirs(config.basemodel_save_path, exist_ok=True)
-    
-    log_dir = os.path.join(config.base_save_path, "logs")
-    logger = setup_logging(config.exp_name, log_dir, 0)
-    
-    torch.manual_seed(config.seed)
-    np.random.seed(config.seed)
-    random.seed(config.seed)
-    
-    logger.info("Loading pretrained model or random initialization...")
-    print("Loading pretrained model or random initialization...")
-    if getattr(config, 'pre_trained_tokenizer', True):
-        tokenizer = NosTokenizer.from_pretrained(config.finetuned_tokenizer_path)
-    else:
-        import json, os
-        print("pre_trained_tokenizer=False, randomly initializing Tokenizer architecture for training")
-        cfg_path_tok = os.path.join(config.pretrained_tokenizer_path if hasattr(config, 'pretrained_tokenizer_path') else config.finetuned_tokenizer_path, 'config.json')
-        with open(cfg_path_tok, 'r') as f:
-            arch_t = json.load(f)
-        tokenizer = NosTokenizer(
-            d_in=arch_t.get('d_in', 6),
-            d_model=arch_t.get('d_model', 256),
-            n_heads=arch_t.get('n_heads', 4),
-            ff_dim=arch_t.get('ff_dim', 512),
-            n_enc_layers=arch_t.get('n_enc_layers', 4),
-            n_dec_layers=arch_t.get('n_dec_layers', 4),
-            ffn_dropout_p=arch_t.get('ffn_dropout_p', 0.0),
-            attn_dropout_p=arch_t.get('attn_dropout_p', 0.0),
-            resid_dropout_p=arch_t.get('resid_dropout_p', 0.0),
-            s1_bits=arch_t.get('s1_bits', 10),
-            s2_bits=arch_t.get('s2_bits', 10),
-            beta=arch_t.get('beta', 0.05),
-            gamma0=arch_t.get('gamma0', 1.0),
-            gamma=arch_t.get('gamma', 1.1),
-            zeta=arch_t.get('zeta', 0.05),
-            group_size=arch_t.get('group_size', 4)
-        )
-
-    if getattr(config, 'pre_trained_predictor', True):
-        model = Nos.from_pretrained(config.pretrained_predictor_path)
-    else:
-        import json, os
-        print("pre_trained_predictor=False, randomly initializing Predictor architecture for training")
-        cfg_path = os.path.join(config.pretrained_predictor_path, 'config.json')
-        with open(cfg_path, 'r') as f:
-            arch = json.load(f)
-        model = Nos(
-            s1_bits=arch.get('s1_bits', 10),
-            s2_bits=arch.get('s2_bits', 10),
-            n_layers=arch.get('n_layers', 12),
-            d_model=arch.get('d_model', 832),
-            n_heads=arch.get('n_heads', 16),
-            ff_dim=arch.get('ff_dim', 2048),
-            ffn_dropout_p=arch.get('ffn_dropout_p', 0.2),
-            attn_dropout_p=arch.get('attn_dropout_p', 0.0),
-            resid_dropout_p=arch.get('resid_dropout_p', 0.2),
-            token_dropout_p=arch.get('token_dropout_p', 0.0),
-            learn_te=arch.get('learn_te', True)
-        )
-    
-    tokenizer = tokenizer.to(device)
-    model = model.to(device)
-    
-    model_size = sum(p.numel() for p in model.parameters())
-    logger.info(f"Model parameters: {model_size:,}")
-    print(f"Model parameters: {model_size:,}")
-    
-    logger.info("=== Training Configuration ===")
-    logger.info(f"Data path: {config.data_path}")
-    logger.info(f"Lookback window: {config.lookback_window}")
-    logger.info(f"Predict window: {config.predict_window}")
-    logger.info(f"Batch size: {config.batch_size}")
-    logger.info(f"Learning rate: {config.predictor_learning_rate}")
-    logger.info(f"Training epochs: {config.basemodel_epochs}")
-    logger.info(f"Device: {device}")
-    logger.info(f"Tokenizer path: {config.finetuned_tokenizer_path}")
-    logger.info(f"Pretrained model path: {config.pretrained_predictor_path}")
-    
-    logger.info("Starting fine-tuning training...")
-    print("Starting fine-tuning training...")
-    best_val_loss = train_model(model, tokenizer, device, config, config.basemodel_save_path, logger)
-    
-    final_msg = f"Training completed! Best validation loss: {best_val_loss:.4f}\nModel saved to: {config.basemodel_save_path}"
-    logger.info(final_msg)
-    print(final_msg)
-
-
-if __name__ == "__main__":
-    main()
-
-```
-
-### `finetune_tokenizer.py`
-
-```python
-import os
-import sys
-import json
-import time
-import random
-import numpy as np
-import torch
-import torch.nn.functional as F
-from torch.utils.data import DataLoader
-from torch.utils.data.distributed import DistributedSampler
-from time import gmtime, strftime
-import datetime
-import logging
-from logging.handlers import RotatingFileHandler
-import torch.distributed as dist
-from torch.nn.parallel import DistributedDataParallel as DDP
-
-sys.path.append("../")
-from model import NosTokenizer
-from finetune_base_model import CustomKlineDataset
-from config_loader import CustomFinetuneConfig
-
-
-def set_seed(seed: int, rank: int = 0):
-    actual_seed = seed
-    random.seed(actual_seed)
-    np.random.seed(actual_seed)
-    torch.manual_seed(actual_seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(actual_seed)
-        torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = False
-
-
-def get_model_size(model: torch.nn.Module) -> str:
-    total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    if total_params >= 1e9:
-        return f"{total_params / 1e9:.1f}B"
-    elif total_params >= 1e6:
-        return f"{total_params / 1e6:.1f}M"
-    else:
-        return f"{total_params / 1e3:.1f}K"
-
-
-def format_time(seconds: float) -> str:
-    return str(datetime.timedelta(seconds=int(seconds)))
-
-
-def setup_logging(exp_name: str, log_dir: str, rank: int = 0) -> logging.Logger:
-    os.makedirs(log_dir, exist_ok=True)
-    
-    logger = logging.getLogger(f"tokenizer_training_rank_{rank}")
-    logger.setLevel(logging.INFO)
-    
-    if logger.handlers:
-        return logger
-    
-    log_file = os.path.join(log_dir, f"tokenizer_training_rank_{rank}.log")
-    file_handler = RotatingFileHandler(
-        log_file, 
-        maxBytes=10*1024*1024,
-        backupCount=5,
-        encoding='utf-8'
-    )
-    file_handler.setLevel(logging.INFO)
-    
-    console_handler = None
-    if rank == 0:
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.INFO)
-    
-    formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
-    file_handler.setFormatter(formatter)
-    if console_handler is not None:
-        console_handler.setFormatter(formatter)
-    
-    logger.addHandler(file_handler)
-    if console_handler is not None:
-        logger.addHandler(console_handler)
-    
-    logger.info(f"=== Tokenizer Training Started ===")
-    logger.info(f"Experiment Name: {exp_name}")
-    logger.info(f"Log Directory: {log_dir}")
-    logger.info(f"Rank: {rank}")
-    logger.info(f"Timestamp: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    
-    return logger
-
-
-def create_dataloaders(config):
-    if not dist.is_available() or not dist.is_initialized() or dist.get_rank() == 0:
-        print("Creating tokenizer training data loaders...")
-    
-    train_dataset = CustomKlineDataset(
-        data_path=config.data_path,
-        data_type="train",
-        lookback_window=config.lookback_window,
-        predict_window=config.predict_window,
-        clip=config.clip,
-        seed=config.seed,
-        train_ratio=config.train_ratio,
-        val_ratio=config.val_ratio,
-        test_ratio=config.test_ratio
-    )
-    
-    val_dataset = CustomKlineDataset(
-        data_path=config.data_path,
-        data_type="val",
-        lookback_window=config.lookback_window,
-        predict_window=config.predict_window,
-        clip=config.clip,
-        seed=config.seed + 1,
-        train_ratio=config.train_ratio,
-        val_ratio=config.val_ratio,
-        test_ratio=config.test_ratio
-    )
-    
-    use_ddp = dist.is_available() and dist.is_initialized()
-    train_sampler = DistributedSampler(train_dataset, num_replicas=dist.get_world_size(), rank=dist.get_rank(), shuffle=True) if use_ddp else None
-    val_sampler = DistributedSampler(val_dataset, num_replicas=dist.get_world_size(), rank=dist.get_rank(), shuffle=False, drop_last=False) if use_ddp else None
-
-    train_loader = DataLoader(
-        train_dataset,
-        batch_size=config.batch_size,
-        shuffle=(train_sampler is None),
-        num_workers=config.num_workers,
-        pin_memory=True,
-        drop_last=True,
-        sampler=train_sampler
-    )
-    
-    val_loader = DataLoader(
-        val_dataset,
-        batch_size=config.batch_size,
-        shuffle=False,
-        num_workers=config.num_workers,
-        pin_memory=True,
-        drop_last=False,
-        sampler=val_sampler
-    )
-    
-    if not dist.is_available() or not dist.is_initialized() or dist.get_rank() == 0:
-        print(f"Training set size: {len(train_dataset)}, Validation set size: {len(val_dataset)}")
-    
-    return train_loader, val_loader, train_dataset, val_dataset, train_sampler, val_sampler
-
-
-def train_tokenizer(model, device, config, save_dir, logger):
-    logger.info("Starting tokenizer training...")
-    use_ddp = dist.is_available() and dist.is_initialized()
-    rank = dist.get_rank() if use_ddp else 0
-    world_size = dist.get_world_size() if use_ddp else 1
-    
-    train_loader, val_loader, train_dataset, val_dataset, train_sampler, val_sampler = create_dataloaders(config)
-    
-    optimizer = torch.optim.AdamW(
-        model.parameters(),
-        lr=config.tokenizer_learning_rate,
-        weight_decay=config.adam_weight_decay
-    )
-    
-    scheduler = torch.optim.lr_scheduler.OneCycleLR(
-        optimizer,
-        max_lr=config.tokenizer_learning_rate,
-        steps_per_epoch=len(train_loader),
-        epochs=config.tokenizer_epochs,
-        pct_start=0.03,
-        div_factor=10
-    )
-    
-    if use_ddp:
-        local_rank = int(os.environ.get("LOCAL_RANK", "0"))
-        model = DDP(model, device_ids=[local_rank], output_device=local_rank, find_unused_parameters=False)
-
-    best_val_loss = float("inf")
-    batch_idx_global = 0
-    
-    accumulation_steps = getattr(config, 'accumulation_steps', 1)
-    
-    for epoch in range(config.tokenizer_epochs):
-        epoch_start_time = time.time()
-        model.train()
-        
-        train_dataset.set_epoch_seed(epoch * 10000)
-        val_dataset.set_epoch_seed(0)
-        if train_sampler is not None:
-            train_sampler.set_epoch(epoch)
-        
-        for batch_idx, (ori_batch_x, _) in enumerate(train_loader):
-            ori_batch_x = ori_batch_x.squeeze(0).to(device, non_blocking=True)
-            
-            current_batch_total_loss = 0.0
-            for j in range(accumulation_steps):
-                start_idx = j * (ori_batch_x.shape[0] // accumulation_steps)
-                end_idx = (j + 1) * (ori_batch_x.shape[0] // accumulation_steps)
-                batch_x = ori_batch_x[start_idx:end_idx]
-                
-                zs, bsq_loss, _, _ = (model.module if use_ddp else model)(batch_x)
-                z_pre, z = zs
-                
-                recon_loss_pre = F.mse_loss(z_pre, batch_x)
-                recon_loss_all = F.mse_loss(z, batch_x)
-                recon_loss = recon_loss_pre + recon_loss_all
-                loss = (recon_loss + bsq_loss) / 2
-                
-                loss_scaled = loss / accumulation_steps
-                current_batch_total_loss += loss.item()
-                loss_scaled.backward()
-            
-            torch.nn.utils.clip_grad_norm_((model.module if use_ddp else model).parameters(), max_norm=2.0)
-            optimizer.step()
-            scheduler.step()
-            optimizer.zero_grad()
-            
-            if (batch_idx_global + 1) % config.log_interval == 0:
-                avg_loss = current_batch_total_loss / accumulation_steps
-                lr = optimizer.param_groups[0]["lr"]
-                log_msg = (f"[Epoch {epoch+1}/{config.tokenizer_epochs}, Step {batch_idx+1}/{len(train_loader)}] "
-                          f"LR: {lr:.6f}, Loss: {avg_loss:.4f}")
-                logger.info(log_msg)
-                if rank == 0:
-                    print(log_msg)
-                
-                detail_msg = (f"  - VQ Loss: {bsq_loss.item():.4f}\n"
-                            f"  - Recon Loss Pre: {recon_loss_pre.item():.4f}\n"
-                            f"  - Recon Loss All: {recon_loss_all.item():.4f}")
-                logger.info(detail_msg)
-                if rank == 0:
-                    print(detail_msg)
-            
-            batch_idx_global += 1
-        
-        model.eval()
-        tot_val_loss_sum_rank = 0.0
-        val_sample_count_rank = 0
-        
-        with torch.no_grad():
-            for ori_batch_x, _ in val_loader:
-                ori_batch_x = ori_batch_x.squeeze(0).to(device, non_blocking=True)
-                zs, _, _, _ = (model.module if use_ddp else model)(ori_batch_x)
-                _, z = zs
-                val_loss_item = F.mse_loss(z, ori_batch_x)
-                
-                tot_val_loss_sum_rank += val_loss_item.item() * ori_batch_x.size(0)
-                val_sample_count_rank += ori_batch_x.size(0)
-        
-        if use_ddp:
-            tensor_sum = torch.tensor([tot_val_loss_sum_rank, val_sample_count_rank], dtype=torch.float64, device=device)
-            dist.all_reduce(tensor_sum, op=dist.ReduceOp.SUM)
-            tot_val_loss_all = tensor_sum[0].item()
-            val_count_all = int(tensor_sum[1].item())
-            avg_val_loss = (tot_val_loss_all / val_count_all) if val_count_all > 0 else 0.0
-        else:
-            avg_val_loss = tot_val_loss_sum_rank / val_sample_count_rank if val_sample_count_rank > 0 else 0
-        
-        epoch_time = time.time() - epoch_start_time
-        epoch_summary = (f"\n--- Epoch {epoch+1}/{config.tokenizer_epochs} Summary ---\n"
-                       f"Validation Loss: {avg_val_loss:.4f}\n"
-                       f"Epoch Time: {format_time(epoch_time)}\n"
-                       f"Total Training Time: {format_time(time.time() - epoch_start_time)}\n")
-        logger.info(epoch_summary)
-        if rank == 0:
-            print(epoch_summary)
-        
-        if avg_val_loss < best_val_loss:
-            best_val_loss = avg_val_loss
-            if rank == 0:
-                model_save_path = os.path.join(save_dir, "best_model")
-                os.makedirs(model_save_path, exist_ok=True)
-                (model.module if use_ddp else model).save_pretrained(model_save_path)
-                save_msg = f"Best model saved to: {model_save_path} (validation loss: {best_val_loss:.4f})"
-                logger.info(save_msg)
-                print(save_msg)
-    
-    return best_val_loss
-
-
-def main():
-    import argparse
-    
-    parser = argparse.ArgumentParser(description='Nos Tokenizer Fine-tuning Training')
-    parser.add_argument('--config', type=str, default='config.yaml', 
-                       help='Configuration file path (default: config.yaml)')
-    args = parser.parse_args()
-    
-    config = CustomFinetuneConfig(args.config)
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device: {device}")
-    
-    config = CustomFinetuneConfig(args.config)
-    
-    os.makedirs(config.tokenizer_save_path, exist_ok=True)
-    
-    log_dir = os.path.join(config.base_save_path, "logs")
-    logger = setup_logging(config.exp_name, log_dir, 0)
-    
-    set_seed(config.seed)
-    
-    # 加载预训练tokenizer
-    if getattr(config, 'pre_trained_tokenizer', True):
-        logger.info("Loading pretrained tokenizer...")
-        print("Loading pretrained tokenizer...")
-        tokenizer = NosTokenizer.from_pretrained(config.pretrained_tokenizer_path)
-    else:
-        print("pre_trained_tokenizer=False, randomly initializing Tokenizer architecture")
-        import json, os
-        cfg_path = os.path.join(config.pretrained_tokenizer_path, 'config.json')
-        with open(cfg_path, 'r') as f:
-            arch = json.load(f)
-        tokenizer = NosTokenizer(
-            d_in=arch.get('d_in', 6),
-            d_model=arch.get('d_model', 256),
-            n_heads=arch.get('n_heads', 4),
-            ff_dim=arch.get('ff_dim', 512),
-            n_enc_layers=arch.get('n_enc_layers', 4),
-            n_dec_layers=arch.get('n_dec_layers', 4),
-            ffn_dropout_p=arch.get('ffn_dropout_p', 0.0),
-            attn_dropout_p=arch.get('attn_dropout_p', 0.0),
-            resid_dropout_p=arch.get('resid_dropout_p', 0.0),
-            s1_bits=arch.get('s1_bits', 10),
-            s2_bits=arch.get('s2_bits', 10),
-            beta=arch.get('beta', 0.05),
-            gamma0=arch.get('gamma0', 1.0),
-            gamma=arch.get('gamma', 1.1),
-            zeta=arch.get('zeta', 0.05),
-            group_size=arch.get('group_size', 4)
-        )
-    tokenizer = tokenizer.to(device)
-    
-    model_size = get_model_size(tokenizer)
-    logger.info(f"Tokenizer parameters: {model_size}")
-    print(f"Tokenizer parameters: {model_size}")
-    
-    logger.info("=== Training Configuration ===")
-    logger.info(f"Data path: {config.data_path}")
-    logger.info(f"Lookback window: {config.lookback_window}")
-    logger.info(f"Predict window: {config.predict_window}")
-    logger.info(f"Batch size: {config.batch_size}")
-    logger.info(f"Learning rate: {config.tokenizer_learning_rate}")
-    logger.info(f"Training epochs: {config.tokenizer_epochs}")
-    logger.info(f"Device: {device}")
-    logger.info(f"Distributed training: False")
-    
-    logger.info("Starting tokenizer fine-tuning training...")
-    print("Starting tokenizer fine-tuning training...")
-    best_val_loss = train_tokenizer(tokenizer, device, config, config.tokenizer_save_path, logger)
-    
-    final_msg = f"Tokenizer training completed! Best validation loss: {best_val_loss:.4f}\nModel saved to: {config.tokenizer_save_path}"
-    logger.info(final_msg)
-    print(final_msg)
-
-
-if __name__ == "__main__":
-    main()
-    
-
-```
-
-### `train_sequential.py`
-
-```python
-import os
-import sys
-import time
-import argparse
-import torch
-import torch.nn as nn
-from torch.utils.data import DataLoader
-import torch.distributed as dist
-
-sys.path.append('../')
-from model import Nos, NosTokenizer, NosPredictor
-
-from config_loader import CustomFinetuneConfig
-from finetune_tokenizer import train_tokenizer, set_seed, setup_logging as setup_tokenizer_logging
-from finetune_base_model import train_model, create_dataloaders, setup_logging as setup_basemodel_logging
-
-
-class SequentialTrainer:
-    
-    def __init__(self, config_path: str = None):
-        self.config = CustomFinetuneConfig(config_path)
-        self.rank = int(os.environ.get("RANK", "0"))
-        self.world_size = int(os.environ.get("WORLD_SIZE", "1"))
-        self.local_rank = int(os.environ.get("LOCAL_RANK", str(self.config.device_id if hasattr(self.config, 'device_id') else 0)))
-        self.device = self._setup_device()
-        
-        self.config.print_config_summary()
-    
-    def _setup_device(self):
-        if self.config.use_cuda and torch.cuda.is_available():
-            torch.cuda.set_device(self.local_rank)
-            device = torch.device(f"cuda:{self.local_rank}")
-        else:
-            device = torch.device("cpu")
-        
-        if self.rank == 0:
-            print(f"Using device: {device} (rank={self.rank}, world_size={self.world_size}, local_rank={self.local_rank})")
-        return device
-    
-    def _setup_distributed(self):
-        if self.world_size > 1 and torch.cuda.is_available():
-            backend = os.environ.get("DIST_BACKEND", "nccl").lower()
-            if not dist.is_initialized():
-                dist.init_process_group(backend=backend)
-            if self.rank == 0:
-                print(f"Distributed training initialized: backend={backend}, world_size={self.world_size}")
-        else:
-            if self.rank == 0:
-                print("Distributed training not enabled, using single GPU/CPU training")
-    
-    def _check_existing_models(self):
-        tokenizer_exists = os.path.exists(self.config.tokenizer_best_model_path)
-        basemodel_exists = os.path.exists(self.config.basemodel_best_model_path)
-        
-        print(f"Tokenizer model exists: {tokenizer_exists}")
-        print(f"Basemodel model exists: {basemodel_exists}")
-        
-        return tokenizer_exists, basemodel_exists
-    
-    def _create_directories(self):
-        os.makedirs(self.config.tokenizer_save_path, exist_ok=True)
-        os.makedirs(self.config.basemodel_save_path, exist_ok=True)
-        print(f"Created directory: {self.config.tokenizer_save_path}")
-        print(f"Created directory: {self.config.basemodel_save_path}")
-    
-    def train_tokenizer_phase(self):
-        print("\n" + "="*60)
-        print("Starting Tokenizer Fine-tuning Phase")
-        print("="*60)
-        
-        tokenizer_exists, _ = self._check_existing_models()
-        if tokenizer_exists and self.config.skip_existing:
-            print("Tokenizer model already exists, skipping training")
-            return True
-        
-        log_dir = os.path.join(self.config.base_save_path, "logs")
-        logger = setup_tokenizer_logging(self.config.exp_name, log_dir, self.rank)
-        
-        set_seed(self.config.seed)
-        
-        if getattr(self.config, 'pre_trained_tokenizer', True):
-            logger.info("Loading pretrained tokenizer...")
-            if self.rank == 0:
-                print("Loading pretrained tokenizer...")
-            tokenizer = NosTokenizer.from_pretrained(self.config.pretrained_tokenizer_path)
-        else:
-            if self.rank == 0:
-                print("pre_trained_tokenizer=False, randomly initializing Tokenizer architecture")
-            import json
-            cfg_path = os.path.join(self.config.pretrained_tokenizer_path, 'config.json')
-            with open(cfg_path, 'r') as f:
-                arch = json.load(f)
-            tokenizer = NosTokenizer(
-                d_in=arch.get('d_in', 6),
-                d_model=arch.get('d_model', 256),
-                n_heads=arch.get('n_heads', 4),
-                ff_dim=arch.get('ff_dim', 512),
-                n_enc_layers=arch.get('n_enc_layers', 4),
-                n_dec_layers=arch.get('n_dec_layers', 4),
-                ffn_dropout_p=arch.get('ffn_dropout_p', 0.0),
-                attn_dropout_p=arch.get('attn_dropout_p', 0.0),
-                resid_dropout_p=arch.get('resid_dropout_p', 0.0),
-                s1_bits=arch.get('s1_bits', 10),
-                s2_bits=arch.get('s2_bits', 10),
-                beta=arch.get('beta', 0.05),
-                gamma0=arch.get('gamma0', 1.0),
-                gamma=arch.get('gamma', 1.1),
-                zeta=arch.get('zeta', 0.05),
-                group_size=arch.get('group_size', 4)
-            )
-        tokenizer = tokenizer.to(self.device)
-        
-        model_size = sum(p.numel() for p in tokenizer.parameters())
-        logger.info(f"Tokenizer parameters: {model_size:,}")
-        if self.rank == 0:
-            print(f"Tokenizer parameters: {model_size:,}")
-        
-        logger.info("=== Training Configuration ===")
-        logger.info(f"Data path: {self.config.data_path}")
-        logger.info(f"Lookback window: {self.config.lookback_window}")
-        logger.info(f"Predict window: {self.config.predict_window}")
-        logger.info(f"Batch size: {self.config.batch_size}")
-        logger.info(f"Learning rate: {self.config.tokenizer_learning_rate}")
-        logger.info(f"Training epochs: {self.config.tokenizer_epochs}")
-        logger.info(f"Device: {self.device}")
-        logger.info(f"Distributed training: False")
-        
-        logger.info("Starting tokenizer fine-tuning training...")
-        if self.rank == 0:
-            print("Starting tokenizer fine-tuning training...")
-        start_time = time.time()
-        best_val_loss = train_tokenizer(
-            tokenizer,
-            self.device,
-            self.config,
-            self.config.tokenizer_save_path,
-            logger,
-        )
-        training_time = time.time() - start_time
-        
-        final_msg = f"Tokenizer training completed! Best validation loss: {best_val_loss:.4f}\nTraining time: {training_time/60:.2f} minutes\nModel saved to: {self.config.tokenizer_save_path}"
-        logger.info(final_msg)
-        if self.rank == 0:
-            print(f"\n{final_msg}")
-        
-        return True
-    
-    def train_basemodel_phase(self):
-        print("\n" + "="*60)
-        print("Starting Basemodel Fine-tuning Phase")
-        print("="*60)
-        
-        if getattr(self.config, 'pre_trained_tokenizer', True):
-            if not os.path.exists(self.config.finetuned_tokenizer_path):
-                raise FileNotFoundError(f"Fine-tuned tokenizer does not exist: {self.config.finetuned_tokenizer_path}")
-        
-        _, basemodel_exists = self._check_existing_models()
-        if basemodel_exists and self.config.skip_existing:
-            print("Basemodel model already exists, skipping training")
-            return True
-        
-        log_dir = os.path.join(self.config.base_save_path, "logs")
-        logger = setup_basemodel_logging(self.config.exp_name, log_dir, self.rank)
-        
-        set_seed(self.config.seed)
-        
-        if getattr(self.config, 'pre_trained_tokenizer', True):
-            logger.info("Loading fine-tuned tokenizer...")
-            if self.rank == 0:
-                print("Loading fine-tuned tokenizer...")
-            tokenizer = NosTokenizer.from_pretrained(self.config.finetuned_tokenizer_path)
-        else:
-            if self.rank == 0:
-                print("pre_trained_tokenizer=False, randomly initializing Tokenizer architecture for Predictor training")
-            import json
-            cfg_path = os.path.join(self.config.pretrained_tokenizer_path, 'config.json')
-            with open(cfg_path, 'r') as f:
-                arch = json.load(f)
-            tokenizer = NosTokenizer(
-                d_in=arch.get('d_in', 6),
-                d_model=arch.get('d_model', 256),
-                n_heads=arch.get('n_heads', 4),
-                ff_dim=arch.get('ff_dim', 512),
-                n_enc_layers=arch.get('n_enc_layers', 4),
-                n_dec_layers=arch.get('n_dec_layers', 4),
-                ffn_dropout_p=arch.get('ffn_dropout_p', 0.0),
-                attn_dropout_p=arch.get('attn_dropout_p', 0.0),
-                resid_dropout_p=arch.get('resid_dropout_p', 0.0),
-                s1_bits=arch.get('s1_bits', 10),
-                s2_bits=arch.get('s2_bits', 10),
-                beta=arch.get('beta', 0.05),
-                gamma0=arch.get('gamma0', 1.0),
-                gamma=arch.get('gamma', 1.1),
-                zeta=arch.get('zeta', 0.05),
-                group_size=arch.get('group_size', 4)
-            )
-        tokenizer = tokenizer.to(self.device)
-        
-        if getattr(self.config, 'pre_trained_predictor', True):
-            logger.info("Loading pretrained predictor...")
-            if self.rank == 0:
-                print("Loading pretrained predictor...")
-            model = Nos.from_pretrained(self.config.pretrained_predictor_path)
-        else:
-            if self.rank == 0:
-                print("pre_trained_predictor=False, randomly initializing Predictor architecture")
-            import json
-            cfg_path = os.path.join(self.config.pretrained_predictor_path, 'config.json')
-            with open(cfg_path, 'r') as f:
-                arch = json.load(f)
-            print("model_config: ", arch)
-            model = Nos(
-                s1_bits=arch.get('s1_bits', 10),
-                s2_bits=arch.get('s2_bits', 10),
-                n_layers=arch.get('n_layers', 12),
-                d_model=arch.get('d_model', 832),
-                n_heads=arch.get('n_heads', 16),
-                ff_dim=arch.get('ff_dim', 2048),
-                ffn_dropout_p=arch.get('ffn_dropout_p', 0.2),
-                attn_dropout_p=arch.get('attn_dropout_p', 0.0),
-                resid_dropout_p=arch.get('resid_dropout_p', 0.2),
-                token_dropout_p=arch.get('token_dropout_p', 0.0),
-                learn_te=arch.get('learn_te', True)
-            )
-        model = model.to(self.device)
-        
-        model_size = sum(p.numel() for p in model.parameters())
-        logger.info(f"Model parameters: {model_size:,}")
-        if self.rank == 0:
-            print(f"Model parameters: {model_size:,}")
-        
-        logger.info("=== Training Configuration ===")
-        logger.info(f"Data path: {self.config.data_path}")
-        logger.info(f"Lookback window: {self.config.lookback_window}")
-        logger.info(f"Predict window: {self.config.predict_window}")
-        logger.info(f"Batch size: {self.config.batch_size}")
-        logger.info(f"Learning rate: {self.config.predictor_learning_rate}")
-        logger.info(f"Training epochs: {self.config.basemodel_epochs}")
-        logger.info(f"Device: {self.device}")
-        logger.info(f"Tokenizer path: {self.config.finetuned_tokenizer_path}")
-        logger.info(f"Pretrained model path: {self.config.pretrained_predictor_path}")
-        
-        logger.info("Starting fine-tuning training...")
-        if self.rank == 0:
-            print("Starting fine-tuning training...")
-        start_time = time.time()
-        best_val_loss = train_model(
-            model,
-            tokenizer,
-            self.device,
-            self.config,
-            self.config.basemodel_save_path,
-            logger,
-        )
-        training_time = time.time() - start_time
-        
-        final_msg = f"Basemodel training completed! Best validation loss: {best_val_loss:.4f}\nTraining time: {training_time/60:.2f} minutes\nModel saved to: {self.config.basemodel_save_path}"
-        logger.info(final_msg)
-        if self.rank == 0:
-            print(f"\n{final_msg}")
-        
-        return True
-    
-    def run_training(self):
-        if self.rank == 0:
-            print("Starting Nos model sequential fine-tuning training")
-            print(f"Experiment name: {self.config.experiment_name}")
-            print(f"Experiment description: {self.config.experiment_description}")
-        
-        self._setup_distributed()
-        
-        self._create_directories()
-        
-        tokenizer_exists, basemodel_exists = self._check_existing_models()
-        
-        total_start_time = time.time()
-        
-        try:
-            if self.config.train_tokenizer:
-                success = self.train_tokenizer_phase()
-                if not success:
-                    print("Tokenizer training failed, terminating training")
-                    return False
-            else:
-                print("Skipping Tokenizer training phase")
-            
-            if self.config.train_basemodel:
-                success = self.train_basemodel_phase()
-                if not success:
-                    print("Basemodel training failed, terminating training")
-                    return False
-            else:
-                print("Skipping Basemodel training phase")
-            
-            total_time = time.time() - total_start_time
-            
-            if self.rank == 0:
-                print("\n" + "="*60)
-                print("Training completed!")
-                print("="*60)
-                print(f"Total training time: {total_time/60:.2f} minutes")
-                print(f"Tokenizer model: {self.config.tokenizer_best_model_path}")
-                print(f"Basemodel model: {self.config.basemodel_best_model_path}")
-                print("="*60)
-            
-            return True
-            
-        except Exception as e:
-            if self.rank == 0:
-                print(f"Error occurred during training: {str(e)}")
-            import traceback
-            traceback.print_exc()
-            return False
-        
-        finally:
-            pass
-
-
-def main():
-    parser = argparse.ArgumentParser(description='Nos Model Sequential Fine-tuning Training')
-    parser.add_argument('--config', type=str, default='config.yaml', 
-                       help='Configuration file path (default: config.yaml)')
-    parser.add_argument('--skip-tokenizer', action='store_true', 
-                       help='Skip tokenizer training phase')
-    parser.add_argument('--skip-basemodel', action='store_true', 
-                       help='Skip basemodel training phase')
-    parser.add_argument('--skip-existing', action='store_true', 
-                       help='Skip training for existing models')
-    
-    args = parser.parse_args()
-    
-    trainer = SequentialTrainer(args.config)
-    
-    if args.skip_tokenizer:
-        trainer.config.train_tokenizer = False
-    if args.skip_basemodel:
-        trainer.config.train_basemodel = False
-    if args.skip_existing:
-        trainer.config.skip_existing = True
-    
-    success = trainer.run_training()
-    
-    if success:
-        print("Training completed successfully!")
-        if dist.is_available() and dist.is_initialized():
-            dist.barrier()
-            dist.destroy_process_group()
-        sys.exit(0)
-    else:
-        print("Training failed!")
-        if dist.is_available() and dist.is_initialized():
-            try:
-                dist.barrier()
-                dist.destroy_process_group()
-            except Exception:
-                pass
-        sys.exit(1)
-
-
-if __name__ == "__main__":
-    main()
-
-```
-
-### `configs/config_test_1h.yaml`
+### `configs/config.yaml`
 
 ```yaml
 
@@ -1520,33 +51,51 @@ data:
   test_ratio: 0.0
 
 training:
-
   tokenizer_epochs: 30
   basemodel_epochs: 20
   batch_size: 32
   log_interval: 50
   num_workers: 6
   seed: 42
-  
+
   tokenizer_learning_rate: 0.0002
   predictor_learning_rate: 0.000001
-  
+
   adam_beta1: 0.9
   adam_beta2: 0.95
   adam_weight_decay: 0.1
-  
+
   accumulation_steps: 1
+
+  # Scheduler params (previously hardcoded)
+  tokenizer_pct_start: 0.03
+  tokenizer_div_factor: 10.0
+  basemodel_pct_start: 0.03
+  basemodel_div_factor: 10.0
+
+  # Gradient clipping (previously hardcoded)
+  tokenizer_max_grad_norm: 2.0
+  basemodel_max_grad_norm: 3.0
+
+  # Dropout overrides (optional — leave null to use pretrained values)
+  ffn_dropout_p: null
+  attn_dropout_p: null
+  resid_dropout_p: null
+  token_dropout_p: null
+
+  # BSQ loss weight overrides (optional — leave null to use pretrained values)
+  bsq_beta: null
+  bsq_gamma0: null
+  bsq_gamma: null
+  bsq_zeta: null
 
 model_paths:
   pretrained_tokenizer: "models/nos_tokenizer_2k"
   pretrained_predictor: "models/nos_mini"
-  
   exp_name: "test_1h"
   base_path: "finetuned"
-
-  base_save_path: "" 
-  finetuned_tokenizer: ""  
-
+  base_save_path: ""
+  finetuned_tokenizer: ""
   tokenizer_save_name: "tokenizer"
   basemodel_save_name: "basemodel"
 
@@ -1554,54 +103,168 @@ experiment:
   name: "Nos_custom_finetune"
   description: "Custom finetune for 1h stock data"
   use_comet: false
-
   train_tokenizer: true
   train_basemodel: true
-
   skip_existing: false
 
 device:
   use_cuda: true
   device_id: 0
-  
 
+# ── Hyperparameter Search Space ──────────────────────────────────
+hpo:
+  enabled: false                    # Set true to activate HPO
+  n_trials: 30                      # Optuna trials
+  direction: "minimize"             # minimize val_loss
+  sampler: "tpe"                    # tpe | random | cmaes
+  pruner: "median"                  # median | hyperband | none
+  storage: null                     # optuna DB URI or null for in-memory
+  study_name: "nos_finetune_hpo"
+
+  # What to optimize
+  optimize_tokenizer: true
+  optimize_basemodel: true
+
+  # Fast evaluation mode during HPO (reduced epochs)
+  hpo_tokenizer_epochs: 5
+  hpo_basemodel_epochs: 3
+
+  search_space:
+    # ── Tokenizer ──────────────────────────────────────────────
+    tokenizer_learning_rate:
+      type: float
+      low: 1.0e-5
+      high: 5.0e-3
+      log: true
+
+    # ── Predictor ──────────────────────────────────────────────
+    predictor_learning_rate:
+      type: float
+      low: 1.0e-7
+      high: 1.0e-4
+      log: true
+
+    # ── Shared Optimizer ───────────────────────────────────────
+    adam_weight_decay:
+      type: float
+      low: 0.001
+      high: 0.3
+      log: true
+
+    adam_beta1:
+      type: float
+      low: 0.85
+      high: 0.95
+      log: false
+
+    adam_beta2:
+      type: float
+      low: 0.90
+      high: 0.999
+      log: false
+
+    # ── Batch & Accumulation ───────────────────────────────────
+    batch_size:
+      type: categorical
+      choices: [16, 32, 64, 128]
+
+    accumulation_steps:
+      type: categorical
+      choices: [1, 2, 4]
+
+    # ── Scheduler ─────────────────────────────────────────────
+    tokenizer_pct_start:
+      type: float
+      low: 0.01
+      high: 0.15
+      log: false
+
+    basemodel_pct_start:
+      type: float
+      low: 0.01
+      high: 0.15
+      log: false
+
+    tokenizer_div_factor:
+      type: categorical
+      choices: [5.0, 10.0, 25.0, 50.0]
+
+    basemodel_div_factor:
+      type: categorical
+      choices: [5.0, 10.0, 25.0, 50.0]
+
+    # ── Gradient Clipping ─────────────────────────────────────
+    tokenizer_max_grad_norm:
+      type: float
+      low: 0.5
+      high: 5.0
+      log: false
+
+    basemodel_max_grad_norm:
+      type: float
+      low: 0.5
+      high: 5.0
+      log: false
+
+    # ── Dropout (finetuning regularization) ────────────────────
+    ffn_dropout_p:
+      type: float
+      low: 0.0
+      high: 0.4
+      log: false
+
+    attn_dropout_p:
+      type: float
+      low: 0.0
+      high: 0.2
+      log: false
+
+    resid_dropout_p:
+      type: float
+      low: 0.0
+      high: 0.3
+      log: false
+
+    token_dropout_p:
+      type: float
+      low: 0.0
+      high: 0.2
+      log: false
+
+    # ── BSQ Loss Weights (careful tuning) ─────────────────────
+    bsq_beta:
+      type: float
+      low: 0.01
+      high: 0.2
+      log: true
+
+    bsq_gamma0:
+      type: float
+      low: 0.5
+      high: 2.0
+      log: false
+
+    bsq_gamma:
+      type: float
+      low: 0.8
+      high: 2.0
+      log: false
+
+    bsq_zeta:
+      type: float
+      low: 0.01
+      high: 0.2
+      log: true
+
+    # ── Data Params ────────────────────────────────────────────
+    clip:
+      type: float
+      low: 3.0
+      high: 10.0
+      log: false
 ```
 
-### `data/1h.csv`
-
-```text
-timestamps,open,high,low,close,volume,amount
-2020-08-11 06:00:00,2.85,3.47,2.85,2.9515,20032.26,0
-2020-08-11 07:00:00,2.9515,3.1355,2.88,2.9224,42069.37,0
-2020-08-11 08:00:00,2.9224,3.0,2.9144,2.96,24280.76,0
-2020-08-11 09:00:00,2.96,2.9736,2.85,2.8543,26371.23,0
-2020-08-11 10:00:00,2.8566,2.9329,2.8433,2.8976,26685.94,0
-
-# ⚠️  Preview only — showing 5 of 12835 data rows (12830 rows hidden).
-```
-
-### `model/__init__.py`
-
-```python
-from .nos import NosTokenizer, Nos, NosPredictor
-
-model_dict = {
-    'nos_tokenizer': NosTokenizer,
-    'nos': Nos,
-    'nos_predictor': NosPredictor
-}
-
-
-def get_model_class(model_name):
-    if model_name in model_dict:
-        return model_dict[model_name]
-    else:
-        print(f"Model {model_name} not found in model_dict")
-        raise NotImplementedError
-
-
-
-```
+---
 
 ### `model/module.py`
 
@@ -2189,6 +852,8 @@ class TemporalEmbedding(nn.Module):
 
 
 ```
+
+---
 
 ### `model/nos.py`
 
@@ -2822,32 +1487,1204 @@ class NosPredictor:
 
 ```
 
-### `models/nos_base`
+---
 
-```text
-[Error reading file: [Errno 13] Permission denied: 'C:\\Users\\kashy\\OneDrive\\Documents\\uNOS\\models\\nos_base']
+### `model/__init__.py`
+
+```python
+from .nos import NosTokenizer, Nos, NosPredictor
+
+model_dict = {
+    'nos_tokenizer': NosTokenizer,
+    'nos': Nos,
+    'nos_predictor': NosPredictor
+}
+
+
+def get_model_class(model_name):
+    if model_name in model_dict:
+        return model_dict[model_name]
+    else:
+        print(f"Model {model_name} not found in model_dict")
+        raise NotImplementedError
+
+
+
 ```
 
-### `models/nos_mini`
+---
 
-```text
-[Error reading file: [Errno 13] Permission denied: 'C:\\Users\\kashy\\OneDrive\\Documents\\uNOS\\models\\nos_mini']
+### `config_loader.py`
+
+```python
+import os
+import yaml
+from typing import Dict, Any
+
+
+class ConfigLoader:
+
+    def __init__(self, config_path: str):
+        self.config_path = config_path
+        self.config = self._load_config()
+
+    def _load_config(self) -> Dict[str, Any]:
+        if not os.path.exists(self.config_path):
+            raise FileNotFoundError(f"config file not found: {self.config_path}")
+
+        with open(self.config_path, 'r', encoding='utf-8') as f:
+            config = yaml.safe_load(f)
+
+        config = self._resolve_dynamic_paths(config)
+        return config
+
+    def _resolve_dynamic_paths(self, config: Dict[str, Any]) -> Dict[str, Any]:
+        exp_name = config.get('model_paths', {}).get('exp_name', '')
+        if not exp_name:
+            return config
+
+        base_path = config.get('model_paths', {}).get('base_path', '')
+        path_templates = {
+            'base_save_path': f"{base_path}/{exp_name}",
+            'finetuned_tokenizer': f"{base_path}/{exp_name}/tokenizer/best_model"
+        }
+
+        if 'model_paths' in config:
+            for key, template in path_templates.items():
+                if key in config['model_paths']:
+                    current_value = config['model_paths'][key]
+                    if current_value == "" or current_value is None:
+                        config['model_paths'][key] = template
+                    else:
+                        if isinstance(current_value, str) and '{exp_name}' in current_value:
+                            config['model_paths'][key] = current_value.format(exp_name=exp_name)
+
+        return config
+
+    def get(self, key: str, default=None):
+        keys = key.split('.')
+        value = self.config
+        try:
+            for k in keys:
+                value = value[k]
+            return value
+        except (KeyError, TypeError):
+            return default
+
+    def get_data_config(self) -> Dict[str, Any]:
+        return self.config.get('data', {})
+
+    def get_training_config(self) -> Dict[str, Any]:
+        return self.config.get('training', {})
+
+    def get_model_paths(self) -> Dict[str, str]:
+        return self.config.get('model_paths', {})
+
+    def get_experiment_config(self) -> Dict[str, Any]:
+        return self.config.get('experiment', {})
+
+    def get_device_config(self) -> Dict[str, Any]:
+        return self.config.get('device', {})
+
+    def get_distributed_config(self) -> Dict[str, Any]:
+        return self.config.get('distributed', {})
+
+    def get_dynamic_tuning_config(self) -> Dict[str, Any]:
+        return self.config.get('dynamic_tuning', {})
+
+    def update_config(self, updates: Dict[str, Any]):
+        def update_nested_dict(d, u):
+            for k, v in u.items():
+                if isinstance(v, dict):
+                    d[k] = update_nested_dict(d.get(k, {}), v)
+                else:
+                    d[k] = v
+            return d
+        self.config = update_nested_dict(self.config, updates)
+
+    def save_config(self, save_path: str = None):
+        if save_path is None:
+            save_path = self.config_path
+        with open(save_path, 'w', encoding='utf-8') as f:
+            yaml.dump(self.config, f, default_flow_style=False,
+                      allow_unicode=True, indent=2)
+
+    def print_config(self):
+        print("=" * 50)
+        print("Current configuration:")
+        print("=" * 50)
+        yaml.dump(self.config, default_flow_style=False,
+                  allow_unicode=True, indent=2)
+        print("=" * 50)
+
+
+class CustomFinetuneConfig:
+
+    def __init__(self, config_path: str = None):
+        if config_path is None:
+            config_path = os.path.join(os.path.dirname(__file__), 'config.yaml')
+
+        self.loader = ConfigLoader(config_path)
+        self._load_all_configs()
+
+    def _load_all_configs(self):
+        # ── Data ──────────────────────────────────────────
+        data_config = self.loader.get_data_config()
+        self.data_path = data_config.get('data_path')
+        self.lookback_window = data_config.get('lookback_window', 512)
+        self.predict_window = data_config.get('predict_window', 48)
+        self.max_context = data_config.get('max_context', 512)
+        self.clip = data_config.get('clip', 5.0)
+        self.train_ratio = data_config.get('train_ratio', 0.9)
+        self.val_ratio = data_config.get('val_ratio', 0.1)
+        self.test_ratio = data_config.get('test_ratio', 0.0)
+
+        # ── Training ──────────────────────────────────────
+        training_config = self.loader.get_training_config()
+
+        self.tokenizer_epochs = training_config.get('tokenizer_epochs', 30)
+        self.basemodel_epochs = training_config.get('basemodel_epochs', 30)
+        if 'epochs' in training_config and 'tokenizer_epochs' not in training_config:
+            self.tokenizer_epochs = training_config.get('epochs', 30)
+        if 'epochs' in training_config and 'basemodel_epochs' not in training_config:
+            self.basemodel_epochs = training_config.get('epochs', 30)
+
+        self.batch_size = training_config.get('batch_size', 160)
+        self.log_interval = training_config.get('log_interval', 50)
+        self.num_workers = training_config.get('num_workers', 6)
+        self.seed = training_config.get('seed', 100)
+
+        # TIER 1 FIX 1: betas now loaded and passed to both optimizers
+        self.adam_beta1 = training_config.get('adam_beta1', 0.9)
+        self.adam_beta2 = training_config.get('adam_beta2', 0.95)
+        self.adam_weight_decay = training_config.get('adam_weight_decay', 0.1)
+
+        # TIER 2 FIX 7: Adam epsilon
+        self.adam_eps = training_config.get('adam_eps', 1e-6)
+
+        # Learning rates
+        self.tokenizer_learning_rate = training_config.get('tokenizer_learning_rate', 2e-4)
+        self.predictor_learning_rate = training_config.get('predictor_learning_rate', 4e-5)
+
+        # TIER 1 FIX 2: Grad clipping from config
+        self.tokenizer_grad_clip = training_config.get('tokenizer_grad_clip', 2.0)
+        self.basemodel_grad_clip = training_config.get('basemodel_grad_clip', 3.0)
+        self.grad_clip_norm_type = training_config.get('grad_clip_norm_type', 2.0)
+
+        # TIER 1 FIX 3 & 12: Scheduler params from config
+        self.scheduler_type = training_config.get('scheduler_type', 'cosine_warmup')
+        self.scheduler_pct_start = training_config.get('scheduler_pct_start', 0.05)
+        self.scheduler_div_factor = training_config.get('scheduler_div_factor', 25.0)
+        self.scheduler_final_div_factor = training_config.get('scheduler_final_div_factor', 1000.0)
+
+        # TIER 1 FIX 5: Loss weights from config
+        self.tokenizer_recon_pre_weight = training_config.get('tokenizer_recon_pre_weight', 1.0)
+        self.tokenizer_recon_all_weight = training_config.get('tokenizer_recon_all_weight', 1.0)
+        self.tokenizer_bsq_weight = training_config.get('tokenizer_bsq_weight', 0.5)
+        self.tokenizer_recon_weight = training_config.get('tokenizer_recon_weight', 0.5)
+        self.basemodel_s1_weight = training_config.get('basemodel_s1_weight', 0.5)
+        self.basemodel_s2_weight = training_config.get('basemodel_s2_weight', 0.5)
+
+        # TIER 2 FIX 8: Label smoothing
+        self.label_smoothing = training_config.get('label_smoothing', 0.0)
+
+        # TIER 2 FIX 9: BSQ inverse temperature
+        self.bsq_inv_temperature = training_config.get('bsq_inv_temperature', 1.0)
+
+        # TIER 2 FIX 10: RoPE base
+        self.rope_base = training_config.get('rope_base', 10000)
+
+        self.accumulation_steps = training_config.get('accumulation_steps', 1)
+
+        # ── Model paths ───────────────────────────────────
+        model_paths = self.loader.get_model_paths()
+        self.exp_name = model_paths.get('exp_name', 'default_experiment')
+        self.pretrained_tokenizer_path = model_paths.get('pretrained_tokenizer')
+        self.pretrained_predictor_path = model_paths.get('pretrained_predictor')
+        self.base_save_path = model_paths.get('base_save_path') or ''
+        self.tokenizer_save_name = model_paths.get('tokenizer_save_name', 'tokenizer')
+        self.basemodel_save_name = model_paths.get('basemodel_save_name', 'basemodel')
+        self.finetuned_tokenizer_path = model_paths.get('finetuned_tokenizer')
+
+        # ── Experiment ────────────────────────────────────
+        experiment_config = self.loader.get_experiment_config()
+        self.experiment_name = experiment_config.get('name', 'Nos_custom_finetune')
+        self.experiment_description = experiment_config.get('description', '')
+        self.use_comet = experiment_config.get('use_comet', False)
+        self.train_tokenizer = experiment_config.get('train_tokenizer', True)
+        self.train_basemodel = experiment_config.get('train_basemodel', True)
+        self.skip_existing = experiment_config.get('skip_existing', False)
+
+        unified_pretrained = experiment_config.get('pre_trained', None)
+        self.pre_trained_tokenizer = experiment_config.get(
+            'pre_trained_tokenizer',
+            unified_pretrained if unified_pretrained is not None else True)
+        self.pre_trained_predictor = experiment_config.get(
+            'pre_trained_predictor',
+            unified_pretrained if unified_pretrained is not None else True)
+
+        # ── Device ────────────────────────────────────────
+        device_config = self.loader.get_device_config()
+        self.use_cuda = device_config.get('use_cuda', True)
+        self.device_id = device_config.get('device_id', 0)
+
+        # ── Distributed ───────────────────────────────────
+        distributed_config = self.loader.get_distributed_config()
+        self.use_ddp = distributed_config.get('use_ddp', False)
+        self.ddp_backend = distributed_config.get('backend', 'nccl')
+
+        # ── Dynamic tuning ────────────────────────────────
+        dt = self.loader.get_dynamic_tuning_config()
+        self.dynamic_tuning_enabled = dt.get('enabled', False)
+        self.dynamic_tuning_mode = dt.get('mode', 'moderate')
+
+        self.tune_learning_rate = dt.get('tune_learning_rate', True)
+        self.tune_grad_clip = dt.get('tune_grad_clip', True)
+        self.tune_betas = dt.get('tune_betas', True)
+        self.tune_loss_weights = dt.get('tune_loss_weights', True)
+        self.tune_label_smoothing = dt.get('tune_label_smoothing', True)
+        self.tune_bsq_temperature = dt.get('tune_bsq_temperature', True)
+        self.tune_scheduler_params = dt.get('tune_scheduler_params', True)
+        self.tune_weight_decay = dt.get('tune_weight_decay', True)
+        self.tune_dropout = dt.get('tune_dropout', True)
+        self.tune_adam_eps = dt.get('tune_adam_eps', True)
+
+        # Bounds
+        self.dt_lr_min = dt.get('lr_min', 1e-8)
+        self.dt_lr_max = dt.get('lr_max', 1e-3)
+        self.dt_beta1_min = dt.get('beta1_min', 0.85)
+        self.dt_beta1_max = dt.get('beta1_max', 0.95)
+        self.dt_beta2_min = dt.get('beta2_min', 0.90)
+        self.dt_beta2_max = dt.get('beta2_max', 0.999)
+        self.dt_grad_clip_min = dt.get('grad_clip_min', 0.5)
+        self.dt_grad_clip_max = dt.get('grad_clip_max', 10.0)
+        self.dt_loss_weight_min = dt.get('loss_weight_min', 0.1)
+        self.dt_loss_weight_max = dt.get('loss_weight_max', 2.0)
+        self.dt_label_smoothing_min = dt.get('label_smoothing_min', 0.0)
+        self.dt_label_smoothing_max = dt.get('label_smoothing_max', 0.15)
+        self.dt_bsq_inv_temp_min = dt.get('bsq_inv_temp_min', 0.5)
+        self.dt_bsq_inv_temp_max = dt.get('bsq_inv_temp_max', 5.0)
+        self.dt_weight_decay_min = dt.get('weight_decay_min', 0.0)
+        self.dt_weight_decay_max = dt.get('weight_decay_max', 0.5)
+
+        # Detection thresholds
+        self.dt_plateau_window = dt.get('plateau_window_epochs', 4)
+        self.dt_plateau_threshold = dt.get('plateau_threshold', 5e-4)
+        self.dt_overfit_gap_ratio = dt.get('overfit_gap_ratio', 0.10)
+        self.dt_severe_overfit_gap_ratio = dt.get('severe_overfit_gap_ratio', 0.30)
+        self.dt_grad_explosion_threshold = dt.get('grad_explosion_threshold', 8.0)
+
+        # Cooldowns
+        self.dt_lr_cooldown = dt.get('lr_cooldown_epochs', 2)
+        self.dt_beta_cooldown = dt.get('beta_cooldown_epochs', 4)
+        self.dt_loss_weight_cooldown = dt.get('loss_weight_cooldown_epochs', 3)
+        self.dt_label_smooth_cooldown = dt.get('label_smooth_cooldown_epochs', 4)
+        self.dt_bsq_temp_cooldown = dt.get('bsq_temp_cooldown_epochs', 5)
+        self.dt_grad_clip_cooldown = dt.get('grad_clip_cooldown_epochs', 1)
+        self.dt_scheduler_swap_cooldown = dt.get('scheduler_swap_cooldown_epochs', 5)
+        self.dt_tuning_warmup = dt.get('tuning_warmup_epochs', 2)
+
+        self._compute_full_paths()
+
+        # ── HPO ───────────────────────────────────────────
+        hpo_config = self.loader.get('hpo', {})
+        self.hpo_enabled = hpo_config.get('enabled', False)
+        self.hpo_n_trials = hpo_config.get('n_trials', 10)
+        self.hpo_direction = hpo_config.get('direction', 'minimize')
+        self.hpo_sampler = hpo_config.get('sampler', 'tpe')
+        self.hpo_pruner = hpo_config.get('pruner', 'median')
+        self.hpo_storage = hpo_config.get('storage', None)
+        self.hpo_study_name = hpo_config.get('study_name', 'nos_hpo')
+        
+        self.hpo_optimize_tokenizer = hpo_config.get('optimize_tokenizer', True)
+        self.hpo_optimize_basemodel = hpo_config.get('optimize_basemodel', True)
+        self.hpo_tokenizer_epochs = hpo_config.get('hpo_tokenizer_epochs', 5)
+        self.hpo_basemodel_epochs = hpo_config.get('hpo_basemodel_epochs', 3)
+        self.hpo_search_space = hpo_config.get('search_space', {})
+
+    def _compute_full_paths(self):
+        self.tokenizer_save_path = os.path.join(
+            self.base_save_path, self.tokenizer_save_name)
+        self.tokenizer_best_model_path = os.path.join(
+            self.tokenizer_save_path, 'best_model')
+        self.basemodel_save_path = os.path.join(
+            self.base_save_path, self.basemodel_save_name)
+        self.basemodel_best_model_path = os.path.join(
+            self.basemodel_save_path, 'best_model')
+
+    def clone_with_overrides(self, overrides: Dict[str, Any]):
+        """Creates a new config instance with Optuna-suggested parameters."""
+        import copy
+        new_config = copy.copy(self)
+        for k, v in overrides.items():
+            setattr(new_config, k, v)
+        return new_config    
+
+    def get_tokenizer_config(self):
+        return {
+            'data_path': self.data_path,
+            'lookback_window': self.lookback_window,
+            'predict_window': self.predict_window,
+            'max_context': self.max_context,
+            'clip': self.clip,
+            'train_ratio': self.train_ratio,
+            'val_ratio': self.val_ratio,
+            'test_ratio': self.test_ratio,
+            'epochs': self.tokenizer_epochs,
+            'batch_size': self.batch_size,
+            'log_interval': self.log_interval,
+            'num_workers': self.num_workers,
+            'seed': self.seed,
+            'learning_rate': self.tokenizer_learning_rate,
+            'adam_beta1': self.adam_beta1,
+            'adam_beta2': self.adam_beta2,
+            'adam_weight_decay': self.adam_weight_decay,
+            'adam_eps': self.adam_eps,
+            'accumulation_steps': self.accumulation_steps,
+            'pretrained_model_path': self.pretrained_tokenizer_path,
+            'save_path': self.tokenizer_save_path,
+            'use_comet': self.use_comet,
+            'tokenizer_grad_clip': self.tokenizer_grad_clip,
+            'scheduler_type': self.scheduler_type,
+            'scheduler_pct_start': self.scheduler_pct_start,
+            'scheduler_div_factor': self.scheduler_div_factor,
+            'scheduler_final_div_factor': self.scheduler_final_div_factor,
+            'tokenizer_recon_pre_weight': self.tokenizer_recon_pre_weight,
+            'tokenizer_recon_all_weight': self.tokenizer_recon_all_weight,
+            'tokenizer_bsq_weight': self.tokenizer_bsq_weight,
+            'tokenizer_recon_weight': self.tokenizer_recon_weight,
+            'label_smoothing': self.label_smoothing,
+            'bsq_inv_temperature': self.bsq_inv_temperature,
+        }
+
+    def get_basemodel_config(self):
+        return {
+            'data_path': self.data_path,
+            'lookback_window': self.lookback_window,
+            'predict_window': self.predict_window,
+            'max_context': self.max_context,
+            'clip': self.clip,
+            'train_ratio': self.train_ratio,
+            'val_ratio': self.val_ratio,
+            'test_ratio': self.test_ratio,
+            'epochs': self.basemodel_epochs,
+            'batch_size': self.batch_size,
+            'log_interval': self.log_interval,
+            'num_workers': self.num_workers,
+            'seed': self.seed,
+            'predictor_learning_rate': self.predictor_learning_rate,
+            'tokenizer_learning_rate': self.tokenizer_learning_rate,
+            'adam_beta1': self.adam_beta1,
+            'adam_beta2': self.adam_beta2,
+            'adam_weight_decay': self.adam_weight_decay,
+            'adam_eps': self.adam_eps,
+            'pretrained_tokenizer_path': self.finetuned_tokenizer_path,
+            'pretrained_predictor_path': self.pretrained_predictor_path,
+            'save_path': self.basemodel_save_path,
+            'use_comet': self.use_comet,
+            'basemodel_grad_clip': self.basemodel_grad_clip,
+            'scheduler_type': self.scheduler_type,
+            'scheduler_pct_start': self.scheduler_pct_start,
+            'scheduler_div_factor': self.scheduler_div_factor,
+            'scheduler_final_div_factor': self.scheduler_final_div_factor,
+            'basemodel_s1_weight': self.basemodel_s1_weight,
+            'basemodel_s2_weight': self.basemodel_s2_weight,
+            'label_smoothing': self.label_smoothing,
+        }
+
+    def print_config_summary(self):
+        print("=" * 60)
+        print("Nos finetuning configuration summary")
+        print("=" * 60)
+        print(f"Experiment name:          {self.exp_name}")
+        print(f"Data path:                {self.data_path}")
+        print(f"Lookback window:          {self.lookback_window}")
+        print(f"Predict window:           {self.predict_window}")
+        print(f"Tokenizer epochs:         {self.tokenizer_epochs}")
+        print(f"Basemodel epochs:         {self.basemodel_epochs}")
+        print(f"Batch size:               {self.batch_size}")
+        print(f"Tokenizer LR:             {self.tokenizer_learning_rate}")
+        print(f"Predictor LR:             {self.predictor_learning_rate}")
+        print(f"Adam betas:               ({self.adam_beta1}, {self.adam_beta2})")
+        print(f"Adam eps:                 {self.adam_eps}")
+        print(f"Scheduler type:           {self.scheduler_type}")
+        print(f"Scheduler pct_start:      {self.scheduler_pct_start}")
+        print(f"Tokenizer grad clip:      {self.tokenizer_grad_clip}")
+        print(f"Basemodel grad clip:      {self.basemodel_grad_clip}")
+        print(f"Label smoothing:          {self.label_smoothing}")
+        print(f"BSQ inv temperature:      {self.bsq_inv_temperature}")
+        print(f"RoPE base:                {self.rope_base}")
+        print(f"Dynamic tuning enabled:   {self.dynamic_tuning_enabled}")
+        print(f"Dynamic tuning mode:      {self.dynamic_tuning_mode}")
+        print(f"Base save path:           {self.base_save_path}")
+        print("=" * 60)
 ```
 
-### `models/nos_small`
+---
 
-```text
-[Error reading file: [Errno 13] Permission denied: 'C:\\Users\\kashy\\OneDrive\\Documents\\uNOS\\models\\nos_small']
+### `hpo_tuner.py`
+
+```python
+# hpo_tuner.py
+"""
+Automatic Hyperparameter Tuning for Nos Model Finetuning.
+
+Usage:
+    python hpo_tuner.py --config configs/config_test_1h.yaml
+    python hpo_tuner.py --config configs/config_test_1h.yaml --n-trials 50
+    python hpo_tuner.py --config configs/config_test_1h.yaml --phase tokenizer
+    python hpo_tuner.py --config configs/config_test_1h.yaml --phase basemodel
+    python hpo_tuner.py --config configs/config_test_1h.yaml --apply-best
+"""
+
+import os
+import sys
+import json
+import copy
+import logging
+import argparse
+import time
+import tempfile
+import shutil
+import datetime
+from typing import Dict, Any, Optional, Tuple
+
+import torch
+import numpy as np
+import yaml
+
+sys.path.append('../')
+
+# ── Optional Optuna import ─────────────────────────────────────────────────
+try:
+    import optuna
+    from optuna.samplers import TPESampler, RandomSampler, CmaEsSampler
+    from optuna.pruners import MedianPruner, HyperbandPruner, NopPruner
+    OPTUNA_AVAILABLE = True
+except ImportError:
+    OPTUNA_AVAILABLE = False
+    print("WARNING: optuna not installed. Run: pip install optuna")
+
+from config_loader import CustomFinetuneConfig
+from model import Nos, NosTokenizer
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Helper: Apply dropout overrides to a loaded model
+# ══════════════════════════════════════════════════════════════════════════════
+
+def apply_dropout_overrides(model: torch.nn.Module, config: CustomFinetuneConfig):
+    """
+    Walk through all submodules and override dropout values
+    when config specifies non-None values.
+    Works without changing architecture (weights untouched).
+    """
+    import torch.nn as nn
+
+    ffn_dp = getattr(config, 'ffn_dropout_p', None)
+    attn_dp = getattr(config, 'attn_dropout_p', None)
+    resid_dp = getattr(config, 'resid_dropout_p', None)
+    token_dp = getattr(config, 'token_dropout_p', None)
+
+    for name, module in model.named_modules():
+        # FeedForward ffn_dropout
+        if ffn_dp is not None and hasattr(module, 'ffn_dropout'):
+            module.ffn_dropout.p = ffn_dp
+
+        # Residual dropout in attention
+        if resid_dp is not None and hasattr(module, 'resid_dropout'):
+            module.resid_dropout.p = resid_dp
+
+        # Token dropout (only on Nos predictor)
+        if token_dp is not None and hasattr(module, 'token_drop'):
+            module.token_drop.p = token_dp
+
+        # Attention dropout — stored as a float, not nn.Dropout
+        if attn_dp is not None and hasattr(module, 'attn_dropout_p'):
+            module.attn_dropout_p = attn_dp
+
+    return model
+
+
+def apply_bsq_overrides(tokenizer: NosTokenizer, config: CustomFinetuneConfig):
+    """
+    Override BSQ loss weights on a loaded tokenizer.
+    Only modifies scalar attributes, not weight tensors.
+    """
+    bsq = tokenizer.tokenizer.bsq  # BinarySphericalQuantizer instance
+
+    if getattr(config, 'bsq_beta', None) is not None:
+        bsq.beta = config.bsq_beta
+    if getattr(config, 'bsq_gamma0', None) is not None:
+        bsq.gamma0 = config.bsq_gamma0
+    if getattr(config, 'bsq_gamma', None) is not None:
+        bsq.gamma = config.bsq_gamma
+    if getattr(config, 'bsq_zeta', None) is not None:
+        bsq.zeta = config.bsq_zeta
+
+    return tokenizer
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Search Space Builder
+# ══════════════════════════════════════════════════════════════════════════════
+
+class SearchSpaceBuilder:
+    """
+    Reads the `hpo.search_space` block from config and samples
+    Optuna trial suggestions for each parameter.
+    """
+
+    PARAM_GROUPS = {
+        'tokenizer': [
+            'tokenizer_learning_rate',
+            'tokenizer_pct_start',
+            'tokenizer_div_factor',
+            'tokenizer_max_grad_norm',
+            'bsq_beta', 'bsq_gamma0', 'bsq_gamma', 'bsq_zeta',
+        ],
+        'basemodel': [
+            'predictor_learning_rate',
+            'basemodel_pct_start',
+            'basemodel_div_factor',
+            'basemodel_max_grad_norm',
+            'ffn_dropout_p', 'attn_dropout_p',
+            'resid_dropout_p', 'token_dropout_p',
+        ],
+        'shared': [
+            'adam_weight_decay', 'adam_beta1', 'adam_beta2',
+            'batch_size', 'accumulation_steps', 'clip',
+        ],
+    }
+
+    def __init__(self, search_space: Dict[str, Any], phase: str = 'both'):
+        self.search_space = search_space
+        self.phase = phase  # 'tokenizer' | 'basemodel' | 'both'
+
+    def _should_include(self, param_name: str) -> bool:
+        if self.phase == 'both':
+            return True
+        shared = self.PARAM_GROUPS['shared']
+        group = self.PARAM_GROUPS.get(self.phase, [])
+        return param_name in group or param_name in shared
+
+    def suggest(self, trial, param_name: str) -> Any:
+        """Suggest a value for param_name using the trial object."""
+        if param_name not in self.search_space:
+            return None
+
+        spec = self.search_space[param_name]
+        ptype = spec['type']
+
+        if ptype == 'float':
+            return trial.suggest_float(
+                param_name,
+                spec['low'],
+                spec['high'],
+                log=spec.get('log', False)
+            )
+        elif ptype == 'int':
+            return trial.suggest_int(
+                param_name,
+                spec['low'],
+                spec['high'],
+                log=spec.get('log', False)
+            )
+        elif ptype == 'categorical':
+            return trial.suggest_categorical(param_name, spec['choices'])
+        else:
+            raise ValueError(f"Unknown search space type: {ptype}")
+
+    def build_overrides(self, trial) -> Dict[str, Any]:
+        """
+        Returns a dict of {param_name: suggested_value} for all
+        parameters in the search space relevant to this phase.
+        """
+        overrides = {}
+        for param_name in self.search_space:
+            if self._should_include(param_name):
+                value = self.suggest(trial, param_name)
+                if value is not None:
+                    overrides[param_name] = value
+        return overrides
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Objective Functions
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TokenizerObjective:
+    """Optuna objective for tokenizer HPO."""
+
+    def __init__(self, base_config: CustomFinetuneConfig,
+                 search_space_builder: SearchSpaceBuilder,
+                 device: torch.device,
+                 trial_base_dir: str):
+        self.base_config = base_config
+        self.ssb = search_space_builder
+        self.device = device
+        self.trial_base_dir = trial_base_dir
+
+    def __call__(self, trial) -> float:
+        # ── 1. Sample hyperparameters ──────────────────────────────
+        overrides = self.ssb.build_overrides(trial)
+
+        # HPO uses reduced epochs for speed
+        overrides['tokenizer_epochs'] = self.base_config.hpo_tokenizer_epochs
+        overrides['log_interval'] = 999999  # suppress step-level logging
+
+        # ── 2. Build trial config ──────────────────────────────────
+        trial_config = self.base_config.clone_with_overrides(overrides)
+
+        # Unique save dir per trial to avoid conflicts
+        trial_dir = os.path.join(
+            self.trial_base_dir, f"tokenizer_trial_{trial.number}"
+        )
+        trial_config.tokenizer_save_path = trial_dir
+        os.makedirs(trial_dir, exist_ok=True)
+
+        # ── 3. Load model (always from original pretrained) ────────
+        try:
+            if getattr(trial_config, 'pre_trained_tokenizer', True):
+                tokenizer = NosTokenizer.from_pretrained(
+                    self.base_config.pretrained_tokenizer_path
+                )
+            else:
+                cfg_path = os.path.join(
+                    self.base_config.pretrained_tokenizer_path, 'config.json'
+                )
+                with open(cfg_path, 'r') as f:
+                    arch = json.load(f)
+                tokenizer = NosTokenizer(**{k: arch[k] for k in [
+                    'd_in', 'd_model', 'n_heads', 'ff_dim',
+                    'n_enc_layers', 'n_dec_layers', 'ffn_dropout_p',
+                    'attn_dropout_p', 'resid_dropout_p', 's1_bits',
+                    's2_bits', 'beta', 'gamma0', 'gamma', 'zeta', 'group_size'
+                ] if k in arch})
+
+            # Apply BSQ and dropout overrides
+            tokenizer = apply_bsq_overrides(tokenizer, trial_config)
+            tokenizer = apply_dropout_overrides(tokenizer, trial_config)
+            tokenizer = tokenizer.to(self.device)
+
+        except Exception as e:
+            print(f"Trial {trial.number}: Model loading failed: {e}")
+            raise optuna.exceptions.TrialPruned()
+
+        # ── 4. Run training ────────────────────────────────────────
+        logger = _get_silent_logger(f"hpo_tok_trial_{trial.number}")
+
+        try:
+            from finetune_tokenizer import train_tokenizer
+            val_loss = train_tokenizer(
+                tokenizer, self.device, trial_config, trial_dir, logger
+            )
+        except Exception as e:
+            print(f"Trial {trial.number} failed: {e}")
+            raise optuna.exceptions.TrialPruned()
+        finally:
+            # ── Clean up trial artifacts to save disk ──────────────
+            if os.path.exists(trial_dir):
+                shutil.rmtree(trial_dir, ignore_errors=True)
+
+        print(f"  Trial {trial.number}: val_loss={val_loss:.6f} | {overrides}")
+        return val_loss
+
+
+class BasemodelObjective:
+    """Optuna objective for predictor/basemodel HPO."""
+
+    def __init__(self, base_config: CustomFinetuneConfig,
+                 search_space_builder: SearchSpaceBuilder,
+                 device: torch.device,
+                 trial_base_dir: str,
+                 tokenizer_path: str):
+        self.base_config = base_config
+        self.ssb = search_space_builder
+        self.device = device
+        self.trial_base_dir = trial_base_dir
+        self.tokenizer_path = tokenizer_path  # path to best finetuned tokenizer
+
+    def __call__(self, trial) -> float:
+        overrides = self.ssb.build_overrides(trial)
+        overrides['basemodel_epochs'] = self.base_config.hpo_basemodel_epochs
+        overrides['log_interval'] = 999999
+
+        trial_config = self.base_config.clone_with_overrides(overrides)
+        trial_config.finetuned_tokenizer_path = self.tokenizer_path
+
+        trial_dir = os.path.join(
+            self.trial_base_dir, f"basemodel_trial_{trial.number}"
+        )
+        trial_config.basemodel_save_path = trial_dir
+        os.makedirs(trial_dir, exist_ok=True)
+
+        try:
+            # Load tokenizer (frozen during basemodel HPO)
+            tokenizer = NosTokenizer.from_pretrained(self.tokenizer_path)
+            tokenizer = tokenizer.to(self.device)
+            tokenizer.eval()
+            for p in tokenizer.parameters():
+                p.requires_grad_(False)
+
+            # Load predictor
+            if getattr(trial_config, 'pre_trained_predictor', True):
+                model = Nos.from_pretrained(
+                    self.base_config.pretrained_predictor_path
+                )
+            else:
+                cfg_path = os.path.join(
+                    self.base_config.pretrained_predictor_path, 'config.json'
+                )
+                with open(cfg_path, 'r') as f:
+                    arch = json.load(f)
+                model = Nos(**{k: arch[k] for k in [
+                    's1_bits', 's2_bits', 'n_layers', 'd_model', 'n_heads',
+                    'ff_dim', 'ffn_dropout_p', 'attn_dropout_p',
+                    'resid_dropout_p', 'token_dropout_p', 'learn_te'
+                ] if k in arch})
+
+            model = apply_dropout_overrides(model, trial_config)
+            model = model.to(self.device)
+
+        except Exception as e:
+            print(f"Trial {trial.number}: Model loading failed: {e}")
+            raise optuna.exceptions.TrialPruned()
+
+        logger = _get_silent_logger(f"hpo_base_trial_{trial.number}")
+
+        try:
+            from finetune_base_model import train_model
+            val_loss = train_model(
+                model, tokenizer, self.device,
+                trial_config, trial_dir, logger
+            )
+        except Exception as e:
+            print(f"Trial {trial.number} failed: {e}")
+            raise optuna.exceptions.TrialPruned()
+        finally:
+            if os.path.exists(trial_dir):
+                shutil.rmtree(trial_dir, ignore_errors=True)
+
+        print(f"  Trial {trial.number}: val_loss={val_loss:.6f} | {overrides}")
+        return val_loss
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# HPO Runner
+# ══════════════════════════════════════════════════════════════════════════════
+
+class NosHPOTuner:
+    """
+    Main HPO orchestrator. Builds Optuna study, runs trials,
+    reports best params, and optionally writes them back to config.
+    """
+
+    def __init__(self, config_path: str):
+        if not OPTUNA_AVAILABLE:
+            raise RuntimeError("Please install optuna: pip install optuna")
+
+        self.config_path = config_path
+        self.config = CustomFinetuneConfig(config_path)
+        self.device = self._setup_device()
+
+        self.trial_base_dir = os.path.join(
+            self.config.base_save_path, "hpo_trials"
+        )
+        os.makedirs(self.trial_base_dir, exist_ok=True)
+
+        # Results storage
+        self.results: Dict[str, Any] = {}
+
+    def _setup_device(self) -> torch.device:
+        if self.config.use_cuda and torch.cuda.is_available():
+            torch.cuda.set_device(self.config.device_id)
+            return torch.device(f"cuda:{self.config.device_id}")
+        return torch.device("cpu")
+
+    def _build_sampler(self):
+        name = self.config.hpo_sampler.lower()
+        seed = self.config.seed
+        if name == 'tpe':
+            return TPESampler(seed=seed, multivariate=True)
+        elif name == 'random':
+            return RandomSampler(seed=seed)
+        elif name == 'cmaes':
+            return CmaEsSampler(seed=seed)
+        else:
+            return TPESampler(seed=seed)
+
+    def _build_pruner(self):
+        name = self.config.hpo_pruner.lower()
+        if name == 'median':
+            return MedianPruner(
+                n_startup_trials=5,
+                n_warmup_steps=1,
+                interval_steps=1
+            )
+        elif name == 'hyperband':
+            return HyperbandPruner()
+        else:
+            return NopPruner()
+
+    def _create_study(self, study_name_suffix: str = "") -> optuna.Study:
+        study_name = f"{self.config.hpo_study_name}{study_name_suffix}"
+        storage = self.config.hpo_storage
+
+        study = optuna.create_study(
+            study_name=study_name,
+            storage=storage,
+            direction=self.config.hpo_direction,
+            sampler=self._build_sampler(),
+            pruner=self._build_pruner(),
+            load_if_exists=True
+        )
+        return study
+
+    # ── Phase: Tokenizer ──────────────────────────────────────────────────
+
+    def tune_tokenizer(self, n_trials: Optional[int] = None) -> Dict[str, Any]:
+        n = n_trials or self.config.hpo_n_trials
+        print(f"\n{'='*60}")
+        print(f"HPO Phase 1: Tokenizer ({n} trials)")
+        print(f"{'='*60}")
+
+        ssb = SearchSpaceBuilder(
+            self.config.hpo_search_space, phase='tokenizer'
+        )
+        objective = TokenizerObjective(
+            self.config, ssb, self.device, self.trial_base_dir
+        )
+
+        study = self._create_study("_tokenizer")
+        study.optimize(
+            objective,
+            n_trials=n,
+            show_progress_bar=True,
+            catch=(Exception,)
+        )
+
+        best = {
+            'value': study.best_value,
+            'params': study.best_params
+        }
+        self.results['tokenizer'] = best
+
+        print(f"\n✅ Best tokenizer val_loss: {best['value']:.6f}")
+        print(f"   Best params: {best['params']}")
+
+        # Save study results
+        self._save_study_results(study, "tokenizer")
+        return best
+
+    # ── Phase: Basemodel ──────────────────────────────────────────────────
+
+    def tune_basemodel(self,
+                       tokenizer_path: Optional[str] = None,
+                       n_trials: Optional[int] = None) -> Dict[str, Any]:
+        n = n_trials or self.config.hpo_n_trials
+
+        # Determine tokenizer to use
+        if tokenizer_path is None:
+            tokenizer_path = self.config.finetuned_tokenizer_path
+        if not os.path.exists(tokenizer_path):
+            raise FileNotFoundError(
+                f"Tokenizer not found at: {tokenizer_path}\n"
+                f"Run tokenizer finetuning first."
+            )
+
+        print(f"\n{'='*60}")
+        print(f"HPO Phase 2: Basemodel ({n} trials)")
+        print(f"Using tokenizer: {tokenizer_path}")
+        print(f"{'='*60}")
+
+        ssb = SearchSpaceBuilder(
+            self.config.hpo_search_space, phase='basemodel'
+        )
+        objective = BasemodelObjective(
+            self.config, ssb, self.device,
+            self.trial_base_dir, tokenizer_path
+        )
+
+        study = self._create_study("_basemodel")
+        study.optimize(
+            objective,
+            n_trials=n,
+            show_progress_bar=True,
+            catch=(Exception,)
+        )
+
+        best = {
+            'value': study.best_value,
+            'params': study.best_params
+        }
+        self.results['basemodel'] = best
+
+        print(f"\n✅ Best basemodel val_loss: {best['value']:.6f}")
+        print(f"   Best params: {best['params']}")
+
+        self._save_study_results(study, "basemodel")
+        return best
+
+    # ── Full Pipeline ─────────────────────────────────────────────────────
+
+    def tune_full_pipeline(self) -> Dict[str, Any]:
+        """
+        Run HPO for tokenizer, then use best tokenizer params
+        to run HPO for basemodel.
+        """
+        all_results = {}
+
+        if self.config.hpo_optimize_tokenizer:
+            tok_best = self.tune_tokenizer()
+            all_results['tokenizer'] = tok_best
+
+            # Train full tokenizer with best params before basemodel HPO
+            print("\n📦 Training tokenizer with best params for basemodel HPO...")
+            best_tok_config = self.config.clone_with_overrides(
+                tok_best['params']
+            )
+            self._train_phase_with_config(best_tok_config, 'tokenizer')
+
+        if self.config.hpo_optimize_basemodel:
+            tok_path = self.config.tokenizer_best_model_path
+            base_best = self.tune_basemodel(tokenizer_path=tok_path)
+            all_results['basemodel'] = base_best
+
+        self._print_final_report(all_results)
+        return all_results
+
+    def _train_phase_with_config(self, config: CustomFinetuneConfig,
+                                  phase: str):
+        """Run a full training phase (not HPO) with given config."""
+        if phase == 'tokenizer':
+            from finetune_tokenizer import train_tokenizer
+            if getattr(config, 'pre_trained_tokenizer', True):
+                tokenizer = NosTokenizer.from_pretrained(
+                    config.pretrained_tokenizer_path
+                )
+            tokenizer = apply_bsq_overrides(tokenizer, config)
+            tokenizer = apply_dropout_overrides(tokenizer, config)
+            tokenizer = tokenizer.to(self.device)
+            logger = _get_silent_logger("hpo_best_tokenizer")
+            os.makedirs(config.tokenizer_save_path, exist_ok=True)
+            train_tokenizer(
+                tokenizer, self.device, config,
+                config.tokenizer_save_path, logger
+            )
+
+    # ── Results & Reporting ───────────────────────────────────────────────
+
+    def _save_study_results(self, study: optuna.Study, phase: str):
+        results_dir = os.path.join(self.config.base_save_path, "hpo_results")
+        os.makedirs(results_dir, exist_ok=True)
+
+        # Save all trials as JSON
+        trials_data = []
+        for trial in study.trials:
+            if trial.value is not None:
+                trials_data.append({
+                    'number': trial.number,
+                    'value': trial.value,
+                    'params': trial.params,
+                    'state': str(trial.state)
+                })
+
+        results_file = os.path.join(results_dir, f"{phase}_trials.json")
+        with open(results_file, 'w') as f:
+            json.dump({
+                'best_value': study.best_value,
+                'best_params': study.best_params,
+                'n_trials': len(study.trials),
+                'trials': trials_data,
+                'timestamp': datetime.datetime.now().isoformat()
+            }, f, indent=2)
+
+        print(f"📊 Results saved to: {results_file}")
+
+        # Save importances plot if possible
+        try:
+            import optuna.visualization as vis
+            fig = vis.plot_param_importances(study)
+            fig_path = os.path.join(results_dir, f"{phase}_importances.html")
+            fig.write_html(fig_path)
+
+            fig2 = vis.plot_optimization_history(study)
+            fig2_path = os.path.join(
+                results_dir, f"{phase}_history.html"
+            )
+            fig2.write_html(fig2_path)
+            print(f"📈 Plots saved to: {results_dir}")
+        except Exception:
+            pass
+
+    def _print_final_report(self, results: Dict[str, Any]):
+        print(f"\n{'='*60}")
+        print("HPO FINAL REPORT")
+        print(f"{'='*60}")
+
+        for phase, result in results.items():
+            print(f"\n{'─'*40}")
+            print(f"Phase: {phase.upper()}")
+            print(f"  Best val loss: {result['value']:.6f}")
+            print(f"  Best hyperparameters:")
+            for k, v in result['params'].items():
+                print(f"    {k}: {v}")
+
+        print(f"\n{'='*60}")
+
+    def apply_best_to_config(self, output_config_path: Optional[str] = None):
+        """
+        Write best found hyperparameters back into the YAML config file.
+        Creates a new config file by default.
+        """
+        if not self.results:
+            print("No HPO results to apply. Run tune_* methods first.")
+            return
+
+        # Load raw YAML
+        with open(self.config_path, 'r') as f:
+            raw_config = yaml.safe_load(f)
+
+        # Merge best params into training section
+        training_updates = {}
+        for phase_results in self.results.values():
+            training_updates.update(phase_results.get('params', {}))
+
+        for k, v in training_updates.items():
+            raw_config.setdefault('training', {})[k] = v
+
+        # Determine output path
+        if output_config_path is None:
+            base, ext = os.path.splitext(self.config_path)
+            output_config_path = f"{base}_hpo_best{ext}"
+
+        with open(output_config_path, 'w') as f:
+            yaml.dump(raw_config, f, default_flow_style=False,
+                      allow_unicode=True, indent=2)
+
+        print(f"\n✅ Best config written to: {output_config_path}")
+        return output_config_path
+
+    def print_importance_report(self):
+        """
+        Print a ranked list of hyperparameter importances
+        using Optuna's fANOVA estimator (if available).
+        """
+        if not OPTUNA_AVAILABLE:
+            return
+
+        print(f"\n{'='*60}")
+        print("HYPERPARAMETER IMPORTANCE RANKING")
+        print(f"{'='*60}")
+
+        for phase in ['tokenizer', 'basemodel']:
+            study_name = f"{self.config.hpo_study_name}_{phase}"
+            try:
+                storage = self.config.hpo_storage
+                if storage:
+                    study = optuna.load_study(
+                        study_name=study_name, storage=storage
+                    )
+                    importances = optuna.importance.get_param_importances(study)
+                    print(f"\n{phase.upper()} importances:")
+                    for param, imp in sorted(
+                        importances.items(),
+                        key=lambda x: x[1], reverse=True
+                    ):
+                        bar = '█' * int(imp * 30)
+                        print(f"  {param:<40} {imp:.3f} {bar}")
+            except Exception:
+                pass
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Utility
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _get_silent_logger(name: str) -> logging.Logger:
+    """Logger that only writes to a temp file (no console spam during HPO)."""
+    logger = logging.getLogger(name)
+    if not logger.handlers:
+        logger.setLevel(logging.INFO)
+        tmp_log = os.path.join(tempfile.gettempdir(), f"{name}.log")
+        handler = logging.FileHandler(tmp_log, encoding='utf-8')
+        handler.setLevel(logging.INFO)
+        logger.addHandler(handler)
+    return logger
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CLI Entry Point
+# ══════════════════════════════════════════════════════════════════════════════
+
+def main():
+    parser = argparse.ArgumentParser(
+        description='Automatic Hyperparameter Tuning for Nos Finetuning'
+    )
+    parser.add_argument(
+        '--config', type=str, default='configs/config_test_1h.yaml',
+        help='Path to config YAML'
+    )
+    parser.add_argument(
+        '--phase', type=str, default='both',
+        choices=['tokenizer', 'basemodel', 'both'],
+        help='Which phase to tune'
+    )
+    parser.add_argument(
+        '--n-trials', type=int, default=None,
+        help='Override number of trials from config'
+    )
+    parser.add_argument(
+        '--apply-best', action='store_true',
+        help='Write best params back to a new config file after tuning'
+    )
+    parser.add_argument(
+        '--tokenizer-path', type=str, default=None,
+        help='Path to finetuned tokenizer (for basemodel-only HPO)'
+    )
+    parser.add_argument(
+        '--output-config', type=str, default=None,
+        help='Output path for best config (default: original_name_hpo_best.yaml)'
+    )
+    args = parser.parse_args()
+
+    if not OPTUNA_AVAILABLE:
+        print("ERROR: Install optuna first: pip install optuna plotly")
+        sys.exit(1)
+
+    tuner = NosHPOTuner(args.config)
+
+    print(f"HPO Configuration:")
+    print(f"  Phase: {args.phase}")
+    print(f"  Trials: {args.n_trials or tuner.config.hpo_n_trials}")
+    print(f"  Sampler: {tuner.config.hpo_sampler}")
+    print(f"  Pruner: {tuner.config.hpo_pruner}")
+    print(f"  Device: {tuner.device}")
+
+    start = time.time()
+
+    if args.phase == 'both':
+        results = tuner.tune_full_pipeline()
+    elif args.phase == 'tokenizer':
+        results = tuner.tune_tokenizer(n_trials=args.n_trials)
+    elif args.phase == 'basemodel':
+        results = tuner.tune_basemodel(
+            tokenizer_path=args.tokenizer_path,
+            n_trials=args.n_trials
+        )
+
+    elapsed = time.time() - start
+    print(f"\n⏱  Total HPO time: {elapsed/60:.1f} minutes")
+
+    if args.apply_best:
+        tuner.apply_best_to_config(args.output_config)
+
+    tuner.print_importance_report()
+
+
+if __name__ == "__main__":
+    main()
 ```
 
-### `models/nos_tokenizer_2k`
-
-```text
-[Error reading file: [Errno 13] Permission denied: 'C:\\Users\\kashy\\OneDrive\\Documents\\uNOS\\models\\nos_tokenizer_2k']
-```
-
-### `models/nos_tokenizer_base`
-
-```text
-[Error reading file: [Errno 13] Permission denied: 'C:\\Users\\kashy\\OneDrive\\Documents\\uNOS\\models\\nos_tokenizer_base']
-```
+---

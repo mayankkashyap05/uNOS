@@ -1,0 +1,223 @@
+
+data:
+  data_path: "data/1h.csv"
+  lookback_window: 512
+  predict_window: 48
+  max_context: 512
+  clip: 5.0
+  train_ratio: 0.9
+  val_ratio: 0.1
+  test_ratio: 0.0
+
+training:
+  tokenizer_epochs: 30
+  basemodel_epochs: 20
+  batch_size: 32
+  log_interval: 50
+  num_workers: 6
+  seed: 42
+
+  tokenizer_learning_rate: 0.0002
+  predictor_learning_rate: 0.000001
+
+  adam_beta1: 0.9
+  adam_beta2: 0.95
+  adam_weight_decay: 0.1
+
+  accumulation_steps: 1
+
+  # Scheduler params (previously hardcoded)
+  tokenizer_pct_start: 0.03
+  tokenizer_div_factor: 10.0
+  basemodel_pct_start: 0.03
+  basemodel_div_factor: 10.0
+
+  # Gradient clipping (previously hardcoded)
+  tokenizer_max_grad_norm: 2.0
+  basemodel_max_grad_norm: 3.0
+
+  # Dropout overrides (optional — leave null to use pretrained values)
+  ffn_dropout_p: null
+  attn_dropout_p: null
+  resid_dropout_p: null
+  token_dropout_p: null
+
+  # BSQ loss weight overrides (optional — leave null to use pretrained values)
+  bsq_beta: null
+  bsq_gamma0: null
+  bsq_gamma: null
+  bsq_zeta: null
+
+model_paths:
+  pretrained_tokenizer: "models/nos_tokenizer_2k"
+  pretrained_predictor: "models/nos_mini"
+  exp_name: "test_1h"
+  base_path: "finetuned"
+  base_save_path: ""
+  finetuned_tokenizer: ""
+  tokenizer_save_name: "tokenizer"
+  basemodel_save_name: "basemodel"
+
+experiment:
+  name: "Nos_custom_finetune"
+  description: "Custom finetune for 1h stock data"
+  use_comet: false
+  train_tokenizer: true
+  train_basemodel: true
+  skip_existing: false
+
+device:
+  use_cuda: true
+  device_id: 0
+
+# ── Hyperparameter Search Space ──────────────────────────────────
+hpo:
+  enabled: false                    # Set true to activate HPO
+  n_trials: 30                      # Optuna trials
+  direction: "minimize"             # minimize val_loss
+  sampler: "tpe"                    # tpe | random | cmaes
+  pruner: "median"                  # median | hyperband | none
+  storage: null                     # optuna DB URI or null for in-memory
+  study_name: "nos_finetune_hpo"
+
+  # What to optimize
+  optimize_tokenizer: true
+  optimize_basemodel: true
+
+  # Fast evaluation mode during HPO (reduced epochs)
+  hpo_tokenizer_epochs: 5
+  hpo_basemodel_epochs: 3
+
+  search_space:
+    # ── Tokenizer ──────────────────────────────────────────────
+    tokenizer_learning_rate:
+      type: float
+      low: 1.0e-5
+      high: 5.0e-3
+      log: true
+
+    # ── Predictor ──────────────────────────────────────────────
+    predictor_learning_rate:
+      type: float
+      low: 1.0e-7
+      high: 1.0e-4
+      log: true
+
+    # ── Shared Optimizer ───────────────────────────────────────
+    adam_weight_decay:
+      type: float
+      low: 0.001
+      high: 0.3
+      log: true
+
+    adam_beta1:
+      type: float
+      low: 0.85
+      high: 0.95
+      log: false
+
+    adam_beta2:
+      type: float
+      low: 0.90
+      high: 0.999
+      log: false
+
+    # ── Batch & Accumulation ───────────────────────────────────
+    batch_size:
+      type: categorical
+      choices: [16, 32, 64, 128]
+
+    accumulation_steps:
+      type: categorical
+      choices: [1, 2, 4]
+
+    # ── Scheduler ─────────────────────────────────────────────
+    tokenizer_pct_start:
+      type: float
+      low: 0.01
+      high: 0.15
+      log: false
+
+    basemodel_pct_start:
+      type: float
+      low: 0.01
+      high: 0.15
+      log: false
+
+    tokenizer_div_factor:
+      type: categorical
+      choices: [5.0, 10.0, 25.0, 50.0]
+
+    basemodel_div_factor:
+      type: categorical
+      choices: [5.0, 10.0, 25.0, 50.0]
+
+    # ── Gradient Clipping ─────────────────────────────────────
+    tokenizer_max_grad_norm:
+      type: float
+      low: 0.5
+      high: 5.0
+      log: false
+
+    basemodel_max_grad_norm:
+      type: float
+      low: 0.5
+      high: 5.0
+      log: false
+
+    # ── Dropout (finetuning regularization) ────────────────────
+    ffn_dropout_p:
+      type: float
+      low: 0.0
+      high: 0.4
+      log: false
+
+    attn_dropout_p:
+      type: float
+      low: 0.0
+      high: 0.2
+      log: false
+
+    resid_dropout_p:
+      type: float
+      low: 0.0
+      high: 0.3
+      log: false
+
+    token_dropout_p:
+      type: float
+      low: 0.0
+      high: 0.2
+      log: false
+
+    # ── BSQ Loss Weights (careful tuning) ─────────────────────
+    bsq_beta:
+      type: float
+      low: 0.01
+      high: 0.2
+      log: true
+
+    bsq_gamma0:
+      type: float
+      low: 0.5
+      high: 2.0
+      log: false
+
+    bsq_gamma:
+      type: float
+      low: 0.8
+      high: 2.0
+      log: false
+
+    bsq_zeta:
+      type: float
+      low: 0.01
+      high: 0.2
+      log: true
+
+    # ── Data Params ────────────────────────────────────────────
+    clip:
+      type: float
+      low: 3.0
+      high: 10.0
+      log: false

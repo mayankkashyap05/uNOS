@@ -148,133 +148,151 @@ def create_dataloaders(config):
     return train_loader, val_loader, train_dataset, val_dataset, train_sampler, val_sampler
 
 
+
 def train_tokenizer(model, device, config, save_dir, logger):
+    """
+    All previously hardcoded values (pct_start, div_factor, max_norm)
+    are now read from config with safe fallbacks.
+    """
     logger.info("Starting tokenizer training...")
     use_ddp = dist.is_available() and dist.is_initialized()
     rank = dist.get_rank() if use_ddp else 0
-    world_size = dist.get_world_size() if use_ddp else 1
-    
-    train_loader, val_loader, train_dataset, val_dataset, train_sampler, val_sampler = create_dataloaders(config)
-    
+
+    train_loader, val_loader, train_dataset, val_dataset, \
+        train_sampler, val_sampler = create_dataloaders(config)
+
     optimizer = torch.optim.AdamW(
         model.parameters(),
         lr=config.tokenizer_learning_rate,
+        betas=(config.adam_beta1, config.adam_beta2),   # ← beta1/beta2 now used
         weight_decay=config.adam_weight_decay
     )
-    
+
+    # ── Scheduler: read from config ───────────────────────────────
+    pct_start = getattr(config, 'tokenizer_pct_start', 0.03)
+    div_factor = getattr(config, 'tokenizer_div_factor', 10.0)
+
     scheduler = torch.optim.lr_scheduler.OneCycleLR(
         optimizer,
         max_lr=config.tokenizer_learning_rate,
         steps_per_epoch=len(train_loader),
         epochs=config.tokenizer_epochs,
-        pct_start=0.03,
-        div_factor=10
+        pct_start=pct_start,
+        div_factor=div_factor
     )
-    
+
     if use_ddp:
         local_rank = int(os.environ.get("LOCAL_RANK", "0"))
-        model = DDP(model, device_ids=[local_rank], output_device=local_rank, find_unused_parameters=False)
+        model = DDP(model, device_ids=[local_rank],
+                    output_device=local_rank, find_unused_parameters=False)
+
+    # ── Grad clip: read from config ───────────────────────────────
+    max_grad_norm = getattr(config, 'tokenizer_max_grad_norm', 2.0)
 
     best_val_loss = float("inf")
     batch_idx_global = 0
-    
     accumulation_steps = getattr(config, 'accumulation_steps', 1)
-    
+
     for epoch in range(config.tokenizer_epochs):
         epoch_start_time = time.time()
         model.train()
-        
+
         train_dataset.set_epoch_seed(epoch * 10000)
         val_dataset.set_epoch_seed(0)
         if train_sampler is not None:
             train_sampler.set_epoch(epoch)
-        
+
         for batch_idx, (ori_batch_x, _) in enumerate(train_loader):
             ori_batch_x = ori_batch_x.squeeze(0).to(device, non_blocking=True)
-            
+
             current_batch_total_loss = 0.0
             for j in range(accumulation_steps):
                 start_idx = j * (ori_batch_x.shape[0] // accumulation_steps)
                 end_idx = (j + 1) * (ori_batch_x.shape[0] // accumulation_steps)
                 batch_x = ori_batch_x[start_idx:end_idx]
-                
+
                 zs, bsq_loss, _, _ = (model.module if use_ddp else model)(batch_x)
                 z_pre, z = zs
-                
+
                 recon_loss_pre = F.mse_loss(z_pre, batch_x)
                 recon_loss_all = F.mse_loss(z, batch_x)
                 recon_loss = recon_loss_pre + recon_loss_all
                 loss = (recon_loss + bsq_loss) / 2
-                
+
                 loss_scaled = loss / accumulation_steps
                 current_batch_total_loss += loss.item()
                 loss_scaled.backward()
-            
-            torch.nn.utils.clip_grad_norm_((model.module if use_ddp else model).parameters(), max_norm=2.0)
+
+            # ── Grad clip from config ─────────────────────────
+            torch.nn.utils.clip_grad_norm_(
+                (model.module if use_ddp else model).parameters(),
+                max_norm=max_grad_norm
+            )
             optimizer.step()
             scheduler.step()
             optimizer.zero_grad()
-            
+
             if (batch_idx_global + 1) % config.log_interval == 0:
                 avg_loss = current_batch_total_loss / accumulation_steps
                 lr = optimizer.param_groups[0]["lr"]
-                log_msg = (f"[Epoch {epoch+1}/{config.tokenizer_epochs}, Step {batch_idx+1}/{len(train_loader)}] "
-                          f"LR: {lr:.6f}, Loss: {avg_loss:.4f}")
+                log_msg = (
+                    f"[Epoch {epoch+1}/{config.tokenizer_epochs}, "
+                    f"Step {batch_idx+1}/{len(train_loader)}] "
+                    f"LR: {lr:.6f}, Loss: {avg_loss:.4f}"
+                )
                 logger.info(log_msg)
                 if rank == 0:
                     print(log_msg)
-                
-                detail_msg = (f"  - VQ Loss: {bsq_loss.item():.4f}\n"
-                            f"  - Recon Loss Pre: {recon_loss_pre.item():.4f}\n"
-                            f"  - Recon Loss All: {recon_loss_all.item():.4f}")
-                logger.info(detail_msg)
-                if rank == 0:
-                    print(detail_msg)
-            
+
             batch_idx_global += 1
-        
+
+        # ── Validation ────────────────────────────────────────────
         model.eval()
         tot_val_loss_sum_rank = 0.0
         val_sample_count_rank = 0
-        
+
         with torch.no_grad():
             for ori_batch_x, _ in val_loader:
                 ori_batch_x = ori_batch_x.squeeze(0).to(device, non_blocking=True)
                 zs, _, _, _ = (model.module if use_ddp else model)(ori_batch_x)
                 _, z = zs
                 val_loss_item = F.mse_loss(z, ori_batch_x)
-                
                 tot_val_loss_sum_rank += val_loss_item.item() * ori_batch_x.size(0)
                 val_sample_count_rank += ori_batch_x.size(0)
-        
+
         if use_ddp:
-            tensor_sum = torch.tensor([tot_val_loss_sum_rank, val_sample_count_rank], dtype=torch.float64, device=device)
+            tensor_sum = torch.tensor(
+                [tot_val_loss_sum_rank, val_sample_count_rank],
+                dtype=torch.float64, device=device
+            )
             dist.all_reduce(tensor_sum, op=dist.ReduceOp.SUM)
-            tot_val_loss_all = tensor_sum[0].item()
-            val_count_all = int(tensor_sum[1].item())
-            avg_val_loss = (tot_val_loss_all / val_count_all) if val_count_all > 0 else 0.0
+            avg_val_loss = (tensor_sum[0].item() / tensor_sum[1].item()
+                            if tensor_sum[1].item() > 0 else 0.0)
         else:
-            avg_val_loss = tot_val_loss_sum_rank / val_sample_count_rank if val_sample_count_rank > 0 else 0
-        
+            avg_val_loss = (tot_val_loss_sum_rank / val_sample_count_rank
+                            if val_sample_count_rank > 0 else 0)
+
         epoch_time = time.time() - epoch_start_time
-        epoch_summary = (f"\n--- Epoch {epoch+1}/{config.tokenizer_epochs} Summary ---\n"
-                       f"Validation Loss: {avg_val_loss:.4f}\n"
-                       f"Epoch Time: {format_time(epoch_time)}\n"
-                       f"Total Training Time: {format_time(time.time() - epoch_start_time)}\n")
+        epoch_summary = (
+            f"\n--- Epoch {epoch+1}/{config.tokenizer_epochs} Summary ---\n"
+            f"Validation Loss: {avg_val_loss:.6f}\n"
+            f"Epoch Time: {format_time(epoch_time)}\n"
+        )
         logger.info(epoch_summary)
         if rank == 0:
             print(epoch_summary)
-        
+
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
             if rank == 0:
                 model_save_path = os.path.join(save_dir, "best_model")
                 os.makedirs(model_save_path, exist_ok=True)
                 (model.module if use_ddp else model).save_pretrained(model_save_path)
-                save_msg = f"Best model saved to: {model_save_path} (validation loss: {best_val_loss:.4f})"
+                save_msg = (f"Best model saved: {model_save_path} "
+                            f"(val loss: {best_val_loss:.6f})")
                 logger.info(save_msg)
                 print(save_msg)
-    
+
     return best_val_loss
 
 
