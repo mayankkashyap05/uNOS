@@ -43,12 +43,29 @@ class ConfigLoader:
         return config
 
     def get(self, key: str, default=None):
-        keys = key.split('.')
+        """
+        Retrieves a (possibly nested) config value using dot-notation keys.
+
+        Examples:
+            loader.get('training.batch_size')
+            loader.get('hpo.search_space.tokenizer_learning_rate.low')
+
+        Args:
+            key:     Dot-separated key path into the config dict.
+            default: Value to return if any key in the path is missing.
+
+        Returns:
+            Config value at the given path, or default if not found.
+        """
+        keys  = key.split('.')
         value = self.config
         try:
             for k in keys:
+                if not isinstance(value, dict):
+                    return default
                 value = value[k]
-            return value
+            # Treat explicit YAML null (None) as absent — return default
+            return value if value is not None else default
         except (KeyError, TypeError):
             return default
 
@@ -72,6 +89,15 @@ class ConfigLoader:
 
     def get_dynamic_tuning_config(self) -> Dict[str, Any]:
         return self.config.get('dynamic_tuning', {})
+    
+    def get_hpo_config(self) -> Dict[str, Any]:
+        """
+        Returns the full HPO configuration block.
+
+        Returns an empty dict (not None) if the block is absent, so callers
+        can safely use .get() without None-checks.
+        """
+        return self.config.get('hpo') or {}
 
     def update_config(self, updates: Dict[str, Any]):
         def update_nested_dict(d, u):
@@ -120,7 +146,7 @@ class CustomFinetuneConfig:
         self.val_ratio = data_config.get('val_ratio', 0.1)
         self.test_ratio = data_config.get('test_ratio', 0.0)
 
-        # ── Training ──────────────────────────────────────
+        # ── Training ──────────────────────────────────────────────
         training_config = self.loader.get_training_config()
 
         self.tokenizer_epochs = training_config.get('tokenizer_epochs', 30)
@@ -135,30 +161,33 @@ class CustomFinetuneConfig:
         self.num_workers = training_config.get('num_workers', 6)
         self.seed = training_config.get('seed', 100)
 
-        # TIER 1 FIX 1: betas now loaded and passed to both optimizers
         self.adam_beta1 = training_config.get('adam_beta1', 0.9)
         self.adam_beta2 = training_config.get('adam_beta2', 0.95)
         self.adam_weight_decay = training_config.get('adam_weight_decay', 0.1)
-
-        # TIER 2 FIX 7: Adam epsilon
         self.adam_eps = training_config.get('adam_eps', 1e-6)
 
-        # Learning rates
         self.tokenizer_learning_rate = training_config.get('tokenizer_learning_rate', 2e-4)
         self.predictor_learning_rate = training_config.get('predictor_learning_rate', 4e-5)
 
-        # TIER 1 FIX 2: Grad clipping from config
-        self.tokenizer_grad_clip = training_config.get('tokenizer_grad_clip', 2.0)
-        self.basemodel_grad_clip = training_config.get('basemodel_grad_clip', 3.0)
-        self.grad_clip_norm_type = training_config.get('grad_clip_norm_type', 2.0)
+        self.tokenizer_grad_clip = float(
+            training_config.get('tokenizer_grad_clip')
+            or training_config.get('tokenizer_max_grad_norm')
+            or 2.0
+        )
+        self.basemodel_grad_clip = float(
+            training_config.get('basemodel_grad_clip')
+            or training_config.get('basemodel_max_grad_norm')
+            or 3.0
+        )
+        self.grad_clip_norm_type = float(
+            training_config.get('grad_clip_norm_type', 2.0)
+        )
 
-        # TIER 1 FIX 3 & 12: Scheduler params from config
         self.scheduler_type = training_config.get('scheduler_type', 'cosine_warmup')
         self.scheduler_pct_start = training_config.get('scheduler_pct_start', 0.05)
         self.scheduler_div_factor = training_config.get('scheduler_div_factor', 25.0)
         self.scheduler_final_div_factor = training_config.get('scheduler_final_div_factor', 1000.0)
 
-        # TIER 1 FIX 5: Loss weights from config
         self.tokenizer_recon_pre_weight = training_config.get('tokenizer_recon_pre_weight', 1.0)
         self.tokenizer_recon_all_weight = training_config.get('tokenizer_recon_all_weight', 1.0)
         self.tokenizer_bsq_weight = training_config.get('tokenizer_bsq_weight', 0.5)
@@ -166,16 +195,41 @@ class CustomFinetuneConfig:
         self.basemodel_s1_weight = training_config.get('basemodel_s1_weight', 0.5)
         self.basemodel_s2_weight = training_config.get('basemodel_s2_weight', 0.5)
 
-        # TIER 2 FIX 8: Label smoothing
         self.label_smoothing = training_config.get('label_smoothing', 0.0)
-
-        # TIER 2 FIX 9: BSQ inverse temperature
         self.bsq_inv_temperature = training_config.get('bsq_inv_temperature', 1.0)
-
-        # TIER 2 FIX 10: RoPE base
         self.rope_base = training_config.get('rope_base', 10000)
-
         self.accumulation_steps = training_config.get('accumulation_steps', 1)
+
+        # ── NEW: HPO search space params that must exist as real attributes ──
+        # Without these, getattr() fallbacks in training code ignore YAML values
+        # whenever HPO doesn't sample a given parameter in a trial.
+        self.tokenizer_pct_start = training_config.get(
+            'tokenizer_pct_start', self.scheduler_pct_start
+        )
+        self.tokenizer_div_factor = training_config.get(
+            'tokenizer_div_factor', self.scheduler_div_factor
+        )
+        self.tokenizer_max_grad_norm = training_config.get(
+            'tokenizer_max_grad_norm', self.tokenizer_grad_clip
+        )
+        self.basemodel_pct_start = training_config.get(
+            'basemodel_pct_start', self.scheduler_pct_start
+        )
+        self.basemodel_div_factor = training_config.get(
+            'basemodel_div_factor', self.scheduler_div_factor
+        )
+        self.basemodel_max_grad_norm = training_config.get(
+            'basemodel_max_grad_norm', self.basemodel_grad_clip
+        )
+        self.bsq_beta   = training_config.get('bsq_beta',   None)
+        self.bsq_gamma0 = training_config.get('bsq_gamma0', None)
+        self.bsq_gamma  = training_config.get('bsq_gamma',  None)
+        self.bsq_zeta   = training_config.get('bsq_zeta',   None)
+        self.ffn_dropout_p   = training_config.get('ffn_dropout_p',   None)
+        self.attn_dropout_p  = training_config.get('attn_dropout_p',  None)
+        self.resid_dropout_p = training_config.get('resid_dropout_p', None)
+        self.token_dropout_p = training_config.get('token_dropout_p', None)
+        # ── END NEW ──────────────────────────────────────────────────────────
 
         # ── Model paths ───────────────────────────────────
         model_paths = self.loader.get_model_paths()
@@ -268,20 +322,64 @@ class CustomFinetuneConfig:
         self._compute_full_paths()
 
         # ── HPO ───────────────────────────────────────────
-        hpo_config = self.loader.get('hpo', {})
-        self.hpo_enabled = hpo_config.get('enabled', False)
-        self.hpo_n_trials = hpo_config.get('n_trials', 10)
-        self.hpo_direction = hpo_config.get('direction', 'minimize')
-        self.hpo_sampler = hpo_config.get('sampler', 'tpe')
-        self.hpo_pruner = hpo_config.get('pruner', 'median')
-        self.hpo_storage = hpo_config.get('storage', None)
-        self.hpo_study_name = hpo_config.get('study_name', 'nos_hpo')
-        
-        self.hpo_optimize_tokenizer = hpo_config.get('optimize_tokenizer', True)
-        self.hpo_optimize_basemodel = hpo_config.get('optimize_basemodel', True)
-        self.hpo_tokenizer_epochs = hpo_config.get('hpo_tokenizer_epochs', 5)
-        self.hpo_basemodel_epochs = hpo_config.get('hpo_basemodel_epochs', 3)
-        self.hpo_search_space = hpo_config.get('search_space', {})
+        hpo_config = self.loader.get('hpo') or {}
+
+        self.hpo_enabled            = bool(hpo_config.get('enabled', False))
+        self.hpo_n_trials           = int(hpo_config.get('n_trials', 10))
+        self.hpo_direction          = str(hpo_config.get('direction', 'minimize'))
+        self.hpo_sampler            = str(hpo_config.get('sampler', 'tpe'))
+        self.hpo_pruner             = str(hpo_config.get('pruner', 'median'))
+        self.hpo_storage            = hpo_config.get('storage', None)
+        self.hpo_study_name         = str(hpo_config.get('study_name', 'nos_hpo'))
+
+        self.hpo_optimize_tokenizer = bool(hpo_config.get('optimize_tokenizer', True))
+        self.hpo_optimize_basemodel = bool(hpo_config.get('optimize_basemodel', True))
+        self.hpo_tokenizer_epochs   = int(hpo_config.get('hpo_tokenizer_epochs', 5))
+        self.hpo_basemodel_epochs   = int(hpo_config.get('hpo_basemodel_epochs', 3))
+
+        # Deep-copy the search space so that trial clones can never mutate
+        # the base config's search space dict via shared reference.
+        import copy as _copy
+        raw_search_space = hpo_config.get('search_space', {}) or {}
+        self.hpo_search_space: Dict[str, Any] = _copy.deepcopy(raw_search_space)
+
+        # ── Search space key aliasing ─────────────────────────────────────────
+        # The YAML uses tokenizer_max_grad_norm / basemodel_max_grad_norm but
+        # the training code reads tokenizer_grad_clip / basemodel_grad_clip.
+        # Normalise here so both YAML spellings work transparently.
+        _alias_map = {
+            'tokenizer_max_grad_norm': 'tokenizer_grad_clip',
+            'basemodel_max_grad_norm': 'basemodel_grad_clip',
+        }
+        for yaml_key, code_key in _alias_map.items():
+            if yaml_key in self.hpo_search_space and code_key not in self.hpo_search_space:
+                self.hpo_search_space[code_key] = _copy.deepcopy(
+                    self.hpo_search_space[yaml_key]
+                )
+
+        # ── Validate storage URI ──────────────────────────────────────────────
+        # Warn loudly if SQLite is configured without a timeout parameter.
+        # The timeout prevents "database is locked" errors under 8 concurrent
+        # workers. See configs/config.yaml for the recommended URI format.
+        if (
+            self.hpo_storage is not None
+            and self.hpo_storage.startswith('sqlite')
+            and 'timeout=' not in self.hpo_storage
+        ):
+            import logging
+            logging.getLogger(__name__).warning(
+                f"HPO storage URI '{self.hpo_storage}' is SQLite but does not "
+                f"include a timeout parameter. Under concurrent multi-GPU HPO "
+                f"this will cause 'database is locked' errors. "
+                f"Recommended: append '?timeout=60' to the URI."
+            )
+
+        # ── Validate direction ────────────────────────────────────────────────
+        if self.hpo_direction not in ('minimize', 'maximize'):
+            raise ValueError(
+                f"hpo.direction must be 'minimize' or 'maximize'. "
+                f"Got: '{self.hpo_direction}'"
+            )
 
     def _compute_full_paths(self):
         self.tokenizer_save_path = os.path.join(
@@ -293,13 +391,25 @@ class CustomFinetuneConfig:
         self.basemodel_best_model_path = os.path.join(
             self.basemodel_save_path, 'best_model')
 
-    def clone_with_overrides(self, overrides: Dict[str, Any]):
-        """Creates a new config instance with Optuna-suggested parameters."""
+    def clone_with_overrides(self, overrides: Dict[str, Any]) -> 'CustomFinetuneConfig':
+        
         import copy
-        new_config = copy.copy(self)
+        import logging
+
+        new_config = copy.deepcopy(self)
+
         for k, v in overrides.items():
+            if not hasattr(new_config, k):
+                logging.getLogger(__name__).warning(
+                    f"clone_with_overrides: attribute '{k}' does not exist "
+                    f"on CustomFinetuneConfig. Adding dynamically. "
+                    f"Verify this parameter name matches the training code."
+                )
             setattr(new_config, k, v)
-        return new_config    
+
+        new_config._compute_full_paths()
+
+        return new_config   
 
     def get_tokenizer_config(self):
         return {

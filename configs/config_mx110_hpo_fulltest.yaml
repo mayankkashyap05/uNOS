@@ -1,39 +1,46 @@
-# configs/config_mx110_hpo_fulltest.yaml
-# EXTREME SMOKE TEST - USELESS MODEL, FULL HPO PIPELINE
-
 data:
   data_path: "data/1h.csv"
-  lookback_window: 3        # Drastically reduced
-  predict_window: 2         # Drastically reduced
-  max_context: 5            # lookback + predict
+  lookback_window: 3
+  predict_window: 2
+  max_context: 5
   clip: 5.0
   train_ratio: 0.9
   val_ratio: 0.1
   test_ratio: 0.0
 
 training:
-  tokenizer_epochs: 3       # Just enough to verify it runs
-  basemodel_epochs: 3
-  batch_size: 32            # Higher batch size works now because context is tiny
-  log_interval: 1           # Log every step since there are very few steps
-  num_workers: 0            # Keep 0 to avoid RAM duplication on weak hardware
+  # Base epochs kept at 1 for the final "apply best" retraining phase
+  tokenizer_epochs: 5
+  basemodel_epochs: 5
+  
+  # CRITICAL for 2GB VRAM: keep base batch_size tiny
+  batch_size: 512
+  log_interval: 10
+
+  num_workers: 2
+
+  pin_memory: true
+  persistent_workers: true
   seed: 42
 
   tokenizer_learning_rate: 0.0002
-  predictor_learning_rate: 0.000005
+  predictor_learning_rate: 0.000001
 
   adam_beta1: 0.9
   adam_beta2: 0.95
   adam_weight_decay: 0.1
-  accumulation_steps: 1     # Forced to 1 as requested
 
-  tokenizer_pct_start: 0.05
+  accumulation_steps: 1
+
+  tokenizer_pct_start: 0.03
   tokenizer_div_factor: 10.0
-  basemodel_pct_start: 0.05
+  basemodel_pct_start: 0.03
   basemodel_div_factor: 10.0
 
-  tokenizer_max_grad_norm: 2.0
-  basemodel_max_grad_norm: 1.0
+  tokenizer_max_grad_norm: 2.0   
+  basemodel_max_grad_norm: 3.0   
+  tokenizer_grad_clip: 2.0
+  basemodel_grad_clip: 3.0
 
   ffn_dropout_p: null
   attn_dropout_p: null
@@ -48,7 +55,7 @@ training:
 model_paths:
   pretrained_tokenizer: "models/nos_tokenizer_2k"
   pretrained_predictor: "models/nos_mini"
-  exp_name: "run_mx110_hpo_test"
+  exp_name: "smoke_test_full_hpo"
   base_path: "finetuned"
   base_save_path: ""
   finetuned_tokenizer: ""
@@ -56,13 +63,12 @@ model_paths:
   basemodel_save_name: "basemodel"
 
 experiment:
-  name: "Nos_MX110_HPO_Test"
-  description: "Testing Optuna HPO logic with tiny context"
+  name: "Nos_smoke_test_full"
+  description: "2GB VRAM Full HPO Structure Test"
   use_comet: false
   train_tokenizer: true
   train_basemodel: true
   skip_existing: false
-  pre_trained: true
 
 device:
   use_cuda: true
@@ -70,47 +76,157 @@ device:
 
 # ── Hyperparameter Search Space ──────────────────────────────────
 hpo:
-  enabled: true
-  n_trials: 3               # 3 trials per phase is enough to test the search logic
-  direction: "minimize"
-  sampler: "tpe"
-  pruner: "none"            # Disabled pruner so all 3 trials finish completely
-  storage: "sqlite:///finetuned/run_mx110_hpo_test/hpo_results.db"
-  study_name: "mx110_full_hpo_test"
+  enabled: true                    
+  # 5 trials is enough for TPE to sample a wide variety of combinations
+  # without taking all day on a local GPU.
+  n_trials: 2                      
+  direction: "minimize"            
+  sampler: "tpe"                   
+  pruner: "median"                 
+  
+  # Actively testing the SQLite WAL & NullPool lock fix locally
+  storage: "sqlite:///nos_smoke_test.db?timeout=60"
+  study_name: "nos_finetune_hpo_full"
 
   optimize_tokenizer: true
   optimize_basemodel: true
-  
-  hpo_tokenizer_epochs: 2   # 2 epochs per trial
-  hpo_basemodel_epochs: 2
+
+  # 1 epoch per trial to burn through the 5 trials rapidly
+  hpo_tokenizer_epochs: 1
+  hpo_basemodel_epochs: 1
 
   search_space:
     # ── Tokenizer ──────────────────────────────────────────────
     tokenizer_learning_rate:
       type: float
-      low: 1.0e-4
-      high: 1.0e-3
+      low: 1.0e-5
+      high: 5.0e-3
       log: true
 
     # ── Predictor ──────────────────────────────────────────────
     predictor_learning_rate:
       type: float
-      low: 1.0e-6
+      low: 1.0e-7
       high: 1.0e-4
       log: true
 
+    # ── Shared Optimizer ───────────────────────────────────────
+    adam_weight_decay:
+      type: float
+      low: 0.001
+      high: 0.3
+      log: true
+
+    adam_beta1:
+      type: float
+      low: 0.85
+      high: 0.95
+      log: false
+
+    adam_beta2:
+      type: float
+      low: 0.90
+      high: 0.999
+      log: false
+
     # ── Batch & Accumulation ───────────────────────────────────
+    # CRITICAL VRAM GUARD: Limits batch to what a 2GB card can survive.
     batch_size:
       type: categorical
-      choices: [16, 32, 64] # Test higher batch sizes
+      choices: [1, 2, 4]
 
+    # Accumulation doesn't cost extra VRAM, so we can test larger sizes.
     accumulation_steps:
       type: categorical
-      choices: [1]          # Locked to 1
+      choices: [1, 2, 4]
 
-    # ── BSQ Weights ────────────────────────────────────────────
+    # ── Scheduler ─────────────────────────────────────────────
+    tokenizer_pct_start:
+      type: float
+      low: 0.01
+      high: 0.15
+      log: false
+
+    basemodel_pct_start:
+      type: float
+      low: 0.01
+      high: 0.15
+      log: false
+
+    tokenizer_div_factor:
+      type: categorical
+      choices: [5.0, 10.0, 25.0, 50.0]
+
+    basemodel_div_factor:
+      type: categorical
+      choices: [5.0, 10.0, 25.0, 50.0]
+
+    # ── Gradient Clipping ─────────────────────────────────────
+    tokenizer_max_grad_norm:
+      type: float
+      low: 0.5
+      high: 5.0
+      log: false
+
+    basemodel_max_grad_norm:
+      type: float
+      low: 0.5
+      high: 5.0
+      log: false
+
+    # ── Dropout (finetuning regularization) ────────────────────
+    ffn_dropout_p:
+      type: float
+      low: 0.0
+      high: 0.4
+      log: false
+
+    attn_dropout_p:
+      type: float
+      low: 0.0
+      high: 0.2
+      log: false
+
+    resid_dropout_p:
+      type: float
+      low: 0.0
+      high: 0.3
+      log: false
+
+    token_dropout_p:
+      type: float
+      low: 0.0
+      high: 0.2
+      log: false
+
+    # ── BSQ Loss Weights (careful tuning) ─────────────────────
     bsq_beta:
       type: float
       low: 0.01
-      high: 0.1
+      high: 0.2
+      log: true
+
+    bsq_gamma0:
+      type: float
+      low: 0.5
+      high: 2.0
+      log: false
+
+    bsq_gamma:
+      type: float
+      low: 0.8
+      high: 2.0
+      log: false
+
+    bsq_zeta:
+      type: float
+      low: 0.01
+      high: 0.2
+      log: true
+
+    # ── Data Params ────────────────────────────────────────────
+    clip:
+      type: float
+      low: 3.0
+      high: 10.0
       log: false

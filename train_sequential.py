@@ -1,3 +1,17 @@
+"""
+train_sequential.py
+
+Sequential fine-tuning pipeline for the Nos model.
+Runs tokenizer and basemodel training phases in order, with optional
+HPO parameter injection via apply_bsq_overrides and apply_dropout_overrides.
+
+Launch (single GPU):
+    python train_sequential.py --config config.yaml
+
+Launch (multi-GPU via torchrun):
+    torchrun --nproc_per_node=8 train_sequential.py --config config.yaml
+"""
+
 import os
 import sys
 import time
@@ -14,80 +28,129 @@ from config_loader import CustomFinetuneConfig
 from finetune_tokenizer import train_tokenizer, set_seed, setup_logging as setup_tokenizer_logging
 from finetune_base_model import train_model, create_dataloaders, setup_logging as setup_basemodel_logging
 
+# ── HPO override helpers ───────────────────────────────────────────────────────
+# Reusing these functions from hpo_tuner.py guarantees that the dropout and BSQ
+# parameter injection logic is identical during HPO search and final training.
+from hpo_tuner import apply_dropout_overrides, apply_bsq_overrides
+
 
 class SequentialTrainer:
-    
+    """
+    Orchestrates sequential fine-tuning of the Nos tokenizer and basemodel.
+
+    Handles device setup, distributed training initialisation, directory
+    creation, and delegates to the phase-specific training functions.
+    """
+
     def __init__(self, config_path: str = None):
         self.config = CustomFinetuneConfig(config_path)
         self.rank = int(os.environ.get("RANK", "0"))
         self.world_size = int(os.environ.get("WORLD_SIZE", "1"))
-        self.local_rank = int(os.environ.get("LOCAL_RANK", str(self.config.device_id if hasattr(self.config, 'device_id') else 0)))
+        self.local_rank = int(
+            os.environ.get(
+                "LOCAL_RANK",
+                str(self.config.device_id if hasattr(self.config, 'device_id') else 0)
+            )
+        )
         self.device = self._setup_device()
-        
+
         self.config.print_config_summary()
-    
+
+    # ── Device / Distributed Setup ─────────────────────────────────────────────
+
     def _setup_device(self):
         if self.config.use_cuda and torch.cuda.is_available():
             torch.cuda.set_device(self.local_rank)
             device = torch.device(f"cuda:{self.local_rank}")
         else:
             device = torch.device("cpu")
-        
+
         if self.rank == 0:
-            print(f"Using device: {device} (rank={self.rank}, world_size={self.world_size}, local_rank={self.local_rank})")
+            print(
+                f"Using device: {device} "
+                f"(rank={self.rank}, world_size={self.world_size}, "
+                f"local_rank={self.local_rank})"
+            )
         return device
-    
+
     def _setup_distributed(self):
         if self.world_size > 1 and torch.cuda.is_available():
             backend = os.environ.get("DIST_BACKEND", "nccl").lower()
             if not dist.is_initialized():
                 dist.init_process_group(backend=backend)
             if self.rank == 0:
-                print(f"Distributed training initialized: backend={backend}, world_size={self.world_size}")
+                print(
+                    f"Distributed training initialised: "
+                    f"backend={backend}, world_size={self.world_size}"
+                )
         else:
             if self.rank == 0:
-                print("Distributed training not enabled, using single GPU/CPU training")
-    
+                print(
+                    "Distributed training not enabled, "
+                    "using single GPU/CPU training"
+                )
+
+    # ── Directory / Model Existence Helpers ────────────────────────────────────
+
     def _check_existing_models(self):
         tokenizer_exists = os.path.exists(self.config.tokenizer_best_model_path)
         basemodel_exists = os.path.exists(self.config.basemodel_best_model_path)
-        
+
         print(f"Tokenizer model exists: {tokenizer_exists}")
         print(f"Basemodel model exists: {basemodel_exists}")
-        
+
         return tokenizer_exists, basemodel_exists
-    
+
     def _create_directories(self):
         os.makedirs(self.config.tokenizer_save_path, exist_ok=True)
         os.makedirs(self.config.basemodel_save_path, exist_ok=True)
         print(f"Created directory: {self.config.tokenizer_save_path}")
         print(f"Created directory: {self.config.basemodel_save_path}")
-    
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # Phase 1: Tokenizer Fine-tuning
+    # ══════════════════════════════════════════════════════════════════════════
+
     def train_tokenizer_phase(self):
-        print("\n" + "="*60)
+        """
+        Fine-tunes the NosTokenizer.
+
+        Model is loaded (pretrained or randomly initialised), HPO-derived
+        architecture overrides are injected *before* the model is moved to
+        the GPU, then standard tokenizer training proceeds.
+        """
+        print("\n" + "=" * 60)
         print("Starting Tokenizer Fine-tuning Phase")
-        print("="*60)
-        
+        print("=" * 60)
+
         tokenizer_exists, _ = self._check_existing_models()
         if tokenizer_exists and self.config.skip_existing:
             print("Tokenizer model already exists, skipping training")
             return True
-        
+
         log_dir = os.path.join(self.config.base_save_path, "logs")
         logger = setup_tokenizer_logging(self.config.exp_name, log_dir, self.rank)
-        
+
         set_seed(self.config.seed)
-        
+
+        # ── Model instantiation ────────────────────────────────────────────
         if getattr(self.config, 'pre_trained_tokenizer', True):
             logger.info("Loading pretrained tokenizer...")
             if self.rank == 0:
                 print("Loading pretrained tokenizer...")
-            tokenizer = NosTokenizer.from_pretrained(self.config.pretrained_tokenizer_path)
+            tokenizer = NosTokenizer.from_pretrained(
+                self.config.pretrained_tokenizer_path
+            )
         else:
             if self.rank == 0:
-                print("pre_trained_tokenizer=False, randomly initializing Tokenizer architecture")
+                print(
+                    "pre_trained_tokenizer=False, "
+                    "randomly initialising Tokenizer architecture"
+                )
             import json
-            cfg_path = os.path.join(self.config.pretrained_tokenizer_path, 'config.json')
+            cfg_path = os.path.join(
+                self.config.pretrained_tokenizer_path, 'config.json'
+            )
             with open(cfg_path, 'r') as f:
                 arch = json.load(f)
             tokenizer = NosTokenizer(
@@ -106,15 +169,25 @@ class SequentialTrainer:
                 gamma0=arch.get('gamma0', 1.0),
                 gamma=arch.get('gamma', 1.1),
                 zeta=arch.get('zeta', 0.05),
-                group_size=arch.get('group_size', 4)
+                group_size=arch.get('group_size', 4),
             )
+
+        # ── HPO parameter injection (must happen BEFORE .to(device)) ──────
+        # Applying overrides on CPU avoids device-mismatch errors that can
+        # occur when modifying module attributes after GPU placement,
+        # particularly inside DDP wrappers.
+        tokenizer = apply_bsq_overrides(tokenizer, self.config)
+        tokenizer = apply_dropout_overrides(tokenizer, self.config)
+
+        # ── Move to device ─────────────────────────────────────────────────
         tokenizer = tokenizer.to(self.device)
-        
+
+        # ── Diagnostics ───────────────────────────────────────────────────
         model_size = sum(p.numel() for p in tokenizer.parameters())
         logger.info(f"Tokenizer parameters: {model_size:,}")
         if self.rank == 0:
             print(f"Tokenizer parameters: {model_size:,}")
-        
+
         logger.info("=== Training Configuration ===")
         logger.info(f"Data path: {self.config.data_path}")
         logger.info(f"Lookback window: {self.config.lookback_window}")
@@ -124,10 +197,12 @@ class SequentialTrainer:
         logger.info(f"Training epochs: {self.config.tokenizer_epochs}")
         logger.info(f"Device: {self.device}")
         logger.info(f"Distributed training: False")
-        
+
+        # ── Training ───────────────────────────────────────────────────────
         logger.info("Starting tokenizer fine-tuning training...")
         if self.rank == 0:
             print("Starting tokenizer fine-tuning training...")
+
         start_time = time.time()
         best_val_loss = train_tokenizer(
             tokenizer,
@@ -137,43 +212,72 @@ class SequentialTrainer:
             logger,
         )
         training_time = time.time() - start_time
-        
-        final_msg = f"Tokenizer training completed! Best validation loss: {best_val_loss:.4f}\nTraining time: {training_time/60:.2f} minutes\nModel saved to: {self.config.tokenizer_save_path}"
+
+        final_msg = (
+            f"Tokenizer training completed! "
+            f"Best validation loss: {best_val_loss:.4f}\n"
+            f"Training time: {training_time / 60:.2f} minutes\n"
+            f"Model saved to: {self.config.tokenizer_save_path}"
+        )
         logger.info(final_msg)
         if self.rank == 0:
             print(f"\n{final_msg}")
-        
+
         return True
-    
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # Phase 2: Basemodel (Predictor) Fine-tuning
+    # ══════════════════════════════════════════════════════════════════════════
+
     def train_basemodel_phase(self):
-        print("\n" + "="*60)
+        """
+        Fine-tunes the Nos predictor with a (optionally frozen) tokenizer.
+
+        Both the tokenizer and predictor receive HPO-derived overrides before
+        being moved to the GPU.  The tokenizer receives both BSQ and dropout
+        overrides; the predictor receives only dropout overrides (BSQ lives
+        exclusively in the tokenizer architecture).
+        """
+        print("\n" + "=" * 60)
         print("Starting Basemodel Fine-tuning Phase")
-        print("="*60)
-        
+        print("=" * 60)
+
         if getattr(self.config, 'pre_trained_tokenizer', True):
             if not os.path.exists(self.config.finetuned_tokenizer_path):
-                raise FileNotFoundError(f"Fine-tuned tokenizer does not exist: {self.config.finetuned_tokenizer_path}")
-        
+                raise FileNotFoundError(
+                    f"Fine-tuned tokenizer does not exist: "
+                    f"{self.config.finetuned_tokenizer_path}"
+                )
+
         _, basemodel_exists = self._check_existing_models()
         if basemodel_exists and self.config.skip_existing:
             print("Basemodel model already exists, skipping training")
             return True
-        
+
         log_dir = os.path.join(self.config.base_save_path, "logs")
         logger = setup_basemodel_logging(self.config.exp_name, log_dir, self.rank)
-        
+
         set_seed(self.config.seed)
-        
+
+        # ── Tokenizer instantiation ────────────────────────────────────────
         if getattr(self.config, 'pre_trained_tokenizer', True):
             logger.info("Loading fine-tuned tokenizer...")
             if self.rank == 0:
                 print("Loading fine-tuned tokenizer...")
-            tokenizer = NosTokenizer.from_pretrained(self.config.finetuned_tokenizer_path)
+            tokenizer = NosTokenizer.from_pretrained(
+                self.config.finetuned_tokenizer_path
+            )
         else:
             if self.rank == 0:
-                print("pre_trained_tokenizer=False, randomly initializing Tokenizer architecture for Predictor training")
+                print(
+                    "pre_trained_tokenizer=False, "
+                    "randomly initialising Tokenizer architecture "
+                    "for Predictor training"
+                )
             import json
-            cfg_path = os.path.join(self.config.pretrained_tokenizer_path, 'config.json')
+            cfg_path = os.path.join(
+                self.config.pretrained_tokenizer_path, 'config.json'
+            )
             with open(cfg_path, 'r') as f:
                 arch = json.load(f)
             tokenizer = NosTokenizer(
@@ -192,10 +296,17 @@ class SequentialTrainer:
                 gamma0=arch.get('gamma0', 1.0),
                 gamma=arch.get('gamma', 1.1),
                 zeta=arch.get('zeta', 0.05),
-                group_size=arch.get('group_size', 4)
+                group_size=arch.get('group_size', 4),
             )
+
+        # ── HPO injection into the frozen tokenizer (CPU, before .to()) ───
+        tokenizer = apply_bsq_overrides(tokenizer, self.config)
+        tokenizer = apply_dropout_overrides(tokenizer, self.config)
+
+        # ── Move tokenizer to device ───────────────────────────────────────
         tokenizer = tokenizer.to(self.device)
-        
+
+        # ── Predictor instantiation ────────────────────────────────────────
         if getattr(self.config, 'pre_trained_predictor', True):
             logger.info("Loading pretrained predictor...")
             if self.rank == 0:
@@ -203,9 +314,14 @@ class SequentialTrainer:
             model = Nos.from_pretrained(self.config.pretrained_predictor_path)
         else:
             if self.rank == 0:
-                print("pre_trained_predictor=False, randomly initializing Predictor architecture")
+                print(
+                    "pre_trained_predictor=False, "
+                    "randomly initialising Predictor architecture"
+                )
             import json
-            cfg_path = os.path.join(self.config.pretrained_predictor_path, 'config.json')
+            cfg_path = os.path.join(
+                self.config.pretrained_predictor_path, 'config.json'
+            )
             with open(cfg_path, 'r') as f:
                 arch = json.load(f)
             print("model_config: ", arch)
@@ -220,15 +336,23 @@ class SequentialTrainer:
                 attn_dropout_p=arch.get('attn_dropout_p', 0.0),
                 resid_dropout_p=arch.get('resid_dropout_p', 0.2),
                 token_dropout_p=arch.get('token_dropout_p', 0.0),
-                learn_te=arch.get('learn_te', True)
+                learn_te=arch.get('learn_te', True),
             )
+
+        # ── HPO dropout injection into predictor (CPU, before .to()) ──────
+        # BSQ overrides are intentionally omitted here — the BSQ quantizer
+        # lives inside the tokenizer, not the predictor.
+        model = apply_dropout_overrides(model, self.config)
+
+        # ── Move predictor to device ───────────────────────────────────────
         model = model.to(self.device)
-        
+
+        # ── Diagnostics ───────────────────────────────────────────────────
         model_size = sum(p.numel() for p in model.parameters())
         logger.info(f"Model parameters: {model_size:,}")
         if self.rank == 0:
             print(f"Model parameters: {model_size:,}")
-        
+
         logger.info("=== Training Configuration ===")
         logger.info(f"Data path: {self.config.data_path}")
         logger.info(f"Lookback window: {self.config.lookback_window}")
@@ -239,10 +363,12 @@ class SequentialTrainer:
         logger.info(f"Device: {self.device}")
         logger.info(f"Tokenizer path: {self.config.finetuned_tokenizer_path}")
         logger.info(f"Pretrained model path: {self.config.pretrained_predictor_path}")
-        
+
+        # ── Training ───────────────────────────────────────────────────────
         logger.info("Starting fine-tuning training...")
         if self.rank == 0:
             print("Starting fine-tuning training...")
+
         start_time = time.time()
         best_val_loss = train_model(
             model,
@@ -253,28 +379,34 @@ class SequentialTrainer:
             logger,
         )
         training_time = time.time() - start_time
-        
-        final_msg = f"Basemodel training completed! Best validation loss: {best_val_loss:.4f}\nTraining time: {training_time/60:.2f} minutes\nModel saved to: {self.config.basemodel_save_path}"
+
+        final_msg = (
+            f"Basemodel training completed! "
+            f"Best validation loss: {best_val_loss:.4f}\n"
+            f"Training time: {training_time / 60:.2f} minutes\n"
+            f"Model saved to: {self.config.basemodel_save_path}"
+        )
         logger.info(final_msg)
         if self.rank == 0:
             print(f"\n{final_msg}")
-        
+
         return True
-    
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # Top-level Orchestration
+    # ══════════════════════════════════════════════════════════════════════════
+
     def run_training(self):
         if self.rank == 0:
             print("Starting Nos model sequential fine-tuning training")
             print(f"Experiment name: {self.config.experiment_name}")
             print(f"Experiment description: {self.config.experiment_description}")
-        
+
         self._setup_distributed()
-        
         self._create_directories()
-        
-        tokenizer_exists, basemodel_exists = self._check_existing_models()
-        
+
         total_start_time = time.time()
-        
+
         try:
             if self.config.train_tokenizer:
                 success = self.train_tokenizer_phase()
@@ -283,7 +415,7 @@ class SequentialTrainer:
                     return False
             else:
                 print("Skipping Tokenizer training phase")
-            
+
             if self.config.train_basemodel:
                 success = self.train_basemodel_phase()
                 if not success:
@@ -291,55 +423,74 @@ class SequentialTrainer:
                     return False
             else:
                 print("Skipping Basemodel training phase")
-            
+
             total_time = time.time() - total_start_time
-            
+
             if self.rank == 0:
-                print("\n" + "="*60)
+                print("\n" + "=" * 60)
                 print("Training completed!")
-                print("="*60)
-                print(f"Total training time: {total_time/60:.2f} minutes")
+                print("=" * 60)
+                print(f"Total training time: {total_time / 60:.2f} minutes")
                 print(f"Tokenizer model: {self.config.tokenizer_best_model_path}")
                 print(f"Basemodel model: {self.config.basemodel_best_model_path}")
-                print("="*60)
-            
+                print("=" * 60)
+
             return True
-            
+
         except Exception as e:
             if self.rank == 0:
                 print(f"Error occurred during training: {str(e)}")
             import traceback
             traceback.print_exc()
             return False
-        
+
         finally:
             pass
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# CLI Entry Point
+# ══════════════════════════════════════════════════════════════════════════════
+
 def main():
-    parser = argparse.ArgumentParser(description='Nos Model Sequential Fine-tuning Training')
-    parser.add_argument('--config', type=str, default='config.yaml', 
-                       help='Configuration file path (default: config.yaml)')
-    parser.add_argument('--skip-tokenizer', action='store_true', 
-                       help='Skip tokenizer training phase')
-    parser.add_argument('--skip-basemodel', action='store_true', 
-                       help='Skip basemodel training phase')
-    parser.add_argument('--skip-existing', action='store_true', 
-                       help='Skip training for existing models')
-    
+    parser = argparse.ArgumentParser(
+        description='Nos Model Sequential Fine-tuning Training'
+    )
+    parser.add_argument(
+        '--config',
+        type=str,
+        default='config.yaml',
+        help='Configuration file path (default: config.yaml)',
+    )
+    parser.add_argument(
+        '--skip-tokenizer',
+        action='store_true',
+        help='Skip tokenizer training phase',
+    )
+    parser.add_argument(
+        '--skip-basemodel',
+        action='store_true',
+        help='Skip basemodel training phase',
+    )
+    parser.add_argument(
+        '--skip-existing',
+        action='store_true',
+        help='Skip training for existing models',
+    )
+
     args = parser.parse_args()
-    
+
     trainer = SequentialTrainer(args.config)
-    
+
     if args.skip_tokenizer:
         trainer.config.train_tokenizer = False
     if args.skip_basemodel:
         trainer.config.train_basemodel = False
     if args.skip_existing:
         trainer.config.skip_existing = True
-    
+
     success = trainer.run_training()
-    
+
     if success:
         print("Training completed successfully!")
         if dist.is_available() and dist.is_initialized():

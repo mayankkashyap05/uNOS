@@ -14,7 +14,23 @@ training:
   basemodel_epochs: 20
   batch_size: 32
   log_interval: 50
-  num_workers: 6
+    # num_workers: DataLoader subprocess count per GPU process.
+  # hpo_tuner.py overrides this dynamically based on CPU count and number
+  # of concurrent GPU workers. The value here is used for standalone
+  # (non-HPO) training runs only.
+  # Formula used by HPO: floor(cpu_count * 0.8 / n_gpu_workers), capped at 4.
+  num_workers: 4
+
+  # pin_memory: Pins DataLoader output tensors to page-locked (pinned) CPU
+  # memory, enabling faster async CPU→GPU transfers via DMA. Always true
+  # when training on GPU.
+  pin_memory: true
+
+  # persistent_workers: Keeps DataLoader worker processes alive between
+  # epochs instead of restarting them. Eliminates the worker process
+  # spawn overhead at the start of each epoch (~0.5-2s per epoch on large
+  # datasets). Requires num_workers > 0.
+  persistent_workers: true
   seed: 42
 
   tokenizer_learning_rate: 0.0002
@@ -32,9 +48,15 @@ training:
   basemodel_pct_start: 0.03
   basemodel_div_factor: 10.0
 
-  # Gradient clipping (previously hardcoded)
-  tokenizer_max_grad_norm: 2.0
-  basemodel_max_grad_norm: 3.0
+  # Gradient clipping.
+  # Both spellings are supported in config and HPO search space.
+  # The training code reads tokenizer_grad_clip / basemodel_grad_clip.
+  # config_loader.py aliases tokenizer_max_grad_norm → tokenizer_grad_clip
+  # automatically, so either key works in YAML and in HPO search_space.
+  tokenizer_max_grad_norm: 2.0   # alias → tokenizer_grad_clip
+  basemodel_max_grad_norm: 3.0   # alias → basemodel_grad_clip
+  tokenizer_grad_clip: 2.0
+  basemodel_grad_clip: 3.0
 
   # Dropout overrides (optional — leave null to use pretrained values)
   ffn_dropout_p: null
@@ -77,7 +99,18 @@ hpo:
   direction: "minimize"             # minimize val_loss
   sampler: "tpe"                    # tpe | random | cmaes
   pruner: "median"                  # median | hyperband | none
-  storage: null                     # optuna DB URI or null for in-memory
+  # SQLite URI with 60-second busy timeout.
+  # The ?timeout=60 parameter prevents "database is locked" errors when
+  # 8 GPU workers finish trials simultaneously. WAL journal mode is applied
+  # programmatically by hpo_tuner.py via a SQLAlchemy connection hook,
+  # which allows concurrent reads while one worker writes.
+  #
+  # For production clusters with >8 GPUs, switch to PostgreSQL:
+  #   storage: "postgresql://user:password@localhost:5432/nos_hpo"
+  #
+  # For single-GPU development (in-memory, no persistence):
+  #   storage: null
+  storage: null
   study_name: "nos_finetune_hpo"
 
   # What to optimize

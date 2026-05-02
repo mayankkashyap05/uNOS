@@ -4,34 +4,49 @@
 
 | Field | Value |
 | ----- | ----- |
-| **Generated** | `2026-04-26 21:28:20` |
+| **Generated** | `2026-04-27 23:07:10` |
 | **Source mode** | YAML config (`codebase.yaml`) |
 | **Base directory** | `C:\Users\kashy\OneDrive\Documents\uNOS` |
-| **Total files** | 6 |
+| **Total files** | 13 |
 
 ## 📑 Table of Contents
 
 1. [Project Structure](#-project-structure)
 2. [File Contents](#-file-contents)
    - [configs/config.yaml](#configsconfigyaml)
+   - [configs/config_mx110_hpo_fulltest.yaml](#configsconfig-mx110-hpo-fulltestyaml)
+   - [configs/config_mx110_hpo_winner.yaml](#configsconfig-mx110-hpo-winneryaml)
+   - [data/1h.csv](#data1hcsv)
+   - [model/__init__.py](#model--init--py)
    - [model/module.py](#modelmodulepy)
    - [model/nos.py](#modelnospy)
-   - [model/__init__.py](#model--init--py)
    - [config_loader.py](#config-loaderpy)
    - [hpo_tuner.py](#hpo-tunerpy)
+   - [launch_hpo.sh](#launch-hposh)
+   - [finetune_base_model.py](#finetune-base-modelpy)
+   - [finetune_tokenizer.py](#finetune-tokenizerpy)
+   - [train_sequential.py](#train-sequentialpy)
 
 ## 📁 Project Structure
 
 ```
 .
 ├── configs
-│   └── config.yaml
+│   ├── config.yaml
+│   ├── config_mx110_hpo_fulltest.yaml
+│   └── config_mx110_hpo_winner.yaml
+├── data
+│   └── 1h.csv
 ├── model
+│   ├── __init__.py
 │   ├── module.py
-│   ├── nos.py
-│   └── __init__.py
+│   └── nos.py
 ├── config_loader.py
-└── hpo_tuner.py
+├── hpo_tuner.py
+├── launch_hpo.sh
+├── finetune_base_model.py
+├── finetune_tokenizer.py
+└── train_sequential.py
 ```
 
 ## 📄 File Contents
@@ -55,7 +70,23 @@ training:
   basemodel_epochs: 20
   batch_size: 32
   log_interval: 50
-  num_workers: 6
+    # num_workers: DataLoader subprocess count per GPU process.
+  # hpo_tuner.py overrides this dynamically based on CPU count and number
+  # of concurrent GPU workers. The value here is used for standalone
+  # (non-HPO) training runs only.
+  # Formula used by HPO: floor(cpu_count * 0.8 / n_gpu_workers), capped at 4.
+  num_workers: 4
+
+  # pin_memory: Pins DataLoader output tensors to page-locked (pinned) CPU
+  # memory, enabling faster async CPU→GPU transfers via DMA. Always true
+  # when training on GPU.
+  pin_memory: true
+
+  # persistent_workers: Keeps DataLoader worker processes alive between
+  # epochs instead of restarting them. Eliminates the worker process
+  # spawn overhead at the start of each epoch (~0.5-2s per epoch on large
+  # datasets). Requires num_workers > 0.
+  persistent_workers: true
   seed: 42
 
   tokenizer_learning_rate: 0.0002
@@ -73,9 +104,15 @@ training:
   basemodel_pct_start: 0.03
   basemodel_div_factor: 10.0
 
-  # Gradient clipping (previously hardcoded)
-  tokenizer_max_grad_norm: 2.0
-  basemodel_max_grad_norm: 3.0
+  # Gradient clipping.
+  # Both spellings are supported in config and HPO search space.
+  # The training code reads tokenizer_grad_clip / basemodel_grad_clip.
+  # config_loader.py aliases tokenizer_max_grad_norm → tokenizer_grad_clip
+  # automatically, so either key works in YAML and in HPO search_space.
+  tokenizer_max_grad_norm: 2.0   # alias → tokenizer_grad_clip
+  basemodel_max_grad_norm: 3.0   # alias → basemodel_grad_clip
+  tokenizer_grad_clip: 2.0
+  basemodel_grad_clip: 3.0
 
   # Dropout overrides (optional — leave null to use pretrained values)
   ffn_dropout_p: null
@@ -118,7 +155,18 @@ hpo:
   direction: "minimize"             # minimize val_loss
   sampler: "tpe"                    # tpe | random | cmaes
   pruner: "median"                  # median | hyperband | none
-  storage: null                     # optuna DB URI or null for in-memory
+  # SQLite URI with 60-second busy timeout.
+  # The ?timeout=60 parameter prevents "database is locked" errors when
+  # 8 GPU workers finish trials simultaneously. WAL journal mode is applied
+  # programmatically by hpo_tuner.py via a SQLAlchemy connection hook,
+  # which allows concurrent reads while one worker writes.
+  #
+  # For production clusters with >8 GPUs, switch to PostgreSQL:
+  #   storage: "postgresql://user:password@localhost:5432/nos_hpo"
+  #
+  # For single-GPU development (in-memory, no persistence):
+  #   storage: null
+  storage: null
   study_name: "nos_finetune_hpo"
 
   # What to optimize
@@ -266,41 +314,538 @@ hpo:
 
 ---
 
+### `configs/config_mx110_hpo_fulltest.yaml`
+
+```yaml
+data:
+  data_path: "data/1h.csv"
+  lookback_window: 3
+  predict_window: 2
+  max_context: 5
+  clip: 5.0
+  train_ratio: 0.9
+  val_ratio: 0.1
+  test_ratio: 0.0
+
+training:
+  # Base epochs kept at 1 for the final "apply best" retraining phase
+  tokenizer_epochs: 5
+  basemodel_epochs: 5
+  
+  # CRITICAL for 2GB VRAM: keep base batch_size tiny
+  batch_size: 512
+  log_interval: 10
+
+  num_workers: 2
+
+  pin_memory: true
+  persistent_workers: true
+  seed: 42
+
+  tokenizer_learning_rate: 0.0002
+  predictor_learning_rate: 0.000001
+
+  adam_beta1: 0.9
+  adam_beta2: 0.95
+  adam_weight_decay: 0.1
+
+  accumulation_steps: 1
+
+  tokenizer_pct_start: 0.03
+  tokenizer_div_factor: 10.0
+  basemodel_pct_start: 0.03
+  basemodel_div_factor: 10.0
+
+  tokenizer_max_grad_norm: 2.0   
+  basemodel_max_grad_norm: 3.0   
+  tokenizer_grad_clip: 2.0
+  basemodel_grad_clip: 3.0
+
+  ffn_dropout_p: null
+  attn_dropout_p: null
+  resid_dropout_p: null
+  token_dropout_p: null
+
+  bsq_beta: null
+  bsq_gamma0: null
+  bsq_gamma: null
+  bsq_zeta: null
+
+model_paths:
+  pretrained_tokenizer: "models/nos_tokenizer_2k"
+  pretrained_predictor: "models/nos_mini"
+  exp_name: "smoke_test_full_hpo"
+  base_path: "finetuned"
+  base_save_path: ""
+  finetuned_tokenizer: ""
+  tokenizer_save_name: "tokenizer"
+  basemodel_save_name: "basemodel"
+
+experiment:
+  name: "Nos_smoke_test_full"
+  description: "2GB VRAM Full HPO Structure Test"
+  use_comet: false
+  train_tokenizer: true
+  train_basemodel: true
+  skip_existing: false
+
+device:
+  use_cuda: true
+  device_id: 0
+
+# ── Hyperparameter Search Space ──────────────────────────────────
+hpo:
+  enabled: true                    
+  # 5 trials is enough for TPE to sample a wide variety of combinations
+  # without taking all day on a local GPU.
+  n_trials: 2                      
+  direction: "minimize"            
+  sampler: "tpe"                   
+  pruner: "median"                 
+  
+  # Actively testing the SQLite WAL & NullPool lock fix locally
+  storage: "sqlite:///nos_smoke_test.db?timeout=60"
+  study_name: "nos_finetune_hpo_full"
+
+  optimize_tokenizer: true
+  optimize_basemodel: true
+
+  # 1 epoch per trial to burn through the 5 trials rapidly
+  hpo_tokenizer_epochs: 1
+  hpo_basemodel_epochs: 1
+
+  search_space:
+    # ── Tokenizer ──────────────────────────────────────────────
+    tokenizer_learning_rate:
+      type: float
+      low: 1.0e-5
+      high: 5.0e-3
+      log: true
+
+    # ── Predictor ──────────────────────────────────────────────
+    predictor_learning_rate:
+      type: float
+      low: 1.0e-7
+      high: 1.0e-4
+      log: true
+
+    # ── Shared Optimizer ───────────────────────────────────────
+    adam_weight_decay:
+      type: float
+      low: 0.001
+      high: 0.3
+      log: true
+
+    adam_beta1:
+      type: float
+      low: 0.85
+      high: 0.95
+      log: false
+
+    adam_beta2:
+      type: float
+      low: 0.90
+      high: 0.999
+      log: false
+
+    # ── Batch & Accumulation ───────────────────────────────────
+    # CRITICAL VRAM GUARD: Limits batch to what a 2GB card can survive.
+    batch_size:
+      type: categorical
+      choices: [1, 2, 4]
+
+    # Accumulation doesn't cost extra VRAM, so we can test larger sizes.
+    accumulation_steps:
+      type: categorical
+      choices: [1, 2, 4]
+
+    # ── Scheduler ─────────────────────────────────────────────
+    tokenizer_pct_start:
+      type: float
+      low: 0.01
+      high: 0.15
+      log: false
+
+    basemodel_pct_start:
+      type: float
+      low: 0.01
+      high: 0.15
+      log: false
+
+    tokenizer_div_factor:
+      type: categorical
+      choices: [5.0, 10.0, 25.0, 50.0]
+
+    basemodel_div_factor:
+      type: categorical
+      choices: [5.0, 10.0, 25.0, 50.0]
+
+    # ── Gradient Clipping ─────────────────────────────────────
+    tokenizer_max_grad_norm:
+      type: float
+      low: 0.5
+      high: 5.0
+      log: false
+
+    basemodel_max_grad_norm:
+      type: float
+      low: 0.5
+      high: 5.0
+      log: false
+
+    # ── Dropout (finetuning regularization) ────────────────────
+    ffn_dropout_p:
+      type: float
+      low: 0.0
+      high: 0.4
+      log: false
+
+    attn_dropout_p:
+      type: float
+      low: 0.0
+      high: 0.2
+      log: false
+
+    resid_dropout_p:
+      type: float
+      low: 0.0
+      high: 0.3
+      log: false
+
+    token_dropout_p:
+      type: float
+      low: 0.0
+      high: 0.2
+      log: false
+
+    # ── BSQ Loss Weights (careful tuning) ─────────────────────
+    bsq_beta:
+      type: float
+      low: 0.01
+      high: 0.2
+      log: true
+
+    bsq_gamma0:
+      type: float
+      low: 0.5
+      high: 2.0
+      log: false
+
+    bsq_gamma:
+      type: float
+      low: 0.8
+      high: 2.0
+      log: false
+
+    bsq_zeta:
+      type: float
+      low: 0.01
+      high: 0.2
+      log: true
+
+    # ── Data Params ────────────────────────────────────────────
+    clip:
+      type: float
+      low: 3.0
+      high: 10.0
+      log: false
+```
+
+---
+
+### `configs/config_mx110_hpo_winner.yaml`
+
+```yaml
+data:
+  data_path: data/1h.csv
+  lookback_window: 3
+  predict_window: 2
+  max_context: 5
+  clip: 7.282970263056656
+  train_ratio: 0.9
+  val_ratio: 0.1
+  test_ratio: 0.0
+training:
+  tokenizer_epochs: 5
+  basemodel_epochs: 5
+  batch_size: 1
+  log_interval: 10
+  num_workers: 2
+  pin_memory: true
+  persistent_workers: true
+  seed: 42
+  tokenizer_learning_rate: 0.0001025350969016849
+  predictor_learning_rate: 1.3292918943162153e-06
+  adam_beta1: 0.9231993941811405
+  adam_beta2: 0.9592671899355066
+  adam_weight_decay: 0.22648248189516848
+  accumulation_steps: 1
+  tokenizer_pct_start: 0.012881829201412343
+  tokenizer_div_factor: 5.0
+  basemodel_pct_start: 0.012881829201412343
+  basemodel_div_factor: 5.0
+  tokenizer_max_grad_norm: 1.325320294340452
+  basemodel_max_grad_norm: 1.325320294340452
+  tokenizer_grad_clip: 2.0
+  basemodel_grad_clip: 3.0
+  ffn_dropout_p: 0.1216968971838151
+  attn_dropout_p: 0.10495128632644757
+  resid_dropout_p: 0.12958350559263473
+  token_dropout_p: 0.058245828039608386
+  bsq_beta: 0.024878734419814436
+  bsq_gamma0: 1.2871346474483567
+  bsq_gamma: 1.3183340223705389
+  bsq_zeta: 0.023927528765580644
+model_paths:
+  pretrained_tokenizer: models/nos_tokenizer_2k
+  pretrained_predictor: models/nos_mini
+  exp_name: smoke_test_full_hpo
+  base_path: finetuned
+  base_save_path: ''
+  finetuned_tokenizer: ''
+  tokenizer_save_name: tokenizer
+  basemodel_save_name: basemodel
+experiment:
+  name: Nos_smoke_test_full
+  description: 2GB VRAM Full HPO Structure Test
+  use_comet: false
+  train_tokenizer: true
+  train_basemodel: true
+  skip_existing: false
+  hpo_applied: true
+  hpo_applied_timestamp: '2026-04-27T22:31:17.729466'
+device:
+  use_cuda: true
+  device_id: 0
+hpo:
+  enabled: true
+  n_trials: 2
+  direction: minimize
+  sampler: tpe
+  pruner: median
+  storage: sqlite:///nos_smoke_test.db?timeout=60
+  study_name: nos_finetune_hpo_full
+  optimize_tokenizer: true
+  optimize_basemodel: true
+  hpo_tokenizer_epochs: 1
+  hpo_basemodel_epochs: 1
+  search_space:
+    tokenizer_learning_rate:
+      type: float
+      low: 1.0e-05
+      high: 0.005
+      log: true
+    predictor_learning_rate:
+      type: float
+      low: 1.0e-07
+      high: 0.0001
+      log: true
+    adam_weight_decay:
+      type: float
+      low: 0.001
+      high: 0.3
+      log: true
+    adam_beta1:
+      type: float
+      low: 0.85
+      high: 0.95
+      log: false
+    adam_beta2:
+      type: float
+      low: 0.9
+      high: 0.999
+      log: false
+    batch_size:
+      type: categorical
+      choices:
+      - 1
+      - 2
+      - 4
+    accumulation_steps:
+      type: categorical
+      choices:
+      - 1
+      - 2
+      - 4
+    tokenizer_pct_start:
+      type: float
+      low: 0.01
+      high: 0.15
+      log: false
+    basemodel_pct_start:
+      type: float
+      low: 0.01
+      high: 0.15
+      log: false
+    tokenizer_div_factor:
+      type: categorical
+      choices:
+      - 5.0
+      - 10.0
+      - 25.0
+      - 50.0
+    basemodel_div_factor:
+      type: categorical
+      choices:
+      - 5.0
+      - 10.0
+      - 25.0
+      - 50.0
+    tokenizer_max_grad_norm:
+      type: float
+      low: 0.5
+      high: 5.0
+      log: false
+    basemodel_max_grad_norm:
+      type: float
+      low: 0.5
+      high: 5.0
+      log: false
+    ffn_dropout_p:
+      type: float
+      low: 0.0
+      high: 0.4
+      log: false
+    attn_dropout_p:
+      type: float
+      low: 0.0
+      high: 0.2
+      log: false
+    resid_dropout_p:
+      type: float
+      low: 0.0
+      high: 0.3
+      log: false
+    token_dropout_p:
+      type: float
+      low: 0.0
+      high: 0.2
+      log: false
+    bsq_beta:
+      type: float
+      low: 0.01
+      high: 0.2
+      log: true
+    bsq_gamma0:
+      type: float
+      low: 0.5
+      high: 2.0
+      log: false
+    bsq_gamma:
+      type: float
+      low: 0.8
+      high: 2.0
+      log: false
+    bsq_zeta:
+      type: float
+      low: 0.01
+      high: 0.2
+      log: true
+    clip:
+      type: float
+      low: 3.0
+      high: 10.0
+      log: false
+
+```
+
+---
+
+### `data/1h.csv`
+
+```text
+timestamps,open,high,low,close,volume,amount
+2020-08-11 06:00:00,2.85,3.47,2.85,2.9515,20032.26,0
+2020-08-11 07:00:00,2.9515,3.1355,2.88,2.9224,42069.37,0
+2020-08-11 08:00:00,2.9224,3.0,2.9144,2.96,24280.76,0
+2020-08-11 09:00:00,2.96,2.9736,2.85,2.8543,26371.23,0
+2020-08-11 10:00:00,2.8566,2.9329,2.8433,2.8976,26685.94,0
+
+# ⚠️  Preview — showing 5 of 12835 data rows (12830 rows hidden).
+```
+
+---
+
+### `model/__init__.py`
+
+```python
+from .nos import NosTokenizer, Nos, NosPredictor
+
+model_dict = {
+    'nos_tokenizer': NosTokenizer,
+    'nos': Nos,
+    'nos_predictor': NosPredictor
+}
+
+
+def get_model_class(model_name):
+    if model_name in model_dict:
+        return model_dict[model_name]
+    else:
+        print(f"Model {model_name} not found in model_dict")
+        raise NotImplementedError
+
+
+
+```
+
+---
+
 ### `model/module.py`
 
 ```python
 import math
 
 from einops import rearrange, reduce
+from typing import Tuple
 import torch
 import torch.nn as nn
 from torch.autograd import Function
 import torch.nn.functional as F
 
-
 class DifferentiableEntropyFunction(Function):
     @staticmethod
     def forward(ctx, zq, basis, K, eps):
-        zb = (zq + 1) / 2
+        # FORCE FP32: Prevents eps=1e-8 from rounding to 0.0 in autocast (FP16),
+        # which would otherwise cause torch.log(0.0) -> NaNs.
+        zq_32 = zq.float()
+        zb = (zq_32 + 1) / 2
         zi = ((zb * basis).sum(-1)).to(torch.int64)
-        cnt = torch.scatter_reduce(torch.zeros(2 ** K, device=zq.device, dtype=zq.dtype),
-                                   0,
-                                   zi.flatten(),
-                                   torch.ones_like(zi.flatten()).to(zq.dtype),
-                                   'sum')
+
+        # Initialize counts and compute probabilities entirely in float32
+        cnt = torch.scatter_reduce(
+            torch.zeros(2 ** K, device=zq.device, dtype=torch.float32),
+            0,
+            zi.flatten(),
+            torch.ones_like(zi.flatten(), dtype=torch.float32),
+            'sum'
+        )
+        
         prob = (cnt + eps) / (cnt + eps).sum()
         H = -(prob * torch.log(prob)).sum()
+        
+        # Save tensors needed for backward. prob is already float32.
         ctx.save_for_backward(zq, zi, prob)
         ctx.K = K
-        return H
+        
+        # Return loss cast back to the original mixed-precision dtype
+        return H.to(zq.dtype)
 
     @staticmethod
     def backward(ctx, grad_output):
         zq, zi, prob = ctx.saved_tensors
-        grad_array = -grad_output * (torch.log(prob) + 1) / zi.numel() / ctx.K
+        
+        # Force incoming gradients to FP32 for numerical stability
+        grad_output_32 = grad_output.float()
+        
+        grad_array = -grad_output_32 * (torch.log(prob) + 1) / zi.numel() / ctx.K
         reord_grad = grad_array[zi.flatten()].reshape(zi.shape)
-        grad_input = reord_grad.unsqueeze(-1) * zq
-        return grad_input, None, None, None, None
+        
+        # Compute final input gradient and cast back to original dtype
+        grad_input = (reord_grad.unsqueeze(-1) * zq.float()).to(zq.dtype)
+        
+        # Return gradients for (zq, basis, K, eps)
+        return grad_input, None, None, None
 
 
 def codebook_entropy(zq, basis, K, eps=1e-4):
@@ -359,8 +904,6 @@ class BinarySphericalQuantizer(nn.Module):
         return z + (zhat - z).detach()
 
     def forward(self, z):
-        # if self.input_format == 'bchw':
-        #     z = rearrange(z, 'b c h w -> b h w c')
         zq = self.quantize(z)
 
         indices = self.codes_to_indexes(zq.detach())
@@ -386,9 +929,6 @@ class BinarySphericalQuantizer(nn.Module):
         # commit loss
         commit_loss = self.beta * torch.mean(((zq.detach() - z) ** 2).sum(dim=-1))
 
-        # if self.input_format == 'bchw':
-        #     zq = rearrange(zq, 'b h w c -> b c h w')
-
         return (
             zq,
             commit_loss + self.zeta * entropy_penalty / self.inv_temperature,
@@ -397,12 +937,9 @@ class BinarySphericalQuantizer(nn.Module):
         )
 
     def soft_entropy_loss(self, z):
-        # if we divide the code in subgroups of size group_size, the codebook will be of size 2 ** group_size
-        # the sub-code is the last group_size bits of the full code
         group_code_book = self.group_codebook / (self.embed_dim ** 0.5 if self.l2_norm else 1)
         divided_z = rearrange(z, '... (g c) -> ... g c', c=self.group_size)
 
-        # we calculate the distance between the divided_z and the codebook for each subgroup
         distance = - 2 * torch.einsum('... g c, d c ->... g d', divided_z, group_code_book)
         prob = (-distance * self.inv_temperature).softmax(dim=-1)
         if self.persample_entropy_compute == 'analytical':
@@ -415,11 +952,9 @@ class BinarySphericalQuantizer(nn.Module):
         else:
             per_sample_entropy = self.get_entropy(prob, dim=-1, normalize=False).sum(dim=-1).mean()
 
-        # macro average of the probability of each subgroup
         avg_prob = reduce(prob, '... g d ->g d', 'mean')
         codebook_entropy = self.get_entropy(avg_prob, dim=-1, normalize=False)
 
-        # the approximation of the entropy is the sum of the entropy of each subgroup
         return per_sample_entropy, codebook_entropy.sum(), avg_prob
 
     def get_hard_per_sample_entropy(self, zb_by_sample):
@@ -429,23 +964,14 @@ class BinarySphericalQuantizer(nn.Module):
         return persample_entropy.mean()
 
     def codes_to_indexes(self, zhat):
-        """Converts a `code` to an index in the codebook.
-        Args:
-            zhat: A tensor of shape (B, ..., C) containing the codes. must be in {-1, 1}
-        """
         assert zhat.shape[-1] == self.embed_dim, f"Expected {self.embed_dim} dimensions, got {zhat.shape[-1]}"
         return ((zhat + 1) / 2 * self.basis).sum(axis=-1).to(torch.int64)
 
     def codes_to_group_indexes(self, zhat):
-        """Converts a `code` to a list of indexes (in groups) in the codebook.
-        Args:
-            zhat: A tensor of shape (B, ..., C) containing the codes. must be in {-1, 1}
-        """
         zhat_in_group = rearrange(zhat, 'b ... (g c) -> b ... g c', c=self.group_size)
         return ((zhat_in_group + 1) / 2 * self.group_basis).sum(axis=-1).to(torch.int64)
 
     def indexes_to_codes(self, indices):
-        """Inverse of `indexes_to_codes`."""
         indices = indices.unsqueeze(-1)
         codes_non_centered = torch.remainder(
             torch.floor_divide(indices, self.basis), 2
@@ -453,7 +979,6 @@ class BinarySphericalQuantizer(nn.Module):
         return codes_non_centered * 2 - 1
 
     def group_indexes_to_codes(self, group_indices):
-        """Inverse of `group_indexes_to_codes`."""
         group_indices = group_indices.unsqueeze(-1)
         codes_non_centered = torch.remainder(
             torch.floor_divide(group_indices, self.group_basis), 2
@@ -491,7 +1016,6 @@ class BinarySphericalQuantizer(nn.Module):
 
 
 class BSQuantizer(nn.Module):
-
     def __init__(self, s1_bits, s2_bits, beta, gamma0, gamma, zeta, group_size):
         super().__init__()
         self.codebook_dim = s1_bits + s2_bits
@@ -550,62 +1074,104 @@ class FeedForward(nn.Module):
 
 
 class RotaryPositionalEmbedding(nn.Module):
-    def __init__(self, dim):
+    def __init__(self, dim: int) -> None:
         super().__init__()
-        inv_freq = 1.0 / (10000 ** (torch.arange(0, dim, 2).float() / dim))
-        self.register_buffer("inv_freq", inv_freq)
-        self.seq_len_cached = None
-        self.cos_cached = None
-        self.sin_cached = None
+        if dim % 2 != 0:
+            raise ValueError(
+                f"RotaryPositionalEmbedding requires an even head dimension. "
+                f"Got dim={dim}."
+            )
+        inv_freq = 1.0 / (
+            10000 ** (torch.arange(0, dim, 2, dtype=torch.float32) / dim)
+        )
+        self.register_buffer("inv_freq", inv_freq, persistent=True)
 
-    def _update_cos_sin_cache(self, x, seq_len):
-        if seq_len != self.seq_len_cached:
-            self.seq_len_cached = seq_len
-            t = torch.arange(seq_len, device=x.device).type_as(self.inv_freq)
-            freqs = torch.einsum('i,j->ij', t, self.inv_freq)
-            emb = torch.cat((freqs, freqs), dim=-1).to(x.device)
-            self.cos_cached = emb.cos()[None, None, :, :]
-            self.sin_cached = emb.sin()[None, None, :, :]
+        self.register_buffer(
+            "cos_cached", torch.empty(0, dtype=torch.float32), persistent=False
+        )
+        self.register_buffer(
+            "sin_cached", torch.empty(0, dtype=torch.float32), persistent=False
+        )
+        self._seq_len_cached: int = 0
+
+    def _update_cos_sin_cache(
+        self, x: torch.Tensor, seq_len: int
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        if seq_len != self._seq_len_cached:
+            self._seq_len_cached = seq_len
+
+            t = torch.arange(
+                seq_len,
+                device=self.inv_freq.device,
+                dtype=self.inv_freq.dtype,
+            )
+            freqs = torch.einsum("i,j->ij", t, self.inv_freq)
+            emb = torch.cat((freqs, freqs), dim=-1)
+
+            self.cos_cached = emb.cos()[None, None, :, :].to(dtype=x.dtype)
+            self.sin_cached = emb.sin()[None, None, :, :].to(dtype=x.dtype)
+
         return self.cos_cached, self.sin_cached
 
-    def forward(self, q, k):
-        cos, sin = self._update_cos_sin_cache(q, q.shape[-2])
-        return (
-            (q * cos) + (self._rotate_half(q) * sin),
-            (k * cos) + (self._rotate_half(k) * sin),
-        )
-
-    def _rotate_half(self, x):
+    @staticmethod
+    def _rotate_half(x: torch.Tensor) -> torch.Tensor:
         x1, x2 = x.chunk(2, dim=-1)
         return torch.cat((-x2, x1), dim=-1)
 
+    def forward(
+        self,
+        q: torch.Tensor,
+        k: torch.Tensor,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        seq_len = q.shape[-2]
+        cos, sin = self._update_cos_sin_cache(q, seq_len)
 
-def scaled_dot_product_attention(query, key, value, attn_mask=None, dropout_p=0.0, is_causal=False, scale=None, training=True) -> torch.Tensor:
-    L, S = query.size(-2), key.size(-2)
-    scale_factor = 1 / math.sqrt(query.size(-1)) if scale is None else scale
-    attn_bias = torch.zeros(L, S, dtype=query.dtype).to(query.device)
+        rotated_q = (q * cos) + (self._rotate_half(q) * sin)
+        rotated_k = (k * cos) + (self._rotate_half(k) * sin)
+        return rotated_q, rotated_k
 
-    if is_causal:
-        assert attn_mask is None
-        temp_mask = torch.ones(L, S, dtype=torch.bool).tril(diagonal=0).to(query.device)
-        attn_bias.masked_fill_(temp_mask.logical_not(), float("-inf"))
-        attn_bias.to(query.dtype)
 
-    attn_weight = query @ key.transpose(-2, -1) * scale_factor
-    attn_weight += attn_bias
+def scaled_dot_product_attention(
+    query: torch.Tensor, 
+    key: torch.Tensor, 
+    value: torch.Tensor, 
+    attn_mask: torch.Tensor = None, 
+    dropout_p: float = 0.0, 
+    is_causal: bool = False, 
+    scale: float = None, 
+    training: bool = True
+) -> torch.Tensor:
+    """
+    Delegates directly to PyTorch 2.0+ optimized C++ kernels.
+    Resolves O(N^2) memory scaling by avoiding explicit attention matrix materialization.
+    """
+    # PyTorch SDPA expects dropout to be exactly 0.0 during evaluation
+    effective_dropout = dropout_p if training else 0.0
 
+    # Fast-path for causal attention without custom masks
+    if is_causal and attn_mask is None:
+        return F.scaled_dot_product_attention(
+            query, key, value, 
+            dropout_p=effective_dropout, 
+            is_causal=True, 
+            scale=scale
+        )
+    
+    # Handle custom masks
     if attn_mask is not None:
-        attn_mask_bias = torch.zeros_like(attn_weight)
         if attn_mask.dtype == torch.bool:
-            attn_mask_bias.masked_fill_(attn_mask, float("-inf"))
-        else:
-            attn_mask_bias += attn_mask
-        attn_weight += attn_mask_bias
+            # F.sdpa expects True for elements that *are* allowed to attend.
+            # Standard Transformer convention usually uses True to mask *out*.
+            # Invert the boolean mask to match F.sdpa's expectation.
+            attn_mask = ~attn_mask 
 
-    attn_weight = torch.softmax(attn_weight, dim=-1)
-    attn_weight = torch.dropout(attn_weight, dropout_p, train=training)
-    return attn_weight @ value
-
+    return F.scaled_dot_product_attention(
+        query, key, value, 
+        attn_mask=attn_mask, 
+        dropout_p=effective_dropout, 
+        is_causal=False, 
+        scale=scale
+    )
 
 class MultiHeadAttentionWithRoPE(nn.Module):
     def __init__(self, d_model, n_heads, attn_dropout_p=0.0, resid_dropout_p=0.0):
@@ -712,10 +1278,6 @@ class HierarchicalEmbedding(nn.Module):
         nn.init.normal_(self.emb_s2.weight, mean=0, std=d_model ** -0.5)
 
     def forward(self, token_ids):
-        """Inputs:
-        token_ids: [batch_size, seq_len] token ID
-        Output: [batch_size, seq_len, d_model]
-        """
         if isinstance(token_ids, tuple) or isinstance(token_ids, list):
             s1_ids, s2_ids = token_ids
         else:
@@ -732,9 +1294,6 @@ class DependencyAwareLayer(nn.Module):
         self.norm = RMSNorm(d_model)
 
     def forward(self, hidden_states, sibling_embed, key_padding_mask=None):
-        """hidden_states: [batch, seq_len, d_model]
-        sibling_embed: Embedding from another subtoken
-        """
         attn_out = self.cross_attn(
             query=sibling_embed,
             key=hidden_states,
@@ -842,15 +1401,6 @@ class TemporalEmbedding(nn.Module):
         month_x = self.month_embed(x[:, :, 4])
 
         return hour_x + weekday_x + day_x + month_x + minute_x
-
-
-
-
-
-
-
-
-
 ```
 
 ---
@@ -1489,31 +2039,6 @@ class NosPredictor:
 
 ---
 
-### `model/__init__.py`
-
-```python
-from .nos import NosTokenizer, Nos, NosPredictor
-
-model_dict = {
-    'nos_tokenizer': NosTokenizer,
-    'nos': Nos,
-    'nos_predictor': NosPredictor
-}
-
-
-def get_model_class(model_name):
-    if model_name in model_dict:
-        return model_dict[model_name]
-    else:
-        print(f"Model {model_name} not found in model_dict")
-        raise NotImplementedError
-
-
-
-```
-
----
-
 ### `config_loader.py`
 
 ```python
@@ -1562,12 +2087,29 @@ class ConfigLoader:
         return config
 
     def get(self, key: str, default=None):
-        keys = key.split('.')
+        """
+        Retrieves a (possibly nested) config value using dot-notation keys.
+
+        Examples:
+            loader.get('training.batch_size')
+            loader.get('hpo.search_space.tokenizer_learning_rate.low')
+
+        Args:
+            key:     Dot-separated key path into the config dict.
+            default: Value to return if any key in the path is missing.
+
+        Returns:
+            Config value at the given path, or default if not found.
+        """
+        keys  = key.split('.')
         value = self.config
         try:
             for k in keys:
+                if not isinstance(value, dict):
+                    return default
                 value = value[k]
-            return value
+            # Treat explicit YAML null (None) as absent — return default
+            return value if value is not None else default
         except (KeyError, TypeError):
             return default
 
@@ -1591,6 +2133,15 @@ class ConfigLoader:
 
     def get_dynamic_tuning_config(self) -> Dict[str, Any]:
         return self.config.get('dynamic_tuning', {})
+    
+    def get_hpo_config(self) -> Dict[str, Any]:
+        """
+        Returns the full HPO configuration block.
+
+        Returns an empty dict (not None) if the block is absent, so callers
+        can safely use .get() without None-checks.
+        """
+        return self.config.get('hpo') or {}
 
     def update_config(self, updates: Dict[str, Any]):
         def update_nested_dict(d, u):
@@ -1639,7 +2190,7 @@ class CustomFinetuneConfig:
         self.val_ratio = data_config.get('val_ratio', 0.1)
         self.test_ratio = data_config.get('test_ratio', 0.0)
 
-        # ── Training ──────────────────────────────────────
+        # ── Training ──────────────────────────────────────────────
         training_config = self.loader.get_training_config()
 
         self.tokenizer_epochs = training_config.get('tokenizer_epochs', 30)
@@ -1654,30 +2205,33 @@ class CustomFinetuneConfig:
         self.num_workers = training_config.get('num_workers', 6)
         self.seed = training_config.get('seed', 100)
 
-        # TIER 1 FIX 1: betas now loaded and passed to both optimizers
         self.adam_beta1 = training_config.get('adam_beta1', 0.9)
         self.adam_beta2 = training_config.get('adam_beta2', 0.95)
         self.adam_weight_decay = training_config.get('adam_weight_decay', 0.1)
-
-        # TIER 2 FIX 7: Adam epsilon
         self.adam_eps = training_config.get('adam_eps', 1e-6)
 
-        # Learning rates
         self.tokenizer_learning_rate = training_config.get('tokenizer_learning_rate', 2e-4)
         self.predictor_learning_rate = training_config.get('predictor_learning_rate', 4e-5)
 
-        # TIER 1 FIX 2: Grad clipping from config
-        self.tokenizer_grad_clip = training_config.get('tokenizer_grad_clip', 2.0)
-        self.basemodel_grad_clip = training_config.get('basemodel_grad_clip', 3.0)
-        self.grad_clip_norm_type = training_config.get('grad_clip_norm_type', 2.0)
+        self.tokenizer_grad_clip = float(
+            training_config.get('tokenizer_grad_clip')
+            or training_config.get('tokenizer_max_grad_norm')
+            or 2.0
+        )
+        self.basemodel_grad_clip = float(
+            training_config.get('basemodel_grad_clip')
+            or training_config.get('basemodel_max_grad_norm')
+            or 3.0
+        )
+        self.grad_clip_norm_type = float(
+            training_config.get('grad_clip_norm_type', 2.0)
+        )
 
-        # TIER 1 FIX 3 & 12: Scheduler params from config
         self.scheduler_type = training_config.get('scheduler_type', 'cosine_warmup')
         self.scheduler_pct_start = training_config.get('scheduler_pct_start', 0.05)
         self.scheduler_div_factor = training_config.get('scheduler_div_factor', 25.0)
         self.scheduler_final_div_factor = training_config.get('scheduler_final_div_factor', 1000.0)
 
-        # TIER 1 FIX 5: Loss weights from config
         self.tokenizer_recon_pre_weight = training_config.get('tokenizer_recon_pre_weight', 1.0)
         self.tokenizer_recon_all_weight = training_config.get('tokenizer_recon_all_weight', 1.0)
         self.tokenizer_bsq_weight = training_config.get('tokenizer_bsq_weight', 0.5)
@@ -1685,16 +2239,41 @@ class CustomFinetuneConfig:
         self.basemodel_s1_weight = training_config.get('basemodel_s1_weight', 0.5)
         self.basemodel_s2_weight = training_config.get('basemodel_s2_weight', 0.5)
 
-        # TIER 2 FIX 8: Label smoothing
         self.label_smoothing = training_config.get('label_smoothing', 0.0)
-
-        # TIER 2 FIX 9: BSQ inverse temperature
         self.bsq_inv_temperature = training_config.get('bsq_inv_temperature', 1.0)
-
-        # TIER 2 FIX 10: RoPE base
         self.rope_base = training_config.get('rope_base', 10000)
-
         self.accumulation_steps = training_config.get('accumulation_steps', 1)
+
+        # ── NEW: HPO search space params that must exist as real attributes ──
+        # Without these, getattr() fallbacks in training code ignore YAML values
+        # whenever HPO doesn't sample a given parameter in a trial.
+        self.tokenizer_pct_start = training_config.get(
+            'tokenizer_pct_start', self.scheduler_pct_start
+        )
+        self.tokenizer_div_factor = training_config.get(
+            'tokenizer_div_factor', self.scheduler_div_factor
+        )
+        self.tokenizer_max_grad_norm = training_config.get(
+            'tokenizer_max_grad_norm', self.tokenizer_grad_clip
+        )
+        self.basemodel_pct_start = training_config.get(
+            'basemodel_pct_start', self.scheduler_pct_start
+        )
+        self.basemodel_div_factor = training_config.get(
+            'basemodel_div_factor', self.scheduler_div_factor
+        )
+        self.basemodel_max_grad_norm = training_config.get(
+            'basemodel_max_grad_norm', self.basemodel_grad_clip
+        )
+        self.bsq_beta   = training_config.get('bsq_beta',   None)
+        self.bsq_gamma0 = training_config.get('bsq_gamma0', None)
+        self.bsq_gamma  = training_config.get('bsq_gamma',  None)
+        self.bsq_zeta   = training_config.get('bsq_zeta',   None)
+        self.ffn_dropout_p   = training_config.get('ffn_dropout_p',   None)
+        self.attn_dropout_p  = training_config.get('attn_dropout_p',  None)
+        self.resid_dropout_p = training_config.get('resid_dropout_p', None)
+        self.token_dropout_p = training_config.get('token_dropout_p', None)
+        # ── END NEW ──────────────────────────────────────────────────────────
 
         # ── Model paths ───────────────────────────────────
         model_paths = self.loader.get_model_paths()
@@ -1787,20 +2366,64 @@ class CustomFinetuneConfig:
         self._compute_full_paths()
 
         # ── HPO ───────────────────────────────────────────
-        hpo_config = self.loader.get('hpo', {})
-        self.hpo_enabled = hpo_config.get('enabled', False)
-        self.hpo_n_trials = hpo_config.get('n_trials', 10)
-        self.hpo_direction = hpo_config.get('direction', 'minimize')
-        self.hpo_sampler = hpo_config.get('sampler', 'tpe')
-        self.hpo_pruner = hpo_config.get('pruner', 'median')
-        self.hpo_storage = hpo_config.get('storage', None)
-        self.hpo_study_name = hpo_config.get('study_name', 'nos_hpo')
-        
-        self.hpo_optimize_tokenizer = hpo_config.get('optimize_tokenizer', True)
-        self.hpo_optimize_basemodel = hpo_config.get('optimize_basemodel', True)
-        self.hpo_tokenizer_epochs = hpo_config.get('hpo_tokenizer_epochs', 5)
-        self.hpo_basemodel_epochs = hpo_config.get('hpo_basemodel_epochs', 3)
-        self.hpo_search_space = hpo_config.get('search_space', {})
+        hpo_config = self.loader.get('hpo') or {}
+
+        self.hpo_enabled            = bool(hpo_config.get('enabled', False))
+        self.hpo_n_trials           = int(hpo_config.get('n_trials', 10))
+        self.hpo_direction          = str(hpo_config.get('direction', 'minimize'))
+        self.hpo_sampler            = str(hpo_config.get('sampler', 'tpe'))
+        self.hpo_pruner             = str(hpo_config.get('pruner', 'median'))
+        self.hpo_storage            = hpo_config.get('storage', None)
+        self.hpo_study_name         = str(hpo_config.get('study_name', 'nos_hpo'))
+
+        self.hpo_optimize_tokenizer = bool(hpo_config.get('optimize_tokenizer', True))
+        self.hpo_optimize_basemodel = bool(hpo_config.get('optimize_basemodel', True))
+        self.hpo_tokenizer_epochs   = int(hpo_config.get('hpo_tokenizer_epochs', 5))
+        self.hpo_basemodel_epochs   = int(hpo_config.get('hpo_basemodel_epochs', 3))
+
+        # Deep-copy the search space so that trial clones can never mutate
+        # the base config's search space dict via shared reference.
+        import copy as _copy
+        raw_search_space = hpo_config.get('search_space', {}) or {}
+        self.hpo_search_space: Dict[str, Any] = _copy.deepcopy(raw_search_space)
+
+        # ── Search space key aliasing ─────────────────────────────────────────
+        # The YAML uses tokenizer_max_grad_norm / basemodel_max_grad_norm but
+        # the training code reads tokenizer_grad_clip / basemodel_grad_clip.
+        # Normalise here so both YAML spellings work transparently.
+        _alias_map = {
+            'tokenizer_max_grad_norm': 'tokenizer_grad_clip',
+            'basemodel_max_grad_norm': 'basemodel_grad_clip',
+        }
+        for yaml_key, code_key in _alias_map.items():
+            if yaml_key in self.hpo_search_space and code_key not in self.hpo_search_space:
+                self.hpo_search_space[code_key] = _copy.deepcopy(
+                    self.hpo_search_space[yaml_key]
+                )
+
+        # ── Validate storage URI ──────────────────────────────────────────────
+        # Warn loudly if SQLite is configured without a timeout parameter.
+        # The timeout prevents "database is locked" errors under 8 concurrent
+        # workers. See configs/config.yaml for the recommended URI format.
+        if (
+            self.hpo_storage is not None
+            and self.hpo_storage.startswith('sqlite')
+            and 'timeout=' not in self.hpo_storage
+        ):
+            import logging
+            logging.getLogger(__name__).warning(
+                f"HPO storage URI '{self.hpo_storage}' is SQLite but does not "
+                f"include a timeout parameter. Under concurrent multi-GPU HPO "
+                f"this will cause 'database is locked' errors. "
+                f"Recommended: append '?timeout=60' to the URI."
+            )
+
+        # ── Validate direction ────────────────────────────────────────────────
+        if self.hpo_direction not in ('minimize', 'maximize'):
+            raise ValueError(
+                f"hpo.direction must be 'minimize' or 'maximize'. "
+                f"Got: '{self.hpo_direction}'"
+            )
 
     def _compute_full_paths(self):
         self.tokenizer_save_path = os.path.join(
@@ -1812,13 +2435,25 @@ class CustomFinetuneConfig:
         self.basemodel_best_model_path = os.path.join(
             self.basemodel_save_path, 'best_model')
 
-    def clone_with_overrides(self, overrides: Dict[str, Any]):
-        """Creates a new config instance with Optuna-suggested parameters."""
+    def clone_with_overrides(self, overrides: Dict[str, Any]) -> 'CustomFinetuneConfig':
+        
         import copy
-        new_config = copy.copy(self)
+        import logging
+
+        new_config = copy.deepcopy(self)
+
         for k, v in overrides.items():
+            if not hasattr(new_config, k):
+                logging.getLogger(__name__).warning(
+                    f"clone_with_overrides: attribute '{k}' does not exist "
+                    f"on CustomFinetuneConfig. Adding dynamically. "
+                    f"Verify this parameter name matches the training code."
+                )
             setattr(new_config, k, v)
-        return new_config    
+
+        new_config._compute_full_paths()
+
+        return new_config   
 
     def get_tokenizer_config(self):
         return {
@@ -1925,104 +2560,279 @@ class CustomFinetuneConfig:
 ### `hpo_tuner.py`
 
 ```python
-# hpo_tuner.py
 """
 Automatic Hyperparameter Tuning for Nos Model Finetuning.
 
-Usage:
-    python hpo_tuner.py --config configs/config_test_1h.yaml
-    python hpo_tuner.py --config configs/config_test_1h.yaml --n-trials 50
-    python hpo_tuner.py --config configs/config_test_1h.yaml --phase tokenizer
-    python hpo_tuner.py --config configs/config_test_1h.yaml --phase basemodel
-    python hpo_tuner.py --config configs/config_test_1h.yaml --apply-best
+Architecture: Asynchronous multi-process HPO where each GPU process runs
+independently, sharing only an Optuna SQLite/PostgreSQL study database.
+No DDP is used — process isolation is enforced at the launcher level.
+
+Launch (single GPU, development):
+    python hpo_tuner.py --config configs/config.yaml --phase both
+
+Launch (8-GPU cluster, production):
+    ./launch_hpo.sh --config configs/config.yaml --phase both --n-trials 30
+
+Launch (specific phase):
+    python hpo_tuner.py --config configs/config.yaml --phase tokenizer
+    python hpo_tuner.py --config configs/config.yaml --phase basemodel --tokenizer-path path/to/tokenizer
+    python hpo_tuner.py --config configs/config.yaml --apply-best
 """
 
-import os
-import sys
-import json
+from __future__ import annotations
+
 import copy
+import datetime
+import gc
+import json
 import logging
 import argparse
-import time
-import tempfile
+import multiprocessing
+import os
 import shutil
-import datetime
-from typing import Dict, Any, Optional, Tuple
+import sys
+import tempfile
+import time
+import warnings  # <-- Correct standard library import
+from typing import Any, Dict, List, Optional, Tuple
+from sqlalchemy.pool import NullPool
 
 import torch
 import numpy as np
 import yaml
 
-sys.path.append('../')
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # ── Optional Optuna import ─────────────────────────────────────────────────
 try:
     import optuna
+    from optuna.exceptions import ExperimentalWarning  # <-- Moved inside the safe block
     from optuna.samplers import TPESampler, RandomSampler, CmaEsSampler
     from optuna.pruners import MedianPruner, HyperbandPruner, NopPruner
+    from optuna.storages import RDBStorage
+    
+    # Suppress Optuna's experimental feature warnings safely
+    warnings.filterwarnings("ignore", category=ExperimentalWarning)
+    
     OPTUNA_AVAILABLE = True
 except ImportError:
     OPTUNA_AVAILABLE = False
-    print("WARNING: optuna not installed. Run: pip install optuna")
 
 from config_loader import CustomFinetuneConfig
 from model import Nos, NosTokenizer
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Helper: Apply dropout overrides to a loaded model
+# Module-level logger (console output for the orchestrator process)
 # ══════════════════════════════════════════════════════════════════════════════
 
-def apply_dropout_overrides(model: torch.nn.Module, config: CustomFinetuneConfig):
+def _configure_root_logger(log_dir: str, worker_tag: str) -> logging.Logger:
     """
-    Walk through all submodules and override dropout values
-    when config specifies non-None values.
-    Works without changing architecture (weights untouched).
+    Configures the root logger for this HPO worker process.
+
+    Writes INFO+ to both console (WARNING+ only to reduce noise) and a
+    dedicated per-worker log file with full DEBUG output.
+
+    Args:
+        log_dir:    Directory where the worker log file will be written.
+        worker_tag: Unique identifier string (e.g., "pid12345_gpu0").
+
+    Returns:
+        Configured root logger for this process.
     """
-    import torch.nn as nn
+    os.makedirs(log_dir, exist_ok=True)
+    log_path = os.path.join(log_dir, f"worker_{worker_tag}.log")
 
-    ffn_dp = getattr(config, 'ffn_dropout_p', None)
-    attn_dp = getattr(config, 'attn_dropout_p', None)
-    resid_dp = getattr(config, 'resid_dropout_p', None)
-    token_dp = getattr(config, 'token_dropout_p', None)
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.DEBUG)
 
-    for name, module in model.named_modules():
-        # FeedForward ffn_dropout
-        if ffn_dp is not None and hasattr(module, 'ffn_dropout'):
-            module.ffn_dropout.p = ffn_dp
+    # Remove any existing handlers to prevent duplication on re-import
+    root_logger.handlers.clear()
 
-        # Residual dropout in attention
-        if resid_dp is not None and hasattr(module, 'resid_dropout'):
-            module.resid_dropout.p = resid_dp
+    # ── File handler: full DEBUG output per worker ─────────────────────────
+    file_handler = logging.FileHandler(log_path, mode="a", encoding="utf-8")
+    file_handler.setLevel(logging.DEBUG)
+    file_formatter = logging.Formatter(
+        fmt="%(asctime)s [%(levelname)-8s] [%(name)s] %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+    file_handler.setFormatter(file_formatter)
+    root_logger.addHandler(file_handler)
 
-        # Token dropout (only on Nos predictor)
-        if token_dp is not None and hasattr(module, 'token_drop'):
-            module.token_drop.p = token_dp
+    # ── Console handler: WARNING+ only to keep stdout clean ───────────────
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.WARNING)
+    console_formatter = logging.Formatter(
+        fmt="%(asctime)s [%(levelname)s] %(message)s",
+        datefmt="%H:%M:%S",
+    )
+    console_handler.setFormatter(console_formatter)
+    root_logger.addHandler(console_handler)
 
-        # Attention dropout — stored as a float, not nn.Dropout
-        if attn_dp is not None and hasattr(module, 'attn_dropout_p'):
-            module.attn_dropout_p = attn_dp
+    return root_logger
+
+
+def _get_trial_logger(name: str, trial_dir: str) -> logging.Logger:
+    """
+    Creates an isolated, non-propagating file logger for a single trial.
+
+    Using a unique logger name (including PID) prevents Python's logging
+    singleton from returning a cached logger from a previous trial, which
+    would cause handler accumulation (each call adding another FileHandler).
+
+    Args:
+        name:      Base name for the logger (e.g., "hpo_tok_trial_7").
+        trial_dir: Path to the trial's isolated working directory.
+
+    Returns:
+        Configured logger that writes only to trial_dir/trial.log.
+    """
+    unique_name = f"{name}_pid{os.getpid()}"
+    logger = logging.getLogger(unique_name)
+
+    # Always clear handlers — prevents accumulation if function is called
+    # multiple times with the same effective logger name (e.g., trial restarts)
+    logger.handlers.clear()
+    logger.propagate = False  # Do not bubble up to root logger
+    logger.setLevel(logging.INFO)
+
+    log_path = os.path.join(trial_dir, "trial.log")
+    handler = logging.FileHandler(log_path, mode="w", encoding="utf-8")
+    handler.setLevel(logging.INFO)
+    handler.setFormatter(
+        logging.Formatter(
+            fmt="%(asctime)s [%(levelname)s] %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+    )
+    logger.addHandler(handler)
+    return logger
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Model Override Helpers
+# ══════════════════════════════════════════════════════════════════════════════
+
+def apply_dropout_overrides(
+    model: torch.nn.Module,
+    config: CustomFinetuneConfig,
+) -> torch.nn.Module:
+    """
+    Walks all named submodules and overrides dropout probabilities in-place
+    when the corresponding config attribute is set to a non-None value.
+
+    This modifies only scalar dropout probability attributes and the `p`
+    attribute of nn.Dropout instances. Model weights are never touched.
+
+    Args:
+        model:  Any PyTorch module (NosTokenizer or Nos predictor).
+        config: Trial config carrying dropout override values.
+
+    Returns:
+        The same model instance with dropout values updated.
+    """
+    ffn_dp    = getattr(config, "ffn_dropout_p",   None)
+    attn_dp   = getattr(config, "attn_dropout_p",  None)
+    resid_dp  = getattr(config, "resid_dropout_p", None)
+    token_dp  = getattr(config, "token_dropout_p", None)
+
+    for _name, module in model.named_modules():
+        # FeedForward ffn_dropout (nn.Dropout instance on FeedForward blocks)
+        if ffn_dp is not None and hasattr(module, "ffn_dropout"):
+            if isinstance(module.ffn_dropout, torch.nn.Dropout):
+                module.ffn_dropout.p = float(ffn_dp)
+
+        # Residual dropout in attention blocks (nn.Dropout instance)
+        if resid_dp is not None and hasattr(module, "resid_dropout"):
+            if isinstance(module.resid_dropout, torch.nn.Dropout):
+                module.resid_dropout.p = float(resid_dp)
+
+        # Token dropout on Nos predictor (nn.Dropout instance)
+        if token_dp is not None and hasattr(module, "token_drop"):
+            if isinstance(module.token_drop, torch.nn.Dropout):
+                module.token_drop.p = float(token_dp)
+
+        # Attention dropout stored as a plain float scalar (not nn.Dropout)
+        if attn_dp is not None and hasattr(module, "attn_dropout_p"):
+            if isinstance(module.attn_dropout_p, float):
+                module.attn_dropout_p = float(attn_dp)
 
     return model
 
 
-def apply_bsq_overrides(tokenizer: NosTokenizer, config: CustomFinetuneConfig):
+def apply_bsq_overrides(
+    tokenizer: NosTokenizer,
+    config: CustomFinetuneConfig,
+) -> NosTokenizer:
     """
-    Override BSQ loss weights on a loaded tokenizer.
-    Only modifies scalar attributes, not weight tensors.
-    """
-    bsq = tokenizer.tokenizer.bsq  # BinarySphericalQuantizer instance
+    Overrides BSQ (Binary Spherical Quantizer) loss weight scalars on a
+    loaded tokenizer. Only modifies scalar hyperparameter attributes;
+    quantizer weight tensors are never modified.
 
-    if getattr(config, 'bsq_beta', None) is not None:
-        bsq.beta = config.bsq_beta
-    if getattr(config, 'bsq_gamma0', None) is not None:
-        bsq.gamma0 = config.bsq_gamma0
-    if getattr(config, 'bsq_gamma', None) is not None:
-        bsq.gamma = config.bsq_gamma
-    if getattr(config, 'bsq_zeta', None) is not None:
-        bsq.zeta = config.bsq_zeta
+    Args:
+        tokenizer: Loaded NosTokenizer instance.
+        config:    Trial config carrying BSQ override values.
+
+    Returns:
+        The same tokenizer instance with BSQ weights updated.
+
+    Raises:
+        AttributeError: If tokenizer does not have the expected BSQ structure.
+    """
+    try:
+        bsq = tokenizer.tokenizer.bsq  # BinarySphericalQuantizer instance
+    except AttributeError as exc:
+        raise AttributeError(
+            "Could not access tokenizer.tokenizer.bsq. "
+            "Verify NosTokenizer architecture has not changed."
+        ) from exc
+
+    override_map = {
+        "bsq_beta":   "beta",
+        "bsq_gamma0": "gamma0",
+        "bsq_gamma":  "gamma",
+        "bsq_zeta":   "zeta",
+    }
+    for config_attr, bsq_attr in override_map.items():
+        value = getattr(config, config_attr, None)
+        if value is not None:
+            setattr(bsq, bsq_attr, float(value))
 
     return tokenizer
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# GPU Memory Management
+# ══════════════════════════════════════════════════════════════════════════════
+
+def release_gpu_memory(*model_refs) -> None:
+    """
+    Performs deterministic GPU memory cleanup after a trial completes.
+
+    Executes the full cleanup chain required to return memory to the CUDA
+    driver (not just to PyTorch's internal allocator cache):
+      1. Delete all passed model references from Python's reference count.
+      2. Force Python's cyclic garbage collector to collect any cycles.
+      3. Release PyTorch's allocator cache back to the CUDA driver.
+      4. Synchronize the CUDA stream to ensure all ops have completed.
+
+    Without step 3 (`empty_cache`), PyTorch holds memory in its internal
+    pool. Across many HPO trials this accumulates until the next trial's
+    allocation fails with OutOfMemoryError even though logically the memory
+    was "freed" after the previous trial.
+
+    Args:
+        *model_refs: Any number of PyTorch module references to delete.
+    """
+    for ref in model_refs:
+        if ref is not None:
+            del ref
+
+    gc.collect()
+
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -2031,76 +2841,128 @@ def apply_bsq_overrides(tokenizer: NosTokenizer, config: CustomFinetuneConfig):
 
 class SearchSpaceBuilder:
     """
-    Reads the `hpo.search_space` block from config and samples
-    Optuna trial suggestions for each parameter.
+    Translates the `hpo.search_space` YAML block into Optuna trial suggestions.
+
+    The search space config block uses a typed specification format:
+        param_name:
+            type: float | int | categorical
+            low:  <number>          # float and int only
+            high: <number>          # float and int only
+            log:  true | false      # float and int only (log-scale sampling)
+            choices: [a, b, c]      # categorical only
+
+    Parameters are grouped by training phase so that tokenizer-only or
+    basemodel-only HPO runs sample only the relevant hyperparameters.
     """
 
-    PARAM_GROUPS = {
-        'tokenizer': [
-            'tokenizer_learning_rate',
-            'tokenizer_pct_start',
-            'tokenizer_div_factor',
-            'tokenizer_max_grad_norm',
-            'bsq_beta', 'bsq_gamma0', 'bsq_gamma', 'bsq_zeta',
+    # Maps each parameter to its owning training phase.
+    # Parameters listed under 'shared' are always included regardless of phase.
+    PARAM_GROUPS: Dict[str, List[str]] = {
+        "tokenizer": [
+            "tokenizer_learning_rate",
+            "tokenizer_pct_start",
+            "tokenizer_div_factor",
+            "tokenizer_max_grad_norm",
+            "bsq_beta",
+            "bsq_gamma0",
+            "bsq_gamma",
+            "bsq_zeta",
         ],
-        'basemodel': [
-            'predictor_learning_rate',
-            'basemodel_pct_start',
-            'basemodel_div_factor',
-            'basemodel_max_grad_norm',
-            'ffn_dropout_p', 'attn_dropout_p',
-            'resid_dropout_p', 'token_dropout_p',
+        "basemodel": [
+            "predictor_learning_rate",
+            "basemodel_pct_start",
+            "basemodel_div_factor",
+            "basemodel_max_grad_norm",
+            "ffn_dropout_p",
+            "attn_dropout_p",
+            "resid_dropout_p",
+            "token_dropout_p",
         ],
-        'shared': [
-            'adam_weight_decay', 'adam_beta1', 'adam_beta2',
-            'batch_size', 'accumulation_steps', 'clip',
+        "shared": [
+            "adam_weight_decay",
+            "adam_beta1",
+            "adam_beta2",
+            "batch_size",
+            "accumulation_steps",
+            "clip",
         ],
     }
 
-    def __init__(self, search_space: Dict[str, Any], phase: str = 'both'):
+    def __init__(self, search_space: Dict[str, Any], phase: str = "both") -> None:
+        """
+        Args:
+            search_space: The parsed `hpo.search_space` dict from config YAML.
+            phase:        Which phase to sample for: 'tokenizer', 'basemodel', or 'both'.
+        """
+        if phase not in ("tokenizer", "basemodel", "both"):
+            raise ValueError(
+                f"phase must be 'tokenizer', 'basemodel', or 'both'. Got: '{phase}'"
+            )
         self.search_space = search_space
-        self.phase = phase  # 'tokenizer' | 'basemodel' | 'both'
+        self.phase = phase
 
     def _should_include(self, param_name: str) -> bool:
-        if self.phase == 'both':
+        """Returns True if param_name is relevant to the current HPO phase."""
+        if self.phase == "both":
             return True
-        shared = self.PARAM_GROUPS['shared']
-        group = self.PARAM_GROUPS.get(self.phase, [])
-        return param_name in group or param_name in shared
+        phase_params = self.PARAM_GROUPS.get(self.phase, [])
+        shared_params = self.PARAM_GROUPS["shared"]
+        return param_name in phase_params or param_name in shared_params
 
-    def suggest(self, trial, param_name: str) -> Any:
-        """Suggest a value for param_name using the trial object."""
+    def suggest(self, trial: "optuna.Trial", param_name: str) -> Optional[Any]:
+        """
+        Suggests a single hyperparameter value using the Optuna trial API.
+
+        Args:
+            trial:      The current Optuna trial object.
+            param_name: Name of the parameter to suggest.
+
+        Returns:
+            Suggested value, or None if param_name is not in the search space.
+
+        Raises:
+            ValueError: If the spec type is unrecognised.
+        """
         if param_name not in self.search_space:
             return None
 
         spec = self.search_space[param_name]
-        ptype = spec['type']
+        ptype = spec.get("type", "").lower()
 
-        if ptype == 'float':
+        if ptype == "float":
             return trial.suggest_float(
                 param_name,
-                spec['low'],
-                spec['high'],
-                log=spec.get('log', False)
+                float(spec["low"]),
+                float(spec["high"]),
+                log=bool(spec.get("log", False)),
             )
-        elif ptype == 'int':
+        elif ptype == "int":
             return trial.suggest_int(
                 param_name,
-                spec['low'],
-                spec['high'],
-                log=spec.get('log', False)
+                int(spec["low"]),
+                int(spec["high"]),
+                log=bool(spec.get("log", False)),
             )
-        elif ptype == 'categorical':
-            return trial.suggest_categorical(param_name, spec['choices'])
+        elif ptype == "categorical":
+            return trial.suggest_categorical(param_name, spec["choices"])
         else:
-            raise ValueError(f"Unknown search space type: {ptype}")
+            raise ValueError(
+                f"Unknown search space type '{ptype}' for parameter '{param_name}'. "
+                f"Valid types: float, int, categorical."
+            )
 
-    def build_overrides(self, trial) -> Dict[str, Any]:
+    def build_overrides(self, trial: "optuna.Trial") -> Dict[str, Any]:
         """
-        Returns a dict of {param_name: suggested_value} for all
-        parameters in the search space relevant to this phase.
+        Samples all relevant hyperparameters for this phase and returns
+        them as a flat dict suitable for `config.clone_with_overrides()`.
+
+        Args:
+            trial: The current Optuna trial object.
+
+        Returns:
+            Dict mapping parameter names to their suggested values.
         """
-        overrides = {}
+        overrides: Dict[str, Any] = {}
         for param_name in self.search_space:
             if self._should_include(param_name):
                 value = self.suggest(trial, param_name)
@@ -2110,164 +2972,421 @@ class SearchSpaceBuilder:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# Optuna Trial Failure Callback
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _build_failure_rate_callback(
+    max_failure_rate: float = 0.50,
+    min_trials_before_check: int = 4,
+) -> "Callable":
+    """
+    Builds an Optuna callback that aborts the study if the trial failure
+    rate exceeds a threshold. This prevents silent budget exhaustion when
+    a systematic bug causes every trial to crash.
+
+    Without this guard, `catch=(RuntimeError, ...)` in study.optimize will
+    silently mark all trials as FAIL and consume the full n_trials budget
+    before the user notices nothing is working.
+
+    Args:
+        max_failure_rate:          Fraction of failed trials that triggers abort [0.0, 1.0].
+        min_trials_before_check:   Minimum number of trials before rate is evaluated.
+
+    Returns:
+        Callable matching Optuna's callback signature: f(study, trial) -> None.
+    """
+    logger = logging.getLogger(__name__)
+
+    def callback(study: "optuna.Study", trial: "optuna.Trial") -> None:
+        if trial.state != optuna.trial.TrialState.FAIL:
+            return
+
+        completed_and_failed = [
+            t for t in study.trials
+            if t.state in (
+                optuna.trial.TrialState.COMPLETE,
+                optuna.trial.TrialState.FAIL,
+            )
+        ]
+        total = len(completed_and_failed)
+        if total < min_trials_before_check:
+            return
+
+        failed_count = sum(
+            1 for t in completed_and_failed
+            if t.state == optuna.trial.TrialState.FAIL
+        )
+        fail_rate = failed_count / total
+
+        logger.warning(
+            f"Trial {trial.number} FAILED. "
+            f"Cumulative failure rate: {failed_count}/{total} ({fail_rate:.0%})"
+        )
+
+        if fail_rate > max_failure_rate:
+            logger.error(
+                f"Failure rate {fail_rate:.0%} exceeds {max_failure_rate:.0%} "
+                f"threshold after {total} trials. Aborting study to prevent "
+                f"wasting the remaining trial budget. "
+                f"Inspect per-trial logs for root cause."
+            )
+            study.stop()
+
+    return callback
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Objective Functions
 # ══════════════════════════════════════════════════════════════════════════════
 
 class TokenizerObjective:
-    """Optuna objective for tokenizer HPO."""
+    """
+    Optuna objective function for tokenizer HPO.
 
-    def __init__(self, base_config: CustomFinetuneConfig,
-                 search_space_builder: SearchSpaceBuilder,
-                 device: torch.device,
-                 trial_base_dir: str):
+    Each call to __call__ corresponds to one Optuna trial. The lifecycle is:
+      1. Sample hyperparameters from the search space.
+      2. Build a fully isolated trial config (unique save directory, PID-stamped).
+      3. Load the pretrained tokenizer and apply config overrides.
+      4. Run abbreviated training via the external train_tokenizer function.
+      5. Return the validation loss as the optimization target.
+      6. Deterministically release all GPU memory regardless of outcome.
+
+    The trial directory is always deleted in the finally block. Trial artifacts
+    are never shared between workers because the directory name includes both
+    the trial number (assigned by Optuna DB) and the worker PID.
+    """
+
+    def __init__(
+        self,
+        base_config: CustomFinetuneConfig,
+        search_space_builder: SearchSpaceBuilder,
+        device: torch.device,
+        trial_base_dir: str,
+        safe_num_workers: int,
+    ) -> None:
+        """
+        Args:
+            base_config:           Original config (never mutated).
+            search_space_builder:  Configured SearchSpaceBuilder instance.
+            device:                CUDA device for this worker process.
+            trial_base_dir:        Root directory under which per-trial dirs are created.
+            safe_num_workers:      Pre-computed safe DataLoader worker count.
+        """
         self.base_config = base_config
         self.ssb = search_space_builder
         self.device = device
         self.trial_base_dir = trial_base_dir
-
-    def __call__(self, trial) -> float:
-        # ── 1. Sample hyperparameters ──────────────────────────────
-        overrides = self.ssb.build_overrides(trial)
-
-        # HPO uses reduced epochs for speed
-        overrides['tokenizer_epochs'] = self.base_config.hpo_tokenizer_epochs
-        overrides['log_interval'] = 999999  # suppress step-level logging
-
-        # ── 2. Build trial config ──────────────────────────────────
-        trial_config = self.base_config.clone_with_overrides(overrides)
-
-        # Unique save dir per trial to avoid conflicts
-        trial_dir = os.path.join(
-            self.trial_base_dir, f"tokenizer_trial_{trial.number}"
+        self.safe_num_workers = safe_num_workers
+        self._logger = logging.getLogger(
+            f"{__name__}.TokenizerObjective.pid{os.getpid()}"
         )
-        trial_config.tokenizer_save_path = trial_dir
-        os.makedirs(trial_dir, exist_ok=True)
 
-        # ── 3. Load model (always from original pretrained) ────────
-        try:
-            if getattr(trial_config, 'pre_trained_tokenizer', True):
-                tokenizer = NosTokenizer.from_pretrained(
-                    self.base_config.pretrained_tokenizer_path
-                )
-            else:
-                cfg_path = os.path.join(
-                    self.base_config.pretrained_tokenizer_path, 'config.json'
-                )
-                with open(cfg_path, 'r') as f:
-                    arch = json.load(f)
-                tokenizer = NosTokenizer(**{k: arch[k] for k in [
-                    'd_in', 'd_model', 'n_heads', 'ff_dim',
-                    'n_enc_layers', 'n_dec_layers', 'ffn_dropout_p',
-                    'attn_dropout_p', 'resid_dropout_p', 's1_bits',
-                    's2_bits', 'beta', 'gamma0', 'gamma', 'zeta', 'group_size'
-                ] if k in arch})
+    def __call__(self, trial: "optuna.Trial") -> float:
+        """
+        Executes one HPO trial for the tokenizer.
 
-            # Apply BSQ and dropout overrides
-            tokenizer = apply_bsq_overrides(tokenizer, trial_config)
-            tokenizer = apply_dropout_overrides(tokenizer, trial_config)
-            tokenizer = tokenizer.to(self.device)
+        Returns:
+            Validation loss (float) to be minimized by Optuna.
 
-        except Exception as e:
-            print(f"Trial {trial.number}: Model loading failed: {e}")
-            raise optuna.exceptions.TrialPruned()
-
-        # ── 4. Run training ────────────────────────────────────────
-        logger = _get_silent_logger(f"hpo_tok_trial_{trial.number}")
+        Raises:
+            optuna.exceptions.TrialPruned: On model load failure or training crash.
+        """
+        tokenizer: Optional[NosTokenizer] = None
+        trial_dir: Optional[str] = None
 
         try:
-            from finetune_tokenizer import train_tokenizer
-            val_loss = train_tokenizer(
-                tokenizer, self.device, trial_config, trial_dir, logger
+            # ── Step 1: Sample hyperparameters ────────────────────────────
+            overrides = self.ssb.build_overrides(trial)
+
+            # Use reduced epochs for HPO speed; suppress per-step log spam
+            overrides["tokenizer_epochs"] = self.base_config.hpo_tokenizer_epochs
+            overrides["log_interval"]     = 999_999
+            overrides["num_workers"]      = self.safe_num_workers
+
+            self._logger.info(
+                f"Trial {trial.number} | Sampled overrides: {overrides}"
             )
-        except Exception as e:
-            print(f"Trial {trial.number} failed: {e}")
-            raise optuna.exceptions.TrialPruned()
-        finally:
-            # ── Clean up trial artifacts to save disk ──────────────
-            if os.path.exists(trial_dir):
-                shutil.rmtree(trial_dir, ignore_errors=True)
 
-        print(f"  Trial {trial.number}: val_loss={val_loss:.6f} | {overrides}")
-        return val_loss
+            # ── Step 2: Build fully isolated trial config ──────────────────
+            # PID inclusion guarantees uniqueness even if the Optuna DB
+            # assigns the same trial number to two workers simultaneously
+            # (which can happen when a worker restarts mid-study).
+            worker_tag = f"pid{os.getpid()}_trial{trial.number}"
+            trial_dir  = os.path.join(
+                self.trial_base_dir, f"tokenizer_{worker_tag}"
+            )
+            os.makedirs(trial_dir, exist_ok=True)
+
+            trial_config = self.base_config.clone_with_overrides(overrides)
+
+            # Force ALL save paths into the isolated trial directory.
+            # This prevents any overlap with the canonical save paths
+            # that other workers or the main training pipeline might use.
+            trial_config.tokenizer_save_path       = trial_dir
+            trial_config.tokenizer_best_model_path = os.path.join(trial_dir, "best_model")
+            trial_config.base_save_path            = trial_dir
+
+            # ── Step 3: Load model ────────────────────────────────────────
+            try:
+                if getattr(trial_config, "pre_trained_tokenizer", True):
+                    tokenizer = NosTokenizer.from_pretrained(
+                        self.base_config.pretrained_tokenizer_path
+                    )
+                else:
+                    arch_path = os.path.join(
+                        self.base_config.pretrained_tokenizer_path, "config.json"
+                    )
+                    with open(arch_path, "r", encoding="utf-8") as f:
+                        arch = json.load(f)
+                    valid_keys = [
+                        "d_in", "d_model", "n_heads", "ff_dim",
+                        "n_enc_layers", "n_dec_layers", "ffn_dropout_p",
+                        "attn_dropout_p", "resid_dropout_p", "s1_bits",
+                        "s2_bits", "beta", "gamma0", "gamma", "zeta", "group_size",
+                    ]
+                    tokenizer = NosTokenizer(
+                        **{k: arch[k] for k in valid_keys if k in arch}
+                    )
+
+                tokenizer = apply_bsq_overrides(tokenizer, trial_config)
+                tokenizer = apply_dropout_overrides(tokenizer, trial_config)
+                tokenizer = tokenizer.to(self.device)
+
+            except FileNotFoundError as exc:
+                self._logger.error(
+                    f"Trial {trial.number}: Pretrained tokenizer not found "
+                    f"at '{self.base_config.pretrained_tokenizer_path}': {exc}"
+                )
+                raise optuna.exceptions.TrialPruned() from exc
+            except Exception as exc:
+                self._logger.error(
+                    f"Trial {trial.number}: Model loading failed: {exc}",
+                    exc_info=True,
+                )
+                raise optuna.exceptions.TrialPruned() from exc
+
+            # ── Step 4: Run training ──────────────────────────────────────
+            trial_logger = _get_trial_logger(
+                f"hpo_tok_trial_{trial.number}", trial_dir
+            )
+
+            try:
+                from finetune_tokenizer import train_tokenizer  # type: ignore
+                val_loss: float = train_tokenizer(
+                    tokenizer, self.device, trial_config, trial_dir, trial_logger
+                )
+            except optuna.exceptions.TrialPruned:
+                raise  # Pruning signals must propagate — never catch them
+            except (RuntimeError, ValueError, torch.cuda.OutOfMemoryError) as exc:
+                self._logger.warning(
+                    f"Trial {trial.number}: Training failed with expected "
+                    f"transient error ({type(exc).__name__}): {exc}"
+                )
+                raise optuna.exceptions.TrialPruned() from exc
+            except Exception as exc:
+                self._logger.error(
+                    f"Trial {trial.number}: Training failed with unexpected "
+                    f"error: {exc}",
+                    exc_info=True,
+                )
+                raise optuna.exceptions.TrialPruned() from exc
+
+            self._logger.info(
+                f"Trial {trial.number} COMPLETE | "
+                f"val_loss={val_loss:.6f} | overrides={overrides}"
+            )
+            print(
+                f"  [GPU {self.device}] Trial {trial.number}: "
+                f"val_loss={val_loss:.6f}"
+            )
+            return val_loss
+
+        finally:
+            # ── Step 5: Deterministic GPU memory release ───────────────────
+            # This executes regardless of success, pruning, or exception.
+            # Skipping this causes PyTorch allocator cache accumulation,
+            # which leads to OOM on trial N+K even though trial N "freed" its memory.
+            release_gpu_memory(tokenizer)
+
+            # ── Step 6: Delete trial artifacts ────────────────────────────
+            if trial_dir and os.path.exists(trial_dir):
+                shutil.rmtree(trial_dir, ignore_errors=True)
 
 
 class BasemodelObjective:
-    """Optuna objective for predictor/basemodel HPO."""
+    """
+    Optuna objective function for predictor/basemodel HPO.
 
-    def __init__(self, base_config: CustomFinetuneConfig,
-                 search_space_builder: SearchSpaceBuilder,
-                 device: torch.device,
-                 trial_base_dir: str,
-                 tokenizer_path: str):
+    Assumes a finetuned (or pretrained) tokenizer is available at a fixed
+    path. The tokenizer is frozen (eval mode, no gradients) during basemodel
+    HPO to isolate the predictor hyperparameter search from tokenizer variance.
+
+    The lifecycle mirrors TokenizerObjective with the addition of loading
+    and freezing the tokenizer before loading the predictor.
+    """
+
+    def __init__(
+        self,
+        base_config: CustomFinetuneConfig,
+        search_space_builder: SearchSpaceBuilder,
+        device: torch.device,
+        trial_base_dir: str,
+        tokenizer_path: str,
+        safe_num_workers: int,
+    ) -> None:
+        """
+        Args:
+            base_config:           Original config (never mutated).
+            search_space_builder:  Configured SearchSpaceBuilder instance.
+            device:                CUDA device for this worker process.
+            trial_base_dir:        Root directory for per-trial isolation.
+            tokenizer_path:        Path to the finetuned tokenizer checkpoint.
+            safe_num_workers:      Pre-computed safe DataLoader worker count.
+        """
         self.base_config = base_config
         self.ssb = search_space_builder
         self.device = device
         self.trial_base_dir = trial_base_dir
-        self.tokenizer_path = tokenizer_path  # path to best finetuned tokenizer
-
-    def __call__(self, trial) -> float:
-        overrides = self.ssb.build_overrides(trial)
-        overrides['basemodel_epochs'] = self.base_config.hpo_basemodel_epochs
-        overrides['log_interval'] = 999999
-
-        trial_config = self.base_config.clone_with_overrides(overrides)
-        trial_config.finetuned_tokenizer_path = self.tokenizer_path
-
-        trial_dir = os.path.join(
-            self.trial_base_dir, f"basemodel_trial_{trial.number}"
+        self.tokenizer_path = tokenizer_path
+        self.safe_num_workers = safe_num_workers
+        self._logger = logging.getLogger(
+            f"{__name__}.BasemodelObjective.pid{os.getpid()}"
         )
-        trial_config.basemodel_save_path = trial_dir
-        os.makedirs(trial_dir, exist_ok=True)
+
+    def __call__(self, trial: "optuna.Trial") -> float:
+        """
+        Executes one HPO trial for the basemodel predictor.
+
+        Returns:
+            Validation loss (float) to be minimized by Optuna.
+
+        Raises:
+            optuna.exceptions.TrialPruned: On model load failure or training crash.
+        """
+        tokenizer: Optional[NosTokenizer] = None
+        model: Optional[Nos] = None
+        trial_dir: Optional[str] = None
 
         try:
-            # Load tokenizer (frozen during basemodel HPO)
-            tokenizer = NosTokenizer.from_pretrained(self.tokenizer_path)
-            tokenizer = tokenizer.to(self.device)
-            tokenizer.eval()
-            for p in tokenizer.parameters():
-                p.requires_grad_(False)
+            # ── Step 1: Sample hyperparameters ────────────────────────────
+            overrides = self.ssb.build_overrides(trial)
+            overrides["basemodel_epochs"] = self.base_config.hpo_basemodel_epochs
+            overrides["log_interval"]     = 999_999
+            overrides["num_workers"]      = self.safe_num_workers
 
-            # Load predictor
-            if getattr(trial_config, 'pre_trained_predictor', True):
-                model = Nos.from_pretrained(
-                    self.base_config.pretrained_predictor_path
-                )
-            else:
-                cfg_path = os.path.join(
-                    self.base_config.pretrained_predictor_path, 'config.json'
-                )
-                with open(cfg_path, 'r') as f:
-                    arch = json.load(f)
-                model = Nos(**{k: arch[k] for k in [
-                    's1_bits', 's2_bits', 'n_layers', 'd_model', 'n_heads',
-                    'ff_dim', 'ffn_dropout_p', 'attn_dropout_p',
-                    'resid_dropout_p', 'token_dropout_p', 'learn_te'
-                ] if k in arch})
-
-            model = apply_dropout_overrides(model, trial_config)
-            model = model.to(self.device)
-
-        except Exception as e:
-            print(f"Trial {trial.number}: Model loading failed: {e}")
-            raise optuna.exceptions.TrialPruned()
-
-        logger = _get_silent_logger(f"hpo_base_trial_{trial.number}")
-
-        try:
-            from finetune_base_model import train_model
-            val_loss = train_model(
-                model, tokenizer, self.device,
-                trial_config, trial_dir, logger
+            self._logger.info(
+                f"Trial {trial.number} | Sampled overrides: {overrides}"
             )
-        except Exception as e:
-            print(f"Trial {trial.number} failed: {e}")
-            raise optuna.exceptions.TrialPruned()
-        finally:
-            if os.path.exists(trial_dir):
-                shutil.rmtree(trial_dir, ignore_errors=True)
 
-        print(f"  Trial {trial.number}: val_loss={val_loss:.6f} | {overrides}")
-        return val_loss
+            # ── Step 2: Build isolated trial config ────────────────────────
+            worker_tag = f"pid{os.getpid()}_trial{trial.number}"
+            trial_dir  = os.path.join(
+                self.trial_base_dir, f"basemodel_{worker_tag}"
+            )
+            os.makedirs(trial_dir, exist_ok=True)
+
+            trial_config = self.base_config.clone_with_overrides(overrides)
+            trial_config.finetuned_tokenizer_path  = self.tokenizer_path
+            trial_config.basemodel_save_path       = trial_dir
+            trial_config.basemodel_best_model_path = os.path.join(trial_dir, "best_model")
+            trial_config.base_save_path            = trial_dir
+
+            # ── Step 3: Load and freeze tokenizer ─────────────────────────
+            try:
+                tokenizer = NosTokenizer.from_pretrained(self.tokenizer_path)
+                tokenizer = tokenizer.to(self.device)
+                tokenizer.eval()
+                for param in tokenizer.parameters():
+                    param.requires_grad_(False)
+            except FileNotFoundError as exc:
+                self._logger.error(
+                    f"Trial {trial.number}: Tokenizer not found "
+                    f"at '{self.tokenizer_path}': {exc}"
+                )
+                raise optuna.exceptions.TrialPruned() from exc
+            except Exception as exc:
+                self._logger.error(
+                    f"Trial {trial.number}: Tokenizer loading failed: {exc}",
+                    exc_info=True,
+                )
+                raise optuna.exceptions.TrialPruned() from exc
+
+            # ── Step 4: Load predictor model ──────────────────────────────
+            try:
+                if getattr(trial_config, "pre_trained_predictor", True):
+                    model = Nos.from_pretrained(
+                        self.base_config.pretrained_predictor_path
+                    )
+                else:
+                    arch_path = os.path.join(
+                        self.base_config.pretrained_predictor_path, "config.json"
+                    )
+                    with open(arch_path, "r", encoding="utf-8") as f:
+                        arch = json.load(f)
+                    valid_keys = [
+                        "s1_bits", "s2_bits", "n_layers", "d_model",
+                        "n_heads", "ff_dim", "ffn_dropout_p", "attn_dropout_p",
+                        "resid_dropout_p", "token_dropout_p", "learn_te",
+                    ]
+                    model = Nos(**{k: arch[k] for k in valid_keys if k in arch})
+
+                model = apply_dropout_overrides(model, trial_config)
+                model = model.to(self.device)
+
+            except FileNotFoundError as exc:
+                self._logger.error(
+                    f"Trial {trial.number}: Predictor model not found "
+                    f"at '{self.base_config.pretrained_predictor_path}': {exc}"
+                )
+                raise optuna.exceptions.TrialPruned() from exc
+            except Exception as exc:
+                self._logger.error(
+                    f"Trial {trial.number}: Predictor loading failed: {exc}",
+                    exc_info=True,
+                )
+                raise optuna.exceptions.TrialPruned() from exc
+
+            # ── Step 5: Run training ──────────────────────────────────────
+            trial_logger = _get_trial_logger(
+                f"hpo_base_trial_{trial.number}", trial_dir
+            )
+
+            try:
+                from finetune_base_model import train_model  # type: ignore
+                val_loss: float = train_model(
+                    model, tokenizer, self.device,
+                    trial_config, trial_dir, trial_logger,
+                )
+            except optuna.exceptions.TrialPruned:
+                raise
+            except (RuntimeError, ValueError, torch.cuda.OutOfMemoryError) as exc:
+                self._logger.warning(
+                    f"Trial {trial.number}: Training failed with expected "
+                    f"transient error ({type(exc).__name__}): {exc}"
+                )
+                raise optuna.exceptions.TrialPruned() from exc
+            except Exception as exc:
+                self._logger.error(
+                    f"Trial {trial.number}: Training failed with unexpected "
+                    f"error: {exc}",
+                    exc_info=True,
+                )
+                raise optuna.exceptions.TrialPruned() from exc
+
+            self._logger.info(
+                f"Trial {trial.number} COMPLETE | "
+                f"val_loss={val_loss:.6f} | overrides={overrides}"
+            )
+            print(
+                f"  [GPU {self.device}] Trial {trial.number}: "
+                f"val_loss={val_loss:.6f}"
+            )
+            return val_loss
+
+        finally:
+            release_gpu_memory(model, tokenizer)
+            if trial_dir and os.path.exists(trial_dir):
+                shutil.rmtree(trial_dir, ignore_errors=True)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -2276,60 +3395,284 @@ class BasemodelObjective:
 
 class NosHPOTuner:
     """
-    Main HPO orchestrator. Builds Optuna study, runs trials,
-    reports best params, and optionally writes them back to config.
+    Main HPO orchestrator for the Nos two-phase training pipeline.
+
+    Responsibilities:
+    - Device setup with CUDA_VISIBLE_DEVICES awareness for multi-GPU isolation.
+    - Optuna study creation with SQLite WAL mode and concurrency hardening.
+    - Tokenizer and basemodel HPO phases with correct sampler configuration.
+    - Atomic result persistence (race-condition-safe JSON writes).
+    - Best parameter application back to YAML config.
+
+    Multi-GPU Usage:
+        Do NOT use torchrun. Instead, launch independent processes:
+
+            CUDA_VISIBLE_DEVICES=0 python hpo_tuner.py --config cfg.yaml &
+            CUDA_VISIBLE_DEVICES=1 python hpo_tuner.py --config cfg.yaml &
+            ...
+            # Or use launch_hpo.sh which automates this pattern.
+
+        All workers share the same Optuna storage (SQLite or PostgreSQL) and
+        independently pick up and execute trials. No synchronisation barriers.
     """
 
-    def __init__(self, config_path: str):
+    def __init__(self, config_path: str) -> None:
+        """
+        Initialises the HPO tuner, sets up device, logging, and directories.
+
+        Args:
+            config_path: Path to the YAML configuration file.
+
+        Raises:
+            RuntimeError: If Optuna is not installed.
+            FileNotFoundError: If config_path does not exist.
+        """
         if not OPTUNA_AVAILABLE:
-            raise RuntimeError("Please install optuna: pip install optuna")
+            raise RuntimeError(
+                "Optuna is not installed. "
+                "Run: pip install optuna plotly"
+            )
+
+        if not os.path.exists(config_path):
+            raise FileNotFoundError(f"Config not found: {config_path}")
 
         self.config_path = config_path
         self.config = CustomFinetuneConfig(config_path)
-        self.device = self._setup_device()
 
+        # ── Device setup (must precede logging setup for log annotations) ─
+        self.device = self._setup_device()
+        self._worker_tag = f"pid{os.getpid()}_{str(self.device).replace(':', '')}"
+
+        # ── Directory layout ───────────────────────────────────────────────
         self.trial_base_dir = os.path.join(
             self.config.base_save_path, "hpo_trials"
         )
-        os.makedirs(self.trial_base_dir, exist_ok=True)
+        self.results_dir = os.path.join(
+            self.config.base_save_path, "hpo_results"
+        )
+        self.log_dir = os.path.join(
+            self.config.base_save_path, "hpo_logs"
+        )
+        for directory in (self.trial_base_dir, self.results_dir, self.log_dir):
+            os.makedirs(directory, exist_ok=True)
 
-        # Results storage
+        # ── Logging ───────────────────────────────────────────────────────
+        _configure_root_logger(self.log_dir, self._worker_tag)
+        self._logger = logging.getLogger(__name__)
+        self._logger.info(
+            f"NosHPOTuner initialised | config={config_path} | "
+            f"device={self.device} | worker_tag={self._worker_tag}"
+        )
+
+        # ── Pre-compute safe DataLoader concurrency ────────────────────────
+        self._safe_num_workers = _compute_safe_num_workers(
+            n_gpu_workers=self._detect_n_concurrent_workers()
+        )
+
+        # Results accumulator for this worker's session
         self.results: Dict[str, Any] = {}
 
-    def _setup_device(self) -> torch.device:
-        if self.config.use_cuda and torch.cuda.is_available():
-            torch.cuda.set_device(self.config.device_id)
-            return torch.device(f"cuda:{self.config.device_id}")
-        return torch.device("cpu")
+    # ── Device Setup ──────────────────────────────────────────────────────────
 
-    def _build_sampler(self):
+    def _setup_device(self) -> torch.device:
+        """
+        Selects the correct GPU device for this worker process.
+
+        Priority resolution order:
+          1. CUDA_VISIBLE_DEVICES environment variable (set by launch_hpo.sh).
+             When set to a single GPU ID (e.g., "3"), CUDA remaps it to
+             logical index 0 within this process. We use cuda:0 in this case.
+          2. device_id from YAML config (for single-machine manual override).
+          3. CPU fallback if CUDA is unavailable.
+
+        Returns:
+            Resolved torch.device for this worker.
+        """
+        if not (self.config.use_cuda and torch.cuda.is_available()):
+            logging.getLogger(__name__).info(
+                "CUDA not available or disabled in config. Using CPU."
+            )
+            return torch.device("cpu")
+
+        cuda_visible = os.environ.get("CUDA_VISIBLE_DEVICES", None)
+
+        if cuda_visible is not None:
+            # Process-isolation mode: the bash launcher set this env var.
+            # CUDA remaps the assigned physical GPU to logical index 0.
+            visible_list = [
+                v.strip() for v in cuda_visible.split(",")
+                if v.strip().lstrip("-").isdigit()
+            ]
+
+            if len(visible_list) == 0:
+                # Malformed or empty CUDA_VISIBLE_DEVICES — fall back to config
+                logical_id  = int(self.config.device_id)
+                physical_id = logical_id
+                logging.getLogger(__name__).warning(
+                    f"CUDA_VISIBLE_DEVICES='{cuda_visible}' is not a valid "
+                    f"GPU index list. Falling back to config device_id={logical_id}."
+                )
+            elif len(visible_list) == 1:
+                # Exactly one GPU visible — correct process isolation
+                logical_id  = 0
+                physical_id = int(visible_list[0])
+            else:
+                # Multiple GPUs visible — warn and use first
+                logical_id  = 0
+                physical_id = int(visible_list[0])
+                logging.getLogger(__name__).warning(
+                    f"CUDA_VISIBLE_DEVICES='{cuda_visible}' exposes multiple GPUs. "
+                    f"For true process isolation, assign one GPU per worker. "
+                    f"Using logical cuda:0 (physical GPU {physical_id})."
+                )
+        else:
+            # Single-machine mode — use config device_id directly
+            logical_id  = int(self.config.device_id)
+            physical_id = logical_id
+
+        torch.cuda.set_device(logical_id)
+        device = torch.device(f"cuda:{logical_id}")
+
+        gpu_props = torch.cuda.get_device_properties(device)
+        logging.getLogger(__name__).info(
+            f"[PID {os.getpid()}] Using cuda:{logical_id} "
+            f"(physical GPU {physical_id}: {gpu_props.name}, "
+            f"{gpu_props.total_memory / 1e9:.1f} GB VRAM)"
+        )
+        return device
+
+    # ── Worker Concurrency Detection ──────────────────────────────────────────
+
+    def _detect_n_concurrent_workers(self) -> int:
+        """
+        Estimates the number of concurrent GPU workers in this HPO run.
+
+        Used to compute a safe per-process DataLoader num_workers count.
+        Reads CUDA_VISIBLE_DEVICES if set by the launcher; otherwise assumes
+        single-worker mode.
+
+        Returns:
+            Estimated number of concurrent GPU workers (>=1).
+        """
+        cuda_visible = os.environ.get("CUDA_VISIBLE_DEVICES", "")
+        if cuda_visible and cuda_visible not in ("NoDevFiles", "-1"):
+            n = len([v for v in cuda_visible.split(",") if v.strip().isdigit()])
+            if n > 0:
+                return n
+        # If CUDA_VISIBLE_DEVICES is not set, count all available GPUs
+        if torch.cuda.is_available():
+            return max(1, torch.cuda.device_count())
+        return 1
+
+    # ── Optuna Internals ──────────────────────────────────────────────────────
+
+    def _build_sampler(self) -> "optuna.samplers.BaseSampler":
+        """
+        Constructs the Optuna sampler.
+
+        For async multi-worker HPO, TPESampler with constant_liar=True is
+        strongly recommended. Without constant_liar, all workers sample
+        simultaneously before any trial completes, so the TPE model has
+        zero completed trials to learn from and every worker independently
+        suggests the same near-identical parameters (correlated exploration).
+
+        constant_liar=True tells TPE to treat in-progress trials as if they
+        returned the current worst observed value, encouraging each worker
+        to explore a different region of the search space.
+
+        Returns:
+            Configured sampler instance.
+        """
         name = self.config.hpo_sampler.lower()
-        seed = self.config.seed
-        if name == 'tpe':
-            return TPESampler(seed=seed, multivariate=True)
-        elif name == 'random':
+        seed = getattr(self.config, "seed", 42)
+        # Need enough startup trials before TPE's probabilistic model is reliable.
+        # Require at least 2 full rounds of workers to complete before TPE kicks in.
+        n_workers  = self._detect_n_concurrent_workers()
+        n_startup  = max(10, 2 * n_workers)
+
+        if name == "tpe":
+            return TPESampler(
+                seed=seed,
+                multivariate=True,      # Model parameter correlations
+                constant_liar=True,     # Critical for async multi-worker HPO
+                n_startup_trials=n_startup,
+            )
+        elif name == "random":
             return RandomSampler(seed=seed)
-        elif name == 'cmaes':
+        elif name == "cmaes":
+            self._logger.warning(
+                "CMA-ES sampler does not support constant_liar. "
+                "Workers will suggest correlated parameters in async mode. "
+                "TPE is recommended for distributed HPO."
+            )
             return CmaEsSampler(seed=seed)
         else:
-            return TPESampler(seed=seed)
+            self._logger.warning(
+                f"Unknown sampler '{name}'. Defaulting to TPE with constant_liar."
+            )
+            return TPESampler(
+                seed=seed,
+                constant_liar=True,
+                n_startup_trials=n_startup,
+            )
 
-    def _build_pruner(self):
+    def _build_pruner(self) -> "optuna.pruners.BasePruner":
+        """
+        Constructs the Optuna pruner.
+
+        MedianPruner is conservative and works well for training workloads
+        where intermediate values are reported via trial.report().
+        HyperbandPruner is more aggressive and better for very large search spaces.
+
+        Returns:
+            Configured pruner instance.
+        """
         name = self.config.hpo_pruner.lower()
-        if name == 'median':
+        if name == "median":
             return MedianPruner(
                 n_startup_trials=5,
                 n_warmup_steps=1,
-                interval_steps=1
+                interval_steps=1,
             )
-        elif name == 'hyperband':
+        elif name == "hyperband":
             return HyperbandPruner()
         else:
             return NopPruner()
 
-    def _create_study(self, study_name_suffix: str = "") -> optuna.Study:
+    def _create_study(self, study_name_suffix: str = "") -> "optuna.Study":
+        """
+        Creates or loads an Optuna study from the configured storage backend.
+
+        For SQLite storage, applies WAL (Write-Ahead Logging) mode via a
+        connection event hook. WAL allows concurrent readers while one
+        writer is active, dramatically reducing lock contention when 8
+        workers simultaneously commit trial results.
+
+        For non-SQLite storage (PostgreSQL, MySQL), the URI is passed
+        directly without modification.
+
+        load_if_exists=True is mandatory for multi-worker mode: all workers
+        must join the same existing study rather than each creating a new one.
+
+        Args:
+            study_name_suffix: Appended to base study name (e.g., "_tokenizer").
+
+        Returns:
+            Configured optuna.Study instance.
+        """
         study_name = f"{self.config.hpo_study_name}{study_name_suffix}"
-        storage = self.config.hpo_storage
+        storage_uri = self.config.hpo_storage
+
+        self._logger.info(
+            f"Creating/loading study '{study_name}' | storage={storage_uri}"
+        )
+
+        if storage_uri is not None and storage_uri.startswith("sqlite"):
+            storage = self._build_sqlite_storage(storage_uri)
+        else:
+            # None → in-memory (single process only)
+            # postgresql:// or mysql:// → passed through directly
+            storage = storage_uri
 
         study = optuna.create_study(
             study_name=study_name,
@@ -2337,281 +3680,2981 @@ class NosHPOTuner:
             direction=self.config.hpo_direction,
             sampler=self._build_sampler(),
             pruner=self._build_pruner(),
-            load_if_exists=True
+            load_if_exists=True,  # Mandatory for multi-worker mode
+        )
+        self._logger.info(
+            f"Study ready: {len(study.trials)} existing trials loaded."
         )
         return study
 
-    # ── Phase: Tokenizer ──────────────────────────────────────────────────
+    def _build_sqlite_storage(self, uri: str) -> "RDBStorage":
+        db_path = uri.split("?")[0].replace("sqlite:///", "")
+        os.makedirs(os.path.dirname(os.path.abspath(db_path)), exist_ok=True)
 
-    def tune_tokenizer(self, n_trials: Optional[int] = None) -> Dict[str, Any]:
+        storage = RDBStorage(
+            url=uri,
+            engine_kwargs={
+                "connect_args": {
+                     "timeout": 60,
+                     "check_same_thread": False,
+                },
+                "poolclass": NullPool,  # CRITICAL FIX: Disable pooling to prevent lock storms
+           },
+           skip_compatibility_check=False,
+       )
+
+        try:
+             from sqlalchemy import event as sa_event
+
+             @sa_event.listens_for(storage.engine, "connect")
+             def _apply_wal_pragmas(dbapi_connection, connection_record):
+                 cursor = dbapi_connection.cursor()
+                 cursor.execute("PRAGMA journal_mode=WAL")
+                 cursor.execute("PRAGMA synchronous=NORMAL")
+                 cursor.execute("PRAGMA busy_timeout=60000")
+                 cursor.close()
+
+             self._logger.info(
+                 "SQLite WAL mode, NullPool, and busy_timeout=60s applied via connection hook."
+             )
+        except Exception as exc:
+             self._logger.warning(
+                 f"Could not apply WAL mode pragmas: {exc}. "
+                 f"Falling back to URI timeout parameter only."
+            )
+
+        return storage
+
+    # ── Phase: Tokenizer ──────────────────────────────────────────────────────
+
+    def tune_tokenizer(
+        self, n_trials: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """
+        Runs Optuna HPO for the tokenizer training phase.
+
+        Args:
+            n_trials: Number of trials to run. Overrides config if provided.
+
+        Returns:
+            Dict with keys 'value' (best val_loss) and 'params' (best hyperparams).
+        """
         n = n_trials or self.config.hpo_n_trials
+        self._logger.info(
+            f"Starting tokenizer HPO: {n} trials | device={self.device}"
+        )
         print(f"\n{'='*60}")
-        print(f"HPO Phase 1: Tokenizer ({n} trials)")
+        print(f"HPO Phase 1: Tokenizer | {n} trials | {self.device}")
         print(f"{'='*60}")
 
         ssb = SearchSpaceBuilder(
-            self.config.hpo_search_space, phase='tokenizer'
+            self.config.hpo_search_space, phase="tokenizer"
         )
         objective = TokenizerObjective(
-            self.config, ssb, self.device, self.trial_base_dir
+            base_config=self.config,
+            search_space_builder=ssb,
+            device=self.device,
+            trial_base_dir=self.trial_base_dir,
+            safe_num_workers=self._safe_num_workers,
+        )
+        study = self._create_study("_tokenizer")
+        failure_callback = _build_failure_rate_callback(
+            max_failure_rate=0.5,
+            min_trials_before_check=4,
         )
 
-        study = self._create_study("_tokenizer")
         study.optimize(
             objective,
             n_trials=n,
             show_progress_bar=True,
-            catch=(Exception,)
+            # Only catch expected transient failures caused by extreme
+            # hyperparameter values (OOM from huge batch, NaN from bad LR).
+            # Systematic bugs (wrong data path, import error) will NOT be
+            # caught here — they will raise and crash the worker intentionally.
+            catch=(
+                RuntimeError,
+                ValueError,
+                torch.cuda.OutOfMemoryError,
+            ),
+            callbacks=[failure_callback],
         )
 
-        best = {
-            'value': study.best_value,
-            'params': study.best_params
-        }
-        self.results['tokenizer'] = best
+        best = self._extract_best(study)
+        self.results["tokenizer"] = best
 
+        self._logger.info(
+            f"Tokenizer HPO complete | best_val_loss={best['value']:.6f} | "
+            f"best_params={best['params']}"
+        )
         print(f"\n✅ Best tokenizer val_loss: {best['value']:.6f}")
         print(f"   Best params: {best['params']}")
 
-        # Save study results
         self._save_study_results(study, "tokenizer")
         return best
 
-    # ── Phase: Basemodel ──────────────────────────────────────────────────
+    # ── Phase: Basemodel ──────────────────────────────────────────────────────
 
-    def tune_basemodel(self,
-                       tokenizer_path: Optional[str] = None,
-                       n_trials: Optional[int] = None) -> Dict[str, Any]:
+    def tune_basemodel(
+        self,
+        tokenizer_path: Optional[str] = None,
+        n_trials: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        Runs Optuna HPO for the basemodel predictor training phase.
+
+        Requires a finetuned (or original pretrained) tokenizer checkpoint.
+        The tokenizer is frozen throughout all basemodel trials.
+
+        Args:
+            tokenizer_path: Path to tokenizer checkpoint. Defaults to
+                            config.finetuned_tokenizer_path.
+            n_trials:       Number of trials. Overrides config if provided.
+
+        Returns:
+            Dict with keys 'value' (best val_loss) and 'params' (best hyperparams).
+
+        Raises:
+            FileNotFoundError: If tokenizer_path does not exist.
+        """
         n = n_trials or self.config.hpo_n_trials
 
-        # Determine tokenizer to use
         if tokenizer_path is None:
             tokenizer_path = self.config.finetuned_tokenizer_path
         if not os.path.exists(tokenizer_path):
             raise FileNotFoundError(
-                f"Tokenizer not found at: {tokenizer_path}\n"
-                f"Run tokenizer finetuning first."
+                f"Tokenizer checkpoint not found at: '{tokenizer_path}'\n"
+                f"Run tokenizer finetuning or tokenizer HPO first, or "
+                f"provide --tokenizer-path explicitly."
             )
 
+        self._logger.info(
+            f"Starting basemodel HPO: {n} trials | "
+            f"device={self.device} | tokenizer={tokenizer_path}"
+        )
         print(f"\n{'='*60}")
-        print(f"HPO Phase 2: Basemodel ({n} trials)")
-        print(f"Using tokenizer: {tokenizer_path}")
+        print(f"HPO Phase 2: Basemodel | {n} trials | {self.device}")
+        print(f"Tokenizer: {tokenizer_path}")
         print(f"{'='*60}")
 
         ssb = SearchSpaceBuilder(
-            self.config.hpo_search_space, phase='basemodel'
+            self.config.hpo_search_space, phase="basemodel"
         )
         objective = BasemodelObjective(
-            self.config, ssb, self.device,
-            self.trial_base_dir, tokenizer_path
+            base_config=self.config,
+            search_space_builder=ssb,
+            device=self.device,
+            trial_base_dir=self.trial_base_dir,
+            tokenizer_path=tokenizer_path,
+            safe_num_workers=self._safe_num_workers,
+        )
+        study = self._create_study("_basemodel")
+        failure_callback = _build_failure_rate_callback(
+            max_failure_rate=0.5,
+            min_trials_before_check=4,
         )
 
-        study = self._create_study("_basemodel")
         study.optimize(
             objective,
             n_trials=n,
             show_progress_bar=True,
-            catch=(Exception,)
+            catch=(
+                RuntimeError,
+                ValueError,
+                torch.cuda.OutOfMemoryError,
+            ),
+            callbacks=[failure_callback],
         )
 
-        best = {
-            'value': study.best_value,
-            'params': study.best_params
-        }
-        self.results['basemodel'] = best
+        best = self._extract_best(study)
+        self.results["basemodel"] = best
 
+        self._logger.info(
+            f"Basemodel HPO complete | best_val_loss={best['value']:.6f} | "
+            f"best_params={best['params']}"
+        )
         print(f"\n✅ Best basemodel val_loss: {best['value']:.6f}")
         print(f"   Best params: {best['params']}")
 
         self._save_study_results(study, "basemodel")
         return best
 
-    # ── Full Pipeline ─────────────────────────────────────────────────────
+    # ── Full Pipeline ─────────────────────────────────────────────────────────
 
     def tune_full_pipeline(self) -> Dict[str, Any]:
         """
-        Run HPO for tokenizer, then use best tokenizer params
-        to run HPO for basemodel.
+        Runs the complete two-phase HPO pipeline:
+          1. Tokenizer HPO → find best tokenizer hyperparameters.
+          2. Full tokenizer training with best params (to produce a stable checkpoint).
+          3. Basemodel HPO using the stable tokenizer checkpoint.
+
+        Returns:
+            Dict containing results from both phases.
         """
-        all_results = {}
+        all_results: Dict[str, Any] = {}
 
         if self.config.hpo_optimize_tokenizer:
             tok_best = self.tune_tokenizer()
-            all_results['tokenizer'] = tok_best
+            all_results["tokenizer"] = tok_best
 
-            # Train full tokenizer with best params before basemodel HPO
+            # Train the tokenizer with best params at full epochs so the
+            # basemodel HPO uses a well-converged tokenizer checkpoint.
             print("\n📦 Training tokenizer with best params for basemodel HPO...")
-            best_tok_config = self.config.clone_with_overrides(
-                tok_best['params']
+            self._logger.info(
+                "Training full tokenizer with best HPO params before basemodel phase."
             )
-            self._train_phase_with_config(best_tok_config, 'tokenizer')
+            best_tok_config = self.config.clone_with_overrides(tok_best["params"])
+            self._train_best_tokenizer(best_tok_config)
 
         if self.config.hpo_optimize_basemodel:
             tok_path = self.config.tokenizer_best_model_path
             base_best = self.tune_basemodel(tokenizer_path=tok_path)
-            all_results['basemodel'] = base_best
+            all_results["basemodel"] = base_best
 
         self._print_final_report(all_results)
         return all_results
 
-    def _train_phase_with_config(self, config: CustomFinetuneConfig,
-                                  phase: str):
-        """Run a full training phase (not HPO) with given config."""
-        if phase == 'tokenizer':
-            from finetune_tokenizer import train_tokenizer
-            if getattr(config, 'pre_trained_tokenizer', True):
+    def _train_best_tokenizer(self, config: CustomFinetuneConfig) -> None:
+        """
+        Runs one full (non-HPO) tokenizer training pass with the given config.
+        Used to produce a stable tokenizer checkpoint before basemodel HPO.
+
+        Args:
+            config: Config instance with best HPO hyperparameters applied.
+        """
+        tokenizer: Optional[NosTokenizer] = None
+        try:
+            if getattr(config, "pre_trained_tokenizer", True):
                 tokenizer = NosTokenizer.from_pretrained(
                     config.pretrained_tokenizer_path
+                )
+            else:
+                raise ValueError(
+                    "pre_trained_tokenizer=False requires manual model "
+                    "instantiation before calling _train_best_tokenizer."
                 )
             tokenizer = apply_bsq_overrides(tokenizer, config)
             tokenizer = apply_dropout_overrides(tokenizer, config)
             tokenizer = tokenizer.to(self.device)
-            logger = _get_silent_logger("hpo_best_tokenizer")
+
             os.makedirs(config.tokenizer_save_path, exist_ok=True)
+            logger = _get_trial_logger("hpo_best_tokenizer", config.tokenizer_save_path)
+
+            from finetune_tokenizer import train_tokenizer  # type: ignore
             train_tokenizer(
                 tokenizer, self.device, config,
-                config.tokenizer_save_path, logger
+                config.tokenizer_save_path, logger,
             )
+            self._logger.info(
+                f"Best tokenizer training complete. "
+                f"Saved to: {config.tokenizer_save_path}"
+            )
+        finally:
+            release_gpu_memory(tokenizer)
 
-    # ── Results & Reporting ───────────────────────────────────────────────
+    # ── Results Persistence ───────────────────────────────────────────────────
 
-    def _save_study_results(self, study: optuna.Study, phase: str):
-        results_dir = os.path.join(self.config.base_save_path, "hpo_results")
-        os.makedirs(results_dir, exist_ok=True)
+    @staticmethod
+    def _extract_best(study: "optuna.Study") -> Dict[str, Any]:
+        """
+        Safely extracts best trial information from a study.
 
-        # Save all trials as JSON
+        Handles the edge case where no trials completed successfully
+        (all pruned or failed), which would cause study.best_value to raise.
+
+        Args:
+            study: Completed Optuna study.
+
+        Returns:
+            Dict with 'value' and 'params' keys.
+        """
+        completed = [
+            t for t in study.trials
+            if t.state == optuna.trial.TrialState.COMPLETE
+        ]
+        if not completed:
+            logging.getLogger(__name__).error(
+                "No trials completed successfully. "
+                "All trials were pruned or failed. "
+                "Inspect per-trial logs for root cause."
+            )
+            return {"value": float("inf"), "params": {}}
+
+        return {
+            "value": study.best_value,
+            "params": study.best_params,
+        }
+
+    def _save_study_results(
+        self, study: "optuna.Study", phase: str
+    ) -> None:
+        """
+        Persists all trial results for a study phase to a JSON file.
+
+        Uses an atomic write pattern (write to .tmp → os.replace to final path)
+        to guarantee the output file is never in a partially-written state,
+        even if 8 workers call this simultaneously. os.replace() is atomic
+        on POSIX and near-atomic on Windows (the last writer wins, but the
+        file is never corrupt).
+
+        Individual worker results are tagged with the worker PID so they
+        can be distinguished if needed. The final merged view comes from
+        reading the Optuna study, which contains all workers' trials.
+
+        Args:
+            study: The completed Optuna study.
+            phase: Phase label ('tokenizer' or 'basemodel').
+        """
         trials_data = []
-        for trial in study.trials:
-            if trial.value is not None:
+        for t in study.trials:
+            if t.value is not None:
                 trials_data.append({
-                    'number': trial.number,
-                    'value': trial.value,
-                    'params': trial.params,
-                    'state': str(trial.state)
+                    "number":            t.number,
+                    "value":             t.value,
+                    "params":            t.params,
+                    "state":             str(t.state),
+                    "datetime_start":    (
+                        t.datetime_start.isoformat()
+                        if t.datetime_start else None
+                    ),
+                    "datetime_complete": (
+                        t.datetime_complete.isoformat()
+                        if t.datetime_complete else None
+                    ),
                 })
 
-        results_file = os.path.join(results_dir, f"{phase}_trials.json")
-        with open(results_file, 'w') as f:
-            json.dump({
-                'best_value': study.best_value,
-                'best_params': study.best_params,
-                'n_trials': len(study.trials),
-                'trials': trials_data,
-                'timestamp': datetime.datetime.now().isoformat()
-            }, f, indent=2)
+        completed = [t for t in study.trials
+                     if t.state == optuna.trial.TrialState.COMPLETE]
+        payload = {
+            "best_value":   study.best_value  if completed else None,
+            "best_params":  study.best_params if completed else {},
+            "n_trials":     len(study.trials),
+            "n_completed":  len(completed),
+            "n_pruned":     sum(
+                1 for t in study.trials
+                if t.state == optuna.trial.TrialState.PRUNED
+            ),
+            "n_failed":     sum(
+                1 for t in study.trials
+                if t.state == optuna.trial.TrialState.FAIL
+            ),
+            "trials":       trials_data,
+            "timestamp":    datetime.datetime.now().isoformat(),
+            "worker_tag":   self._worker_tag,
+        }
 
-        print(f"📊 Results saved to: {results_file}")
+        # Atomic write: temp file → rename
+        final_path = os.path.join(self.results_dir, f"{phase}_trials.json")
+        tmp_path   = f"{final_path}.{self._worker_tag}.tmp"
 
-        # Save importances plot if possible
+        try:
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                json.dump(payload, f, indent=2, default=str)
+            os.replace(tmp_path, final_path)  # Atomic on POSIX
+            self._logger.info(f"Results atomically written to: {final_path}")
+            print(f"📊 Results saved to: {final_path}")
+        except Exception as exc:
+            self._logger.error(
+                f"Failed to save results to {final_path}: {exc}", exc_info=True
+            )
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+
+        # ── Optional: Save visualisation HTML plots ────────────────────────
+        self._save_visualisations(study, phase)
+
+    def _save_visualisations(
+        self, study: "optuna.Study", phase: str
+    ) -> None:
+        """
+        Attempts to save Optuna HTML visualisation plots.
+
+        Silently skips if plotly is not installed or no completed trials exist.
+
+        Args:
+            study: Completed Optuna study.
+            phase: Phase label for file naming.
+        """
         try:
             import optuna.visualization as vis
-            fig = vis.plot_param_importances(study)
-            fig_path = os.path.join(results_dir, f"{phase}_importances.html")
-            fig.write_html(fig_path)
+            completed = [t for t in study.trials
+                         if t.state == optuna.trial.TrialState.COMPLETE]
+            if len(completed) < 2:
+                return  # Not enough trials for meaningful plots
 
-            fig2 = vis.plot_optimization_history(study)
-            fig2_path = os.path.join(
-                results_dir, f"{phase}_history.html"
+            plots = {
+                f"{phase}_param_importances.html": vis.plot_param_importances,
+                f"{phase}_optimization_history.html": vis.plot_optimization_history,
+                f"{phase}_parallel_coordinate.html": vis.plot_parallel_coordinate,
+            }
+            for filename, plot_fn in plots.items():
+                try:
+                    fig = plot_fn(study)
+                    fig.write_html(os.path.join(self.results_dir, filename))
+                except Exception:
+                    pass  # Individual plot failure should not abort saving
+
+            self._logger.info(
+                f"Visualisation plots saved to: {self.results_dir}"
             )
-            fig2.write_html(fig2_path)
-            print(f"📈 Plots saved to: {results_dir}")
-        except Exception:
-            pass
+            print(f"📈 Plots saved to: {self.results_dir}")
+        except ImportError:
+            pass  # plotly not installed — skip silently
 
-    def _print_final_report(self, results: Dict[str, Any]):
+    # ── Reporting ─────────────────────────────────────────────────────────────
+
+    def _print_final_report(self, results: Dict[str, Any]) -> None:
+        """Prints a formatted summary of all HPO results to stdout."""
         print(f"\n{'='*60}")
         print("HPO FINAL REPORT")
         print(f"{'='*60}")
-
         for phase, result in results.items():
             print(f"\n{'─'*40}")
             print(f"Phase: {phase.upper()}")
-            print(f"  Best val loss: {result['value']:.6f}")
-            print(f"  Best hyperparameters:")
-            for k, v in result['params'].items():
-                print(f"    {k}: {v}")
-
+            if result["value"] == float("inf"):
+                print("  ⚠️  No trials completed successfully.")
+            else:
+                print(f"  Best val loss: {result['value']:.6f}")
+                print(f"  Best hyperparameters:")
+                for k, v in sorted(result["params"].items()):
+                    print(f"    {k:<40}: {v}")
         print(f"\n{'='*60}")
 
-    def apply_best_to_config(self, output_config_path: Optional[str] = None):
+    def print_importance_report(self) -> None:
         """
-        Write best found hyperparameters back into the YAML config file.
-        Creates a new config file by default.
-        """
-        if not self.results:
-            print("No HPO results to apply. Run tune_* methods first.")
-            return
-
-        # Load raw YAML
-        with open(self.config_path, 'r') as f:
-            raw_config = yaml.safe_load(f)
-
-        # Merge best params into training section
-        training_updates = {}
-        for phase_results in self.results.values():
-            training_updates.update(phase_results.get('params', {}))
-
-        for k, v in training_updates.items():
-            raw_config.setdefault('training', {})[k] = v
-
-        # Determine output path
-        if output_config_path is None:
-            base, ext = os.path.splitext(self.config_path)
-            output_config_path = f"{base}_hpo_best{ext}"
-
-        with open(output_config_path, 'w') as f:
-            yaml.dump(raw_config, f, default_flow_style=False,
-                      allow_unicode=True, indent=2)
-
-        print(f"\n✅ Best config written to: {output_config_path}")
-        return output_config_path
-
-    def print_importance_report(self):
-        """
-        Print a ranked list of hyperparameter importances
-        using Optuna's fANOVA estimator (if available).
+        Prints a ranked hyperparameter importance table using Optuna's
+        fANOVA estimator. Requires at least 4 completed trials and a
+        persistent storage backend (not in-memory).
         """
         if not OPTUNA_AVAILABLE:
+            return
+
+        storage_uri = self.config.hpo_storage
+        if storage_uri is None:
+            print(
+                "\n⚠️  Parameter importance report requires persistent storage "
+                "(set hpo.storage in config). Skipping."
+            )
             return
 
         print(f"\n{'='*60}")
         print("HYPERPARAMETER IMPORTANCE RANKING")
         print(f"{'='*60}")
 
-        for phase in ['tokenizer', 'basemodel']:
+        for phase in ("tokenizer", "basemodel"):
             study_name = f"{self.config.hpo_study_name}_{phase}"
             try:
-                storage = self.config.hpo_storage
-                if storage:
-                    study = optuna.load_study(
-                        study_name=study_name, storage=storage
+                study = optuna.load_study(
+                    study_name=study_name, storage=storage_uri
+                )
+                completed = [
+                    t for t in study.trials
+                    if t.state == optuna.trial.TrialState.COMPLETE
+                ]
+                if len(completed) < 4:
+                    print(
+                        f"\n{phase.upper()}: Not enough completed trials "
+                        f"({len(completed)}/4 minimum) for importance analysis."
                     )
-                    importances = optuna.importance.get_param_importances(study)
-                    print(f"\n{phase.upper()} importances:")
-                    for param, imp in sorted(
-                        importances.items(),
-                        key=lambda x: x[1], reverse=True
-                    ):
-                        bar = '█' * int(imp * 30)
-                        print(f"  {param:<40} {imp:.3f} {bar}")
-            except Exception:
-                pass
+                    continue
+
+                importances = optuna.importance.get_param_importances(study)
+                print(f"\n{phase.upper()} importances:")
+                for param, imp in sorted(
+                    importances.items(), key=lambda x: x[1], reverse=True
+                ):
+                    bar = "█" * int(imp * 40)
+                    print(f"  {param:<42} {imp:.4f}  {bar}")
+            except Exception as exc:
+                self._logger.debug(
+                    f"Could not compute importances for {phase}: {exc}"
+                )
+
+    # ── Config Application ────────────────────────────────────────────────────
+
+    def apply_best_to_config(
+        self, output_config_path: Optional[str] = None
+    ) -> Optional[str]:
+        """
+        Writes the best found hyperparameters from all completed phases back
+        into a new YAML config file. The original config is never modified.
+
+        The `clip` parameter is a data-preprocessing scalar that belongs in
+        the `data:` YAML block (where CustomFinetuneConfig reads it from).
+        All other optimised parameters are written to the `training:` block.
+
+        Args:
+            output_config_path: Output path. Defaults to
+                                <original_name>_hpo_best.yaml.
+
+        Returns:
+            Path to the written config file, or None if no results exist.
+        """
+        if not self.results:
+            print(
+                "No HPO results to apply. "
+                "Run tune_tokenizer(), tune_basemodel(), or tune_full_pipeline() first."
+            )
+            return None
+
+        # Load raw YAML to preserve comments and formatting as much as possible
+        with open(self.config_path, "r", encoding="utf-8") as f:
+            raw_config = yaml.safe_load(f)
+
+        # ── Merge all phase best params into a single flat dict ────────────
+        all_best_params: Dict[str, Any] = {}
+        for phase_results in self.results.values():
+            all_best_params.update(phase_results.get("params", {}))
+
+        # ── FIX: Route `clip` to the `data` block, not `training` ─────────
+        # `clip` is a data-preprocessing scalar read by CustomFinetuneConfig
+        # exclusively from config["data"]["clip"]. Writing it into the
+        # `training:` block causes it to be silently ignored at load time,
+        # leaving the old (un-optimised) clip value in effect.
+        #
+        # .pop() removes `clip` from all_best_params so the subsequent
+        # .update() call does NOT write a duplicate (and unreachable) `clip`
+        # key into the `training:` block.
+        if "clip" in all_best_params:
+            optimized_clip = all_best_params.pop("clip")
+            raw_config.setdefault("data", {})["clip"] = optimized_clip
+            self._logger.info(
+                f"Routed optimised clip={optimized_clip} → data.clip "
+                f"(removed from training block to prevent shadowing)."
+            )
+
+        # ── Inject remaining parameters into the training block ────────────
+        raw_config.setdefault("training", {}).update(all_best_params)
+
+        # ── Stamp experiment metadata ──────────────────────────────────────
+        raw_config.setdefault("experiment", {})["hpo_applied"] = True
+        raw_config["experiment"]["hpo_applied_timestamp"] = (
+            datetime.datetime.now().isoformat()
+        )
+
+        if output_config_path is None:
+            base, ext = os.path.splitext(self.config_path)
+            output_config_path = f"{base}_hpo_best{ext}"
+
+        with open(output_config_path, "w", encoding="utf-8") as f:
+            yaml.dump(
+                raw_config, f,
+                default_flow_style=False,
+                allow_unicode=True,
+                indent=2,
+                sort_keys=False,
+            )
+
+        self._logger.info(f"Best config written to: {output_config_path}")
+        print(f"\n✅ Best config written to: {output_config_path}")
+        return output_config_path
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Utility
+# Utility: Safe DataLoader Worker Count
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _get_silent_logger(name: str) -> logging.Logger:
-    """Logger that only writes to a temp file (no console spam during HPO)."""
-    logger = logging.getLogger(name)
-    if not logger.handlers:
-        logger.setLevel(logging.INFO)
-        tmp_log = os.path.join(tempfile.gettempdir(), f"{name}.log")
-        handler = logging.FileHandler(tmp_log, encoding='utf-8')
-        handler.setLevel(logging.INFO)
-        logger.addHandler(handler)
+def _compute_safe_num_workers(n_gpu_workers: int = 1) -> int:
+    """
+    Computes a per-process DataLoader num_workers count that avoids
+    CPU and disk I/O saturation when N GPU processes run simultaneously.
+
+    With N=8 GPUs and num_workers=6 (from config), the system would spawn
+    8×6=48 DataLoader processes competing for CPU cores and disk bandwidth,
+    degrading all workers below single-process performance.
+
+    Formula:
+        available_cores = total_cpu_cores × 0.8  (20% reserved for OS/Optuna)
+        per_process     = floor(available_cores / n_gpu_workers)
+        safe_count      = clamp(per_process, 1, 4)
+
+    The upper clamp of 4 reflects that DataLoader parallelism has strongly
+    diminishing returns beyond 4 workers for most I/O workloads, particularly
+    when reading from a shared NFS or NVMe that is already multi-reader bound.
+
+    Args:
+        n_gpu_workers: Number of concurrent GPU worker processes.
+
+    Returns:
+        Safe num_workers value for DataLoader in each worker process.
+    """
+    total_cores     = multiprocessing.cpu_count()
+    available_cores = max(1, int(total_cores * 0.8))
+    per_process     = max(1, available_cores // max(1, n_gpu_workers))
+    safe_count      = min(per_process, 4)
+
+    logging.getLogger(__name__).info(
+        f"DataLoader num_workers: {safe_count} "
+        f"(CPU cores={total_cores}, GPU workers={n_gpu_workers})"
+    )
+    return safe_count
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CLI Entry Point
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _build_argument_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="hpo_tuner.py",
+        description=(
+            "Asynchronous Hyperparameter Tuning for Nos Model Finetuning.\n\n"
+            "Single GPU:\n"
+            "  python hpo_tuner.py --config configs/config.yaml\n\n"
+            "Multi-GPU (8x A40 cluster):\n"
+            "  ./launch_hpo.sh --config configs/config.yaml --n-trials 30"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "--config",
+        type=str,
+        default="configs/config.yaml",
+        help="Path to YAML configuration file.",
+    )
+    parser.add_argument(
+        "--phase",
+        type=str,
+        default="both",
+        choices=["tokenizer", "basemodel", "both"],
+        help="Which training phase to tune. Default: both.",
+    )
+    parser.add_argument(
+        "--n-trials",
+        type=int,
+        default=None,
+        help="Override n_trials from config.",
+    )
+    parser.add_argument(
+        "--apply-best",
+        action="store_true",
+        help="Write best params back to a new config file after tuning.",
+    )
+    parser.add_argument(
+        "--tokenizer-path",
+        type=str,
+        default=None,
+        help="Path to finetuned tokenizer (required for --phase basemodel).",
+    )
+    parser.add_argument(
+        "--output-config",
+        type=str,
+        default=None,
+        help="Output path for best config YAML (default: <config>_hpo_best.yaml).",
+    )
+    parser.add_argument(
+        "--show-importance",
+        action="store_true",
+        help="Print hyperparameter importance ranking after tuning.",
+    )
+    return parser
+
+
+def main() -> None:
+    parser = _build_argument_parser()
+    args   = parser.parse_args()
+
+    if not OPTUNA_AVAILABLE:
+        print(
+            "ERROR: Optuna is not installed.\n"
+            "Install it with: pip install optuna plotly"
+        )
+        sys.exit(1)
+
+    # ── Validate phase/tokenizer-path combination ──────────────────────────
+    if args.phase == "basemodel" and args.tokenizer_path is None:
+        # Will fall back to config.finetuned_tokenizer_path in tune_basemodel;
+        # log a warning but don't abort here since config may have it set.
+        print(
+            "⚠️  --phase basemodel without --tokenizer-path. "
+            "Will use finetuned_tokenizer path from config."
+        )
+
+    # ── Initialise tuner ──────────────────────────────────────────────────
+    try:
+        tuner = NosHPOTuner(args.config)
+    except (FileNotFoundError, RuntimeError) as exc:
+        print(f"ERROR: {exc}")
+        sys.exit(1)
+
+    print("\nHPO Worker Configuration:")
+    print(f"  Config:      {args.config}")
+    print(f"  Phase:       {args.phase}")
+    print(f"  Trials:      {args.n_trials or tuner.config.hpo_n_trials}")
+    print(f"  Sampler:     {tuner.config.hpo_sampler}")
+    print(f"  Pruner:      {tuner.config.hpo_pruner}")
+    print(f"  Storage:     {tuner.config.hpo_storage or 'in-memory (single worker only)'}")
+    print(f"  Device:      {tuner.device}")
+    print(f"  DL Workers:  {tuner._safe_num_workers} per process")
+    print(f"  Worker tag:  {tuner._worker_tag}")
+
+    wall_start = time.perf_counter()
+
+    # ── Run HPO ───────────────────────────────────────────────────────────
+    try:
+        if args.phase == "both":
+            results = tuner.tune_full_pipeline()
+        elif args.phase == "tokenizer":
+            results = tuner.tune_tokenizer(n_trials=args.n_trials)
+        elif args.phase == "basemodel":
+            results = tuner.tune_basemodel(
+                tokenizer_path=args.tokenizer_path,
+                n_trials=args.n_trials,
+            )
+    except KeyboardInterrupt:
+        print(
+            "\n⚠️  HPO interrupted by user. "
+            "Completed trials have been saved to the study database."
+        )
+        sys.exit(0)
+
+    wall_elapsed = time.perf_counter() - wall_start
+    print(f"\n⏱  Total HPO wall time: {wall_elapsed / 60:.1f} minutes")
+
+    # ── Post-run actions ──────────────────────────────────────────────────
+    if args.apply_best:
+        tuner.apply_best_to_config(args.output_config)
+
+    if args.show_importance:
+        tuner.print_importance_report()
+
+
+if __name__ == "__main__":
+    main()
+```
+
+---
+
+### `launch_hpo.sh`
+
+```bash
+#!/usr/bin/env bash
+# =============================================================================
+# launch_hpo.sh
+# Asynchronous Multi-GPU HPO Launcher for Nos Model Finetuning
+#
+# Architecture:
+#   Spawns one independent hpo_tuner.py process per GPU. Each process gets
+#   its own CUDA context via CUDA_VISIBLE_DEVICES, with no shared memory,
+#   no DDP, and no synchronisation barriers. All workers share only the
+#   Optuna SQLite/PostgreSQL study database.
+#
+# Compatibility:
+#   - Linux        : bash 4.0+  (Ubuntu, Debian, CentOS, RHEL, Amazon Linux)
+#   - Windows      : Git Bash, WSL2, Cygwin (all ship bash 4+)
+#   - macOS        : bash 3.2+ via /bin/bash (limited testing)
+#   - Cloud VMs    : AWS, GCP, Azure GPU instances (all Linux-based)
+#   - Windows VMs  : Azure NV-series, AWS G-series with Git Bash / WSL2
+#
+# Prerequisites:
+#   - nvidia-smi   accessible in PATH
+#   - python       accessible in PATH (or set PYTHON_BIN below)
+#   - hpo_tuner.py in the same directory as this script (or set SCRIPT_DIR)
+#
+# Usage:
+#   chmod +x launch_hpo.sh
+#
+#   # Tune both phases across all GPUs (30 trials per worker):
+#   ./launch_hpo.sh --config configs/config.yaml --phase both --n-trials 30
+#
+#   # Tune tokenizer only on GPUs 0,1,2 (GPU subset):
+#   ./launch_hpo.sh --gpus 0,1,2 --config configs/config.yaml --phase tokenizer
+#
+#   # Dry run — print what would be launched without executing:
+#   ./launch_hpo.sh --dry-run --config configs/config.yaml --phase both
+#
+#   # Resume a previously interrupted study:
+#   ./launch_hpo.sh --config configs/config.yaml --phase both --n-trials 30
+#   (Optuna's load_if_exists=True means workers automatically resume)
+#
+#   # Use a custom Python binary (e.g., conda env):
+#   PYTHON_BIN=/opt/conda/envs/nos/bin/python ./launch_hpo.sh --config ...
+#
+#   # Limit VRAM per GPU (useful on shared machines):
+#   GPU_MEMORY_FRACTION=0.8 ./launch_hpo.sh --config configs/config.yaml
+#
+# Environment Variables (all optional):
+#   PYTHON_BIN              Path to python executable. Default: auto-detected.
+#   GPU_MEMORY_FRACTION     CUDA memory fraction [0.1-1.0]. Default: unset.
+#   HPO_TIMEOUT_SECONDS     Kill workers after N seconds. Default: unset (no limit).
+#   HPO_WORKER_NICE         nice(1) priority for workers [−20 to 19]. Default: 0.
+#   LOG_DIR                 Override log directory. Default: logs/hpo_workers.
+#
+# Exit Codes:
+#   0   All workers completed successfully.
+#   1   One or more workers failed (details in log files).
+#   2   Configuration or environment error (bad args, missing deps).
+#   3   Interrupted by user (SIGINT/SIGTERM). Partial results are preserved.
+# =============================================================================
+
+# ── Bash version guard ────────────────────────────────────────────────────────
+# Arrays with negative indexing and associative arrays require bash 4.0+.
+# macOS ships bash 3.2 at /bin/bash but Git Bash / Homebrew bash is 5.x.
+if [ "${BASH_VERSINFO[0]}" -lt 4 ]; then
+    echo "ERROR: bash 4.0 or later is required." >&2
+    echo "       Detected: bash ${BASH_VERSION}" >&2
+    echo "       macOS users: brew install bash && use /usr/local/bin/bash" >&2
+    echo "       Windows users: use Git Bash 4+ or WSL2." >&2
+    exit 2
+fi
+
+set -euo pipefail
+# -e  : Exit on any unhandled error
+# -u  : Treat unset variables as errors
+# -o pipefail : Propagate pipe failures (not just last command)
+
+# ── Script self-location (works with symlinks and spaces in paths) ─────────────
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}")"
+
+# ── Colour output (disabled automatically when not a terminal) ────────────────
+if [ -t 1 ] && command -v tput &>/dev/null && tput colors &>/dev/null; then
+    C_RESET="\033[0m"
+    C_BOLD="\033[1m"
+    C_RED="\033[31m"
+    C_GREEN="\033[32m"
+    C_YELLOW="\033[33m"
+    C_CYAN="\033[36m"
+    C_WHITE="\033[37m"
+else
+    C_RESET="" C_BOLD="" C_RED="" C_GREEN="" C_YELLOW="" C_CYAN="" C_WHITE=""
+fi
+
+# ── Logging helpers ───────────────────────────────────────────────────────────
+_ts()    { date "+%Y-%m-%d %H:%M:%S"; }
+_info()  { echo -e "${C_CYAN}[$(_ts)] [INFO]${C_RESET}  $*"; }
+_ok()    { echo -e "${C_GREEN}[$(_ts)] [ OK ]${C_RESET}  $*"; }
+_warn()  { echo -e "${C_YELLOW}[$(_ts)] [WARN]${C_RESET}  $*"; }
+_error() { echo -e "${C_RED}[$(_ts)] [ERR ]${C_RESET}  $*" >&2; }
+_die()   { _error "$*"; exit 2; }
+
+# ── Default configuration ─────────────────────────────────────────────────────
+GPU_SUBSET=""                          # Empty = use all GPUs
+DRY_RUN=false
+PYTHON_BIN="${PYTHON_BIN:-}"           # Auto-detected below if empty
+GPU_MEMORY_FRACTION="${GPU_MEMORY_FRACTION:-}"
+HPO_TIMEOUT_SECONDS="${HPO_TIMEOUT_SECONDS:-}"
+HPO_WORKER_NICE="${HPO_WORKER_NICE:-0}"
+LOG_DIR="${LOG_DIR:-${SCRIPT_DIR}/logs/hpo_workers}"
+HPO_TUNER_SCRIPT="${SCRIPT_DIR}/hpo_tuner.py"
+HPO_ARGS=()                            # Arguments forwarded to hpo_tuner.py
+
+# ── Argument parser ───────────────────────────────────────────────────────────
+# Separates launcher-specific flags from hpo_tuner.py pass-through arguments.
+_usage() {
+    cat <<EOF
+
+${C_BOLD}Usage:${C_RESET}
+  ${SCRIPT_NAME} [LAUNCHER OPTIONS] [HPO_TUNER OPTIONS]
+
+${C_BOLD}Launcher Options:${C_RESET}
+  --gpus <0,1,2,...>      Comma-separated GPU IDs to use. Default: all GPUs.
+  --dry-run               Print launch commands without executing them.
+  --log-dir <path>        Override log directory. Default: logs/hpo_workers/
+  --help, -h              Show this help message.
+
+${C_BOLD}HPO Tuner Options (passed through to hpo_tuner.py):${C_RESET}
+  --config <path>         Path to YAML config. Default: configs/config.yaml
+  --phase <phase>         tokenizer | basemodel | both. Default: both
+  --n-trials <int>        Number of Optuna trials per worker.
+  --apply-best            Write best params to a new config file.
+  --tokenizer-path <path> Tokenizer path (for --phase basemodel).
+  --output-config <path>  Output path for best config YAML.
+  --show-importance       Print hyperparameter importance after tuning.
+
+${C_BOLD}Environment Variables:${C_RESET}
+  PYTHON_BIN              Python executable. Default: auto-detected.
+  GPU_MEMORY_FRACTION     CUDA memory fraction [0.1-1.0].
+  HPO_TIMEOUT_SECONDS     Worker timeout in seconds.
+  HPO_WORKER_NICE         Process nice priority [-20 to 19]. Default: 0.
+  LOG_DIR                 Log directory override.
+
+${C_BOLD}Examples:${C_RESET}
+  ${SCRIPT_NAME} --config configs/config.yaml --phase both --n-trials 30
+  ${SCRIPT_NAME} --gpus 0,1,2 --config configs/config.yaml --phase tokenizer
+  ${SCRIPT_NAME} --dry-run --config configs/config.yaml --phase both
+  PYTHON_BIN=/opt/conda/bin/python ${SCRIPT_NAME} --config configs/config.yaml
+
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --gpus)
+            [[ $# -lt 2 ]] && _die "--gpus requires an argument."
+            GPU_SUBSET="$2"; shift 2 ;;
+        --dry-run)
+            DRY_RUN=true; shift ;;
+        --log-dir)
+            [[ $# -lt 2 ]] && _die "--log-dir requires an argument."
+            LOG_DIR="$2"; shift 2 ;;
+        --help|-h)
+            _usage; exit 0 ;;
+        *)
+            # Everything else is forwarded to hpo_tuner.py
+            HPO_ARGS+=("$1"); shift ;;
+    esac
+done
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 1: Environment Detection & Validation
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ── OS detection ──────────────────────────────────────────────────────────────
+_detect_os() {
+    local os_name
+    os_name="$(uname -s 2>/dev/null || echo 'Unknown')"
+    case "${os_name}" in
+        Linux*)   echo "linux"   ;;
+        Darwin*)  echo "macos"   ;;
+        CYGWIN*)  echo "windows" ;;
+        MINGW*)   echo "windows" ;;
+        MSYS*)    echo "windows" ;;
+        *)
+            # Final fallback: check for Windows-style paths
+            if [[ "${OSTYPE:-}" == "msys" ]] || [[ "${OSTYPE:-}" == "cygwin" ]]; then
+                echo "windows"
+            else
+                echo "unknown"
+            fi
+            ;;
+    esac
+}
+
+OS_TYPE="$(_detect_os)"
+_info "Detected OS: ${OS_TYPE}"
+
+# ── Python detection ──────────────────────────────────────────────────────────
+_detect_python() {
+    # If user explicitly set PYTHON_BIN, validate and use it
+    if [[ -n "${PYTHON_BIN}" ]]; then
+        if command -v "${PYTHON_BIN}" &>/dev/null; then
+            echo "${PYTHON_BIN}"
+            return 0
+        else
+            _die "PYTHON_BIN='${PYTHON_BIN}' is not executable or not in PATH."
+        fi
+    fi
+
+    # Auto-detection priority:
+    # 1. python3   (preferred on Linux/macOS/WSL2)
+    # 2. python    (Windows native, conda base envs)
+    # 3. py -3     (Windows Python Launcher — py.exe)
+    local candidates=("python3" "python" "py")
+    for candidate in "${candidates[@]}"; do
+        if command -v "${candidate}" &>/dev/null; then
+            # Verify it is Python 3 (not Python 2)
+            local version
+            version="$("${candidate}" -c 'import sys; print(sys.version_info.major)' 2>/dev/null || echo '0')"
+            if [[ "${version}" == "3" ]]; then
+                echo "${candidate}"
+                return 0
+            fi
+        fi
+    done
+
+    # Windows py.exe launcher
+    if command -v py &>/dev/null; then
+        local version
+        version="$(py -3 -c 'import sys; print(sys.version_info.major)' 2>/dev/null || echo '0')"
+        if [[ "${version}" == "3" ]]; then
+            echo "py -3"
+            return 0
+        fi
+    fi
+
+    _die "No Python 3 interpreter found in PATH. " \
+         "Set PYTHON_BIN=/path/to/python3 or activate your conda/venv."
+}
+
+PYTHON_BIN="$(_detect_python)"
+_info "Python interpreter: ${PYTHON_BIN}"
+
+# Validate Python version is 3.8+
+PY_VERSION="$(${PYTHON_BIN} -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null || echo '0.0')"
+PY_MAJOR="${PY_VERSION%%.*}"
+PY_MINOR="${PY_VERSION#*.}"
+if [[ "${PY_MAJOR}" -lt 3 ]] || { [[ "${PY_MAJOR}" -eq 3 ]] && [[ "${PY_MINOR}" -lt 8 ]]; }; then
+    _die "Python 3.8 or later required. Found: Python ${PY_VERSION}"
+fi
+_info "Python version: ${PY_VERSION} ✓"
+
+# ── nvidia-smi detection ──────────────────────────────────────────────────────
+_detect_nvidia_smi() {
+    # Standard PATH check
+    if command -v nvidia-smi &>/dev/null; then
+        echo "nvidia-smi"
+        return 0
+    fi
+
+    # Windows-specific install paths (not always in PATH inside Git Bash)
+    local win_paths=(
+        "/c/Windows/System32/nvidia-smi.exe"
+        "/c/Program Files/NVIDIA Corporation/NVSMI/nvidia-smi.exe"
+        "/c/Windows/System32/nvidia-smi"
+    )
+    for path in "${win_paths[@]}"; do
+        if [[ -x "${path}" ]]; then
+            echo "${path}"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+NVIDIA_SMI=""
+if ! NVIDIA_SMI="$(_detect_nvidia_smi)"; then
+    _die "nvidia-smi not found in PATH or standard install locations." \
+         "Ensure NVIDIA drivers are installed and nvidia-smi is accessible."
+fi
+_info "nvidia-smi: ${NVIDIA_SMI} ✓"
+
+# ── hpo_tuner.py location check ───────────────────────────────────────────────
+if [[ ! -f "${HPO_TUNER_SCRIPT}" ]]; then
+    _die "hpo_tuner.py not found at: ${HPO_TUNER_SCRIPT}" \
+         "Place launch_hpo.sh in the same directory as hpo_tuner.py."
+fi
+_info "HPO script: ${HPO_TUNER_SCRIPT} ✓"
+
+# ── Optuna installation check ─────────────────────────────────────────────────
+if ! ${PYTHON_BIN} -c "import optuna" &>/dev/null; then
+    _die "Optuna is not installed in the detected Python environment." \
+         "Run: ${PYTHON_BIN} -m pip install optuna plotly"
+fi
+OPTUNA_VERSION="$(${PYTHON_BIN} -c 'import optuna; print(optuna.__version__)' 2>/dev/null || echo 'unknown')"
+_info "Optuna version: ${OPTUNA_VERSION} ✓"
+
+# ── PyTorch + CUDA check ──────────────────────────────────────────────────────
+TORCH_CUDA_AVAILABLE="$(${PYTHON_BIN} -c \
+    'import torch; print("yes" if torch.cuda.is_available() else "no")' \
+    2>/dev/null || echo 'no')"
+if [[ "${TORCH_CUDA_AVAILABLE}" != "yes" ]]; then
+    _warn "torch.cuda.is_available() returned False." \
+          "Workers will run on CPU. Performance will be severely degraded."
+fi
+
+# ── nice availability (non-critical on Windows) ───────────────────────────────
+NICE_CMD=""
+if command -v nice &>/dev/null && [[ "${OS_TYPE}" != "windows" ]]; then
+    NICE_CMD="nice -n ${HPO_WORKER_NICE}"
+fi
+
+# ── timeout availability ──────────────────────────────────────────────────────
+TIMEOUT_CMD=""
+if [[ -n "${HPO_TIMEOUT_SECONDS}" ]]; then
+    if command -v timeout &>/dev/null; then
+        TIMEOUT_CMD="timeout ${HPO_TIMEOUT_SECONDS}"
+    elif command -v gtimeout &>/dev/null; then
+        # macOS via coreutils: brew install coreutils
+        TIMEOUT_CMD="gtimeout ${HPO_TIMEOUT_SECONDS}"
+    else
+        _warn "HPO_TIMEOUT_SECONDS=${HPO_TIMEOUT_SECONDS} set but 'timeout' not found." \
+              "Workers will run without a time limit."
+    fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 2: GPU Enumeration
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ── Enumerate all available GPUs ──────────────────────────────────────────────
+_enumerate_gpus() {
+    local raw_output
+    # --query-gpu=index gives numeric IDs; csv,noheader strips the header row
+    raw_output="$(${NVIDIA_SMI} --query-gpu=index,name,memory.total \
+        --format=csv,noheader,nounits 2>/dev/null)" || {
+        _die "nvidia-smi failed to enumerate GPUs. " \
+             "Check driver installation: ${NVIDIA_SMI} --version"
+    }
+
+    if [[ -z "${raw_output}" ]]; then
+        _die "nvidia-smi returned no GPU information."
+    fi
+    echo "${raw_output}"
+}
+
+# Build GPU arrays
+declare -a ALL_GPU_IDS=()
+declare -a ALL_GPU_NAMES=()
+declare -a ALL_GPU_VRAM=()
+
+while IFS=',' read -r gpu_id gpu_name gpu_vram; do
+    # Trim whitespace (critical for Windows where nvidia-smi adds extra spaces)
+    gpu_id="$(echo "${gpu_id}"   | tr -d '[:space:]')"
+    gpu_name="$(echo "${gpu_name}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+    gpu_vram="$(echo "${gpu_vram}" | tr -d '[:space:]')"
+
+    ALL_GPU_IDS+=("${gpu_id}")
+    ALL_GPU_NAMES+=("${gpu_name}")
+    ALL_GPU_VRAM+=("${gpu_vram}")
+done < <(_enumerate_gpus)
+
+TOTAL_GPUS="${#ALL_GPU_IDS[@]}"
+if [[ "${TOTAL_GPUS}" -eq 0 ]]; then
+    _die "No GPUs detected. Check nvidia-smi output manually: ${NVIDIA_SMI}"
+fi
+
+# ── Apply GPU subset filter ───────────────────────────────────────────────────
+declare -a SELECTED_GPU_IDS=()
+declare -a SELECTED_GPU_NAMES=()
+declare -a SELECTED_GPU_VRAM=()
+
+if [[ -n "${GPU_SUBSET}" ]]; then
+    # Parse comma-separated list: "0,1,2" → array
+    IFS=',' read -ra REQUESTED_IDS <<< "${GPU_SUBSET}"
+    for req_id in "${REQUESTED_IDS[@]}"; do
+        req_id="$(echo "${req_id}" | tr -d '[:space:]')"
+        local_found=false
+        for i in "${!ALL_GPU_IDS[@]}"; do
+            if [[ "${ALL_GPU_IDS[$i]}" == "${req_id}" ]]; then
+                SELECTED_GPU_IDS+=("${ALL_GPU_IDS[$i]}")
+                SELECTED_GPU_NAMES+=("${ALL_GPU_NAMES[$i]}")
+                SELECTED_GPU_VRAM+=("${ALL_GPU_VRAM[$i]}")
+                local_found=true
+                break
+            fi
+        done
+        if [[ "${local_found}" == false ]]; then
+            _warn "Requested GPU ${req_id} not found in available GPUs [${ALL_GPU_IDS[*]}]. Skipping."
+        fi
+    done
+
+    if [[ "${#SELECTED_GPU_IDS[@]}" -eq 0 ]]; then
+        _die "No valid GPUs remain after applying --gpus '${GPU_SUBSET}'."
+    fi
+else
+    # Use all available GPUs
+    SELECTED_GPU_IDS=("${ALL_GPU_IDS[@]}")
+    SELECTED_GPU_NAMES=("${ALL_GPU_NAMES[@]}")
+    SELECTED_GPU_VRAM=("${ALL_GPU_VRAM[@]}")
+fi
+
+NUM_WORKERS="${#SELECTED_GPU_IDS[@]}"
+
+# ── Check for existing HPO DB and warn if starting fresh ──────────────────────
+_check_existing_db() {
+    local storage_uri=""
+    # Extract storage URI from HPO_ARGS if --config was passed
+    local config_path=""
+    for i in "${!HPO_ARGS[@]}"; do
+        if [[ "${HPO_ARGS[$i]}" == "--config" ]]; then
+            config_path="${HPO_ARGS[$((i+1))]:-}"
+            break
+        fi
+    done
+
+    if [[ -n "${config_path}" ]] && [[ -f "${config_path}" ]]; then
+        # Simple grep — avoids requiring PyYAML at bash level
+        storage_uri="$(grep -E '^\s*storage:' "${config_path}" \
+            | sed 's/.*storage:[[:space:]]*//' \
+            | tr -d '"'"'" \
+            | tr -d '[:space:]' || echo '')"
+        if [[ "${storage_uri}" == "null" ]] || [[ -z "${storage_uri}" ]]; then
+            _warn "hpo.storage is null in config. Using in-memory Optuna storage." \
+                  "Results will NOT be shared between workers or persisted across runs." \
+                  "Set hpo.storage to a SQLite or PostgreSQL URI for multi-GPU HPO."
+        else
+            # Extract file path from sqlite:///path?timeout=60
+            local db_path
+            db_path="$(echo "${storage_uri}" \
+                | sed 's|sqlite:///||' \
+                | sed 's|?.*||')"
+            if [[ -f "${db_path}" ]]; then
+                _info "Existing Optuna DB found: ${db_path}"
+                _info "Workers will resume the existing study (load_if_exists=True)."
+            fi
+        fi
+    fi
+}
+_check_existing_db
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 3: Signal Handling & Cleanup
+# ══════════════════════════════════════════════════════════════════════════════
+
+declare -a WORKER_PIDS=()
+INTERRUPTED=false
+
+_cleanup() {
+    local signal="${1:-SIGTERM}"
+    INTERRUPTED=true
+
+    echo ""
+    _warn "Received ${signal}. Sending SIGTERM to all worker processes..."
+
+    local kill_failed=0
+    for pid in "${WORKER_PIDS[@]}"; do
+        if kill -0 "${pid}" 2>/dev/null; then
+            kill -TERM "${pid}" 2>/dev/null || kill_failed=$((kill_failed + 1))
+            _warn "  Sent SIGTERM to PID ${pid}"
+        fi
+    done
+
+    # Give workers 10 seconds to shut down gracefully
+    local grace_seconds=10
+    _info "Waiting up to ${grace_seconds}s for graceful shutdown..."
+    local elapsed=0
+    while [[ ${elapsed} -lt ${grace_seconds} ]]; do
+        local still_running=0
+        for pid in "${WORKER_PIDS[@]}"; do
+            kill -0 "${pid}" 2>/dev/null && still_running=$((still_running + 1))
+        done
+        [[ ${still_running} -eq 0 ]] && break
+        sleep 1
+        elapsed=$((elapsed + 1))
+    done
+
+    # Force kill any remaining workers
+    for pid in "${WORKER_PIDS[@]}"; do
+        if kill -0 "${pid}" 2>/dev/null; then
+            _warn "  Force killing PID ${pid} (SIGKILL)"
+            kill -KILL "${pid}" 2>/dev/null || true
+        fi
+    done
+
+    _warn "Interrupted. Completed trials have been saved to the Optuna DB."
+    _warn "Re-run the same command to resume from where you left off."
+    exit 3
+}
+
+# Trap SIGINT (Ctrl+C), SIGTERM (kill), and SIGHUP (terminal close)
+# Note: SIGHUP is not available on Windows but the trap is harmless there
+trap '_cleanup SIGINT'  INT
+trap '_cleanup SIGTERM' TERM
+trap '_cleanup SIGHUP'  HUP 2>/dev/null || true
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 4: Print Launch Plan
+# ══════════════════════════════════════════════════════════════════════════════
+
+echo ""
+echo -e "${C_BOLD}╔══════════════════════════════════════════════════════════════╗${C_RESET}"
+echo -e "${C_BOLD}║       Nos HPO — Asynchronous Multi-GPU Launcher              ║${C_RESET}"
+echo -e "${C_BOLD}╠══════════════════════════════════════════════════════════════╣${C_RESET}"
+printf  "║  %-20s : %-37s║\n" "OS"           "${OS_TYPE}"
+printf  "║  %-20s : %-37s║\n" "Python"       "${PYTHON_BIN} (${PY_VERSION})"
+printf  "║  %-20s : %-37s║\n" "Optuna"       "${OPTUNA_VERSION}"
+printf  "║  %-20s : %-37s║\n" "Total GPUs"   "${TOTAL_GPUS} detected"
+printf  "║  %-20s : %-37s║\n" "Worker GPUs"  "${NUM_WORKERS} selected"
+printf  "║  %-20s : %-37s║\n" "Log dir"      "${LOG_DIR}"
+[[ -n "${HPO_TIMEOUT_SECONDS}" ]] && \
+printf  "║  %-20s : %-37s║\n" "Worker timeout"  "${HPO_TIMEOUT_SECONDS}s"
+[[ "${DRY_RUN}" == true ]] && \
+printf  "║  %-20s : %-37s║\n" "Mode"         "DRY RUN — no processes launched"
+echo -e "${C_BOLD}╠══════════════════════════════════════════════════════════════╣${C_RESET}"
+echo    "║  Selected GPUs:                                              ║"
+for i in "${!SELECTED_GPU_IDS[@]}"; do
+    printf "║    GPU %-3s : %-20s  %6s MiB VRAM          ║\n" \
+        "${SELECTED_GPU_IDS[$i]}" \
+        "${SELECTED_GPU_NAMES[$i]:0:20}" \
+        "${SELECTED_GPU_VRAM[$i]}"
+done
+echo -e "${C_BOLD}╠══════════════════════════════════════════════════════════════╣${C_RESET}"
+echo    "║  HPO arguments forwarded to hpo_tuner.py:                    ║"
+printf  "║    %-58s║\n" "${HPO_ARGS[*]:0:58}"
+echo -e "${C_BOLD}╚══════════════════════════════════════════════════════════════╝${C_RESET}"
+echo ""
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 5: Worker Launch
+# ══════════════════════════════════════════════════════════════════════════════
+
+mkdir -p "${LOG_DIR}"
+
+# Per-run timestamp for log file naming (shared across all workers in this run)
+RUN_TIMESTAMP="$(date '+%Y%m%d_%H%M%S')"
+
+declare -a LOG_FILES=()
+
+for i in "${!SELECTED_GPU_IDS[@]}"; do
+    GPU_ID="${SELECTED_GPU_IDS[$i]}"
+    GPU_NAME="${SELECTED_GPU_NAMES[$i]}"
+    LOG_FILE="${LOG_DIR}/worker_gpu${GPU_ID}_${RUN_TIMESTAMP}.log"
+    LOG_FILES+=("${LOG_FILE}")
+
+    # ── Build the full command ─────────────────────────────────────────────
+    # Construct as an array to handle paths with spaces correctly
+    CMD=()
+
+    # Process priority (Linux/macOS only)
+    if [[ -n "${NICE_CMD}" ]]; then
+        CMD+=($NICE_CMD)
+    fi
+
+    # Timeout wrapper (if configured)
+    if [[ -n "${TIMEOUT_CMD}" ]]; then
+        CMD+=($TIMEOUT_CMD)
+    fi
+
+    # Python interpreter
+    # Split PYTHON_BIN in case it contains flags (e.g., "py -3")
+    read -ra PY_PARTS <<< "${PYTHON_BIN}"
+    CMD+=("${PY_PARTS[@]}")
+
+    # Unbuffered output: critical so log files get real-time writes,
+    # not buffered writes that only flush when the process exits.
+    CMD+=("-u")
+
+    # The HPO script
+    CMD+=("${HPO_TUNER_SCRIPT}")
+
+    # Forward all HPO arguments
+    CMD+=("${HPO_ARGS[@]}")
+
+    # ── Environment for this worker ────────────────────────────────────────
+    # CUDA_VISIBLE_DEVICES: Restricts this process to exactly one physical GPU.
+    # CUDA remaps the assigned GPU to logical index cuda:0 inside the process.
+    # PYTHONUNBUFFERED: Belt-and-suspenders for -u flag (some launchers ignore -u).
+    # PYTHONFAULTHANDLER: Dumps C-level stack traces on segfaults (invaluable for debugging).
+    declare -a WORKER_ENV=(
+        "CUDA_VISIBLE_DEVICES=${GPU_ID}"
+        "PYTHONUNBUFFERED=1"
+        "PYTHONFAULTHANDLER=1"
+    )
+
+    # Optional VRAM fraction limiter
+    if [[ -n "${GPU_MEMORY_FRACTION}" ]]; then
+        WORKER_ENV+=("PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512")
+        # Note: actual fraction limiting requires PyTorch code changes;
+        # this env var limits the allocator's split size as a proxy.
+    fi
+
+    if [[ "${DRY_RUN}" == true ]]; then
+        _info "[DRY RUN] GPU ${GPU_ID} (${GPU_NAME}) would run:"
+        echo  "         env ${WORKER_ENV[*]} ${CMD[*]}"
+        echo  "         >> ${LOG_FILE} 2>&1 &"
+    else
+        # Write a header into the log file before the process starts
+        {
+            echo "============================================================"
+            echo "  Nos HPO Worker Log"
+            echo "  Run timestamp : ${RUN_TIMESTAMP}"
+            echo "  GPU ID        : ${GPU_ID} (${GPU_NAME})"
+            echo "  GPU VRAM      : ${SELECTED_GPU_VRAM[$i]} MiB"
+            echo "  Command       : ${CMD[*]}"
+            echo "  Environment   : ${WORKER_ENV[*]}"
+            echo "  Started at    : $(date)"
+            echo "============================================================"
+        } > "${LOG_FILE}"
+
+        # Launch the worker process
+        # env sets per-process environment without polluting the parent shell
+        env "${WORKER_ENV[@]}" "${CMD[@]}" >> "${LOG_FILE}" 2>&1 &
+        WORKER_PID=$!
+
+        WORKER_PIDS+=("${WORKER_PID}")
+        _ok "GPU ${GPU_ID} (${GPU_NAME}) → PID ${WORKER_PID} → ${LOG_FILE}"
+    fi
+done
+
+# ── Dry run exits here ────────────────────────────────────────────────────────
+if [[ "${DRY_RUN}" == true ]]; then
+    echo ""
+    _info "Dry run complete. No processes were launched."
+    exit 0
+fi
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 6: Live Monitoring
+# ══════════════════════════════════════════════════════════════════════════════
+
+echo ""
+_info "All ${NUM_WORKERS} worker(s) launched."
+echo ""
+echo -e "  ${C_CYAN}Monitor logs (all workers):${C_RESET}"
+echo    "    tail -f ${LOG_DIR}/worker_gpu*_${RUN_TIMESTAMP}.log"
+echo ""
+echo -e "  ${C_CYAN}Monitor individual worker:${C_RESET}"
+for i in "${!SELECTED_GPU_IDS[@]}"; do
+    echo "    tail -f ${LOG_FILES[$i]}"
+done
+echo ""
+echo -e "  ${C_CYAN}Monitor GPU utilisation:${C_RESET}"
+echo    "    watch -n 2 nvidia-smi"
+echo ""
+echo -e "  ${C_CYAN}Stop all workers:${C_RESET}"
+echo    "    Ctrl+C  (graceful SIGTERM → waits 10s → SIGKILL)"
+echo ""
+
+# ── Optional: background VRAM monitor ─────────────────────────────────────────
+# Logs nvidia-smi output every 60 seconds into a separate file for post-run
+# VRAM analysis. Killed automatically when the script exits.
+VRAM_LOG="${LOG_DIR}/vram_monitor_${RUN_TIMESTAMP}.log"
+(
+    while true; do
+        {
+            echo "--- $(date) ---"
+            "${NVIDIA_SMI}" \
+                --query-gpu=index,name,memory.used,memory.total,utilization.gpu,temperature.gpu \
+                --format=csv,noheader,nounits 2>/dev/null || true
+            echo ""
+        } >> "${VRAM_LOG}" 2>/dev/null
+        sleep 60
+    done
+) &
+VRAM_MONITOR_PID=$!
+_info "VRAM monitor started (PID ${VRAM_MONITOR_PID}) → ${VRAM_LOG}"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 7: Wait for All Workers & Collect Results
+# ══════════════════════════════════════════════════════════════════════════════
+
+declare -a EXIT_CODES=()
+declare -a FAILED_GPUS=()
+declare -a SUCCEEDED_GPUS=()
+FAILED_COUNT=0
+SUCCEEDED_COUNT=0
+
+_info "Waiting for all ${NUM_WORKERS} worker(s) to complete..."
+echo  "  (This may take several hours for large HPO runs)"
+echo ""
+
+for i in "${!WORKER_PIDS[@]}"; do
+    PID="${WORKER_PIDS[$i]}"
+    GPU_ID="${SELECTED_GPU_IDS[$i]}"
+    GPU_NAME="${SELECTED_GPU_NAMES[$i]}"
+    LOG_FILE="${LOG_FILES[$i]}"
+
+    EXIT_CODE=0
+    wait "${PID}" || EXIT_CODE=$?
+    EXIT_CODES+=("${EXIT_CODE}")
+
+    # Append completion footer to the worker's log
+    {
+        echo ""
+        echo "============================================================"
+        echo "  Worker exited at: $(date)"
+        echo "  Exit code: ${EXIT_CODE}"
+        echo "============================================================"
+    } >> "${LOG_FILE}" 2>/dev/null || true
+
+    if [[ "${EXIT_CODE}" -eq 0 ]]; then
+        _ok  "GPU ${GPU_ID} (${GPU_NAME}) | PID ${PID} | EXIT 0 | SUCCESS"
+        SUCCEEDED_GPUS+=("${GPU_ID}")
+        SUCCEEDED_COUNT=$((SUCCEEDED_COUNT + 1))
+    elif [[ "${EXIT_CODE}" -eq 3 ]]; then
+        # Exit code 3 = interrupted by user (our own convention from hpo_tuner.py)
+        _warn "GPU ${GPU_ID} (${GPU_NAME}) | PID ${PID} | EXIT 3 | INTERRUPTED"
+        _warn "  Partial results are preserved in the Optuna DB."
+        SUCCEEDED_GPUS+=("${GPU_ID}")  # Treat interruption as non-failure
+        SUCCEEDED_COUNT=$((SUCCEEDED_COUNT + 1))
+    else
+        _error "GPU ${GPU_ID} (${GPU_NAME}) | PID ${PID} | EXIT ${EXIT_CODE} | FAILED"
+        _error "  Last 20 lines of log:"
+        tail -n 20 "${LOG_FILE}" | sed 's/^/    /' >&2
+        FAILED_GPUS+=("${GPU_ID}")
+        FAILED_COUNT=$((FAILED_COUNT + 1))
+    fi
+done
+
+# ── Kill the VRAM monitor ─────────────────────────────────────────────────────
+kill "${VRAM_MONITOR_PID}" 2>/dev/null || true
+wait "${VRAM_MONITOR_PID}" 2>/dev/null || true
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 8: Final Report
+# ══════════════════════════════════════════════════════════════════════════════
+
+echo ""
+echo -e "${C_BOLD}══════════════════════════════════════════════════════════════${C_RESET}"
+echo -e "${C_BOLD}  HPO LAUNCHER — FINAL REPORT${C_RESET}"
+echo    "══════════════════════════════════════════════════════════════"
+printf  "  %-24s : %s\n" "Run timestamp"    "${RUN_TIMESTAMP}"
+printf  "  %-24s : %s\n" "Total workers"    "${NUM_WORKERS}"
+printf  "  %-24s : %s\n" "Succeeded"        "${SUCCEEDED_COUNT}"
+printf  "  %-24s : %s\n" "Failed"           "${FAILED_COUNT}"
+printf  "  %-24s : %s\n" "Log directory"    "${LOG_DIR}"
+printf  "  %-24s : %s\n" "VRAM log"         "${VRAM_LOG}"
+echo    "══════════════════════════════════════════════════════════════"
+
+if [[ "${FAILED_COUNT}" -gt 0 ]]; then
+    echo ""
+    _error "Failed GPU workers: ${FAILED_GPUS[*]}"
+    _error "Inspect their logs:"
+    for fail_gpu in "${FAILED_GPUS[@]}"; do
+        echo  "  ${LOG_DIR}/worker_gpu${fail_gpu}_${RUN_TIMESTAMP}.log"
+    done
+    echo ""
+    _info "Completed trials from successful workers are preserved in the Optuna DB."
+    _info "You can re-run the same command to launch replacement workers for the failed GPUs:"
+    echo  "  ./launch_hpo.sh --gpus $(IFS=','; echo "${FAILED_GPUS[*]}") ${HPO_ARGS[*]}"
+    echo ""
+    exit 1
+fi
+
+echo ""
+_ok "All ${NUM_WORKERS} worker(s) completed successfully."
+echo ""
+_info "Next steps:"
+echo  "  1. Apply best params to config:"
+echo  "     ${PYTHON_BIN} hpo_tuner.py ${HPO_ARGS[*]} --apply-best"
+echo  "  2. View hyperparameter importance:"
+echo  "     ${PYTHON_BIN} hpo_tuner.py ${HPO_ARGS[*]} --show-importance"
+echo  "  3. Review VRAM usage over time:"
+echo  "     cat ${VRAM_LOG}"
+echo ""
+exit 0
+```
+
+---
+
+### `finetune_base_model.py`
+
+```python
+import os
+import sys
+import json
+import time
+import pickle
+import random
+import pandas as pd
+import numpy as np
+import torch
+import torch.nn as nn
+import datetime
+from torch.utils.data import Dataset, DataLoader
+from torch.utils.data.distributed import DistributedSampler
+from time import gmtime, strftime
+import logging
+from logging.handlers import RotatingFileHandler
+import torch.distributed as dist
+from torch.nn.parallel import DistributedDataParallel as DDP
+
+sys.path.append('../')
+from model import Nos, NosTokenizer, NosPredictor
+from config_loader import CustomFinetuneConfig
+
+
+# ── Utilities ─────────────────────────────────────────────────────────────────
+
+def format_time(seconds: float) -> str:
+    """Convert a duration in seconds to a human-readable string."""
+    return str(datetime.timedelta(seconds=int(seconds)))
+
+
+def get_model_size(model: torch.nn.Module) -> str:
+    total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    if total_params >= 1_000_000_000:
+        return f"{total_params / 1e9:.1f}B"
+    elif total_params >= 1_000_000:
+        return f"{total_params / 1e6:.1f}M"
+    else:
+        return f"{total_params / 1e3:.1f}K"
+
+
+# ── Dataset ───────────────────────────────────────────────────────────────────
+
+class CustomKlineDataset(Dataset):
+    """
+    Memory-mapped Kline dataset.
+
+    The first call for a given (data_path, data_type) pair builds numpy cache
+    files alongside the CSV.  Subsequent calls load them via mmap — zero-copy
+    and safe across multiple DataLoader workers and DDP ranks.
+    """
+
+    FEATURE_COLS      = ['open', 'high', 'low', 'close', 'volume', 'amount']
+    TIME_FEATURE_COLS = ['minute', 'hour', 'weekday', 'day', 'month']
+
+    def __init__(
+        self,
+        data_path: str,
+        data_type: str = 'train',
+        lookback_window: int = 90,
+        predict_window: int = 10,
+        clip: float = 5.0,
+        seed: int = 100,
+        train_ratio: float = 0.70,
+        val_ratio: float  = 0.15,
+        test_ratio: float = 0.15,
+    ):
+        self.data_path       = data_path
+        self.data_type       = data_type
+        self.lookback_window = lookback_window
+        self.predict_window  = predict_window
+        self.window          = lookback_window + predict_window + 1
+        self.clip            = clip
+        self.seed            = seed
+        self.train_ratio     = train_ratio
+        self.val_ratio       = val_ratio
+        self.test_ratio      = test_ratio
+
+        self.py_rng      = random.Random(seed)
+        self.current_epoch = 0
+
+        self._load_or_build_cache()
+
+        self.n_samples = len(self.x_data) - self.window + 1
+        if self.n_samples <= 0:
+            raise ValueError(
+                f"[{data_type.upper()}] Not enough data rows ({len(self.x_data)}) "
+                f"for window size {self.window}."
+            )
+        print(
+            f"[{data_type.upper()}] Rows: {len(self.x_data):,}  "
+            f"Samples: {self.n_samples:,}"
+        )
+
+    # ------------------------------------------------------------------
+    def _load_or_build_cache(self):
+        cache_x     = f"{self.data_path}.{self.data_type}.x.npy"
+        cache_stamp = f"{self.data_path}.{self.data_type}.stamp.npy"
+
+        if os.path.exists(cache_x) and os.path.exists(cache_stamp):
+            self.x_data     = np.load(cache_x,     mmap_mode='r')
+            self.stamp_data = np.load(cache_stamp, mmap_mode='r')
+            return
+
+        print(f"[{self.data_type.upper()}] Building mmap cache …")
+        df = pd.read_csv(self.data_path)
+        df['timestamps'] = pd.to_datetime(df['timestamps'])
+        df = df.sort_values('timestamps').reset_index(drop=True)
+
+        # Temporal features
+        df['minute']  = df['timestamps'].dt.minute
+        df['hour']    = df['timestamps'].dt.hour
+        df['weekday'] = df['timestamps'].dt.weekday
+        df['day']     = df['timestamps'].dt.day
+        df['month']   = df['timestamps'].dt.month
+
+        if df.isnull().any().any():
+            df = df.ffill()
+
+        # Chronological split
+        n = len(df)
+        train_end = int(n * self.train_ratio)
+        val_end   = int(n * (self.train_ratio + self.val_ratio))
+
+        slices = {'train': slice(None, train_end),
+                  'val':   slice(train_end, val_end),
+                  'test':  slice(val_end, None)}
+        df = df.iloc[slices[self.data_type]]
+
+        x_arr     = df[self.FEATURE_COLS].values.astype(np.float32)
+        stamp_arr = df[self.TIME_FEATURE_COLS].values.astype(np.float32)
+
+        np.save(cache_x,     x_arr)
+        np.save(cache_stamp, stamp_arr)
+        del df
+
+        self.x_data     = np.load(cache_x,     mmap_mode='r')
+        self.stamp_data = np.load(cache_stamp, mmap_mode='r')
+
+    # ------------------------------------------------------------------
+    def set_epoch_seed(self, epoch: int):
+        self.py_rng.seed(self.seed + epoch)
+        self.current_epoch = epoch
+
+    def __len__(self) -> int:
+        return self.n_samples
+
+    def __getitem__(self, idx: int):
+        max_start = len(self.x_data) - self.window
+
+        if self.data_type == 'train':
+            epoch      = self.current_epoch
+            start_idx  = (idx * 9973 + (epoch + 1) * 104729) % (max_start + 1)
+        else:
+            start_idx  = idx % (max_start + 1)
+
+        end_idx = start_idx + self.window
+
+        # Copy out of mmap so workers get writable arrays
+        x       = self.x_data[start_idx:end_idx].copy()
+        x_stamp = self.stamp_data[start_idx:end_idx].copy()
+
+        # Per-sample z-score + clip
+        x_mean = x.mean(axis=0)
+        x_std  = x.std(axis=0)
+        x = (x - x_mean) / (x_std + 1e-5)
+        x = np.clip(x, -self.clip, self.clip)
+
+        return torch.from_numpy(x), torch.from_numpy(x_stamp)
+
+
+# ── Logging ───────────────────────────────────────────────────────────────────
+
+def setup_logging(exp_name: str, log_dir: str, rank: int = 0) -> logging.Logger:
+    os.makedirs(log_dir, exist_ok=True)
+
+    logger = logging.getLogger(f"basemodel_training_rank_{rank}")
+    logger.setLevel(logging.INFO)
+
+    # Idempotent – do not attach duplicate handlers on re-import
+    if logger.handlers:
+        return logger
+
+    log_file     = os.path.join(log_dir, f"basemodel_training_rank_{rank}.log")
+    file_handler = RotatingFileHandler(
+        log_file, maxBytes=10 * 1024 * 1024, backupCount=5, encoding='utf-8'
+    )
+    file_handler.setLevel(logging.INFO)
+
+    console_handler = logging.StreamHandler() if rank == 0 else None
+    if console_handler:
+        console_handler.setLevel(logging.INFO)
+
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S',
+    )
+    file_handler.setFormatter(formatter)
+    if console_handler:
+        console_handler.setFormatter(formatter)
+
+    logger.addHandler(file_handler)
+    if console_handler:
+        logger.addHandler(console_handler)
+
+    logger.info("=== Basemodel Training Started ===")
+    logger.info(f"Experiment: {exp_name}")
+    logger.info(f"Log dir:    {log_dir}")
+    logger.info(f"Rank:       {rank}")
+    logger.info(f"Timestamp:  {datetime.datetime.now():%Y-%m-%d %H:%M:%S}")
+
     return logger
+
+
+# ── DataLoaders ───────────────────────────────────────────────────────────────
+
+def create_dataloaders(config):
+    is_main = (
+        not dist.is_available()
+        or not dist.is_initialized()
+        or dist.get_rank() == 0
+    )
+    if is_main:
+        print("Creating data loaders …")
+
+    shared_kw = dict(
+        data_path       = config.data_path,
+        lookback_window = config.lookback_window,
+        predict_window  = config.predict_window,
+        clip            = config.clip,
+        train_ratio     = config.train_ratio,
+        val_ratio       = config.val_ratio,
+        test_ratio      = config.test_ratio,
+    )
+
+    train_dataset = CustomKlineDataset(data_type='train', seed=config.seed,     **shared_kw)
+    val_dataset   = CustomKlineDataset(data_type='val',   seed=config.seed + 1, **shared_kw)
+
+    use_ddp = dist.is_available() and dist.is_initialized()
+    train_sampler = (
+        DistributedSampler(train_dataset, shuffle=True)  if use_ddp else None
+    )
+    val_sampler = (
+        DistributedSampler(val_dataset, shuffle=False, drop_last=False) if use_ddp else None
+    )
+
+    loader_kw = dict(num_workers=config.num_workers, pin_memory=True)
+
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size = config.batch_size,
+        shuffle    = (train_sampler is None),
+        drop_last  = True,
+        sampler    = train_sampler,
+        **loader_kw,
+    )
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size = config.batch_size,
+        shuffle    = False,
+        drop_last  = False,
+        sampler    = val_sampler,
+        **loader_kw,
+    )
+
+    if is_main:
+        print(
+            f"Train samples: {len(train_dataset):,}  "
+            f"Val samples: {len(val_dataset):,}"
+        )
+
+    return (
+        train_loader, val_loader,
+        train_dataset, val_dataset,
+        train_sampler, val_sampler,
+    )
+
+
+# ── Training Loop ─────────────────────────────────────────────────────────────
+
+def train_model(model, tokenizer, device, config, save_dir, logger):
+    """
+    Fine-tunes *model* (NosPredictor / Nos) with the frozen *tokenizer*.
+
+    Gradient accumulation
+    ─────────────────────
+    Each DataLoader batch is sliced into `accumulation_steps` equal micro-batches.
+    The loss for each micro-batch is scaled by (1 / accumulation_steps) before
+    .backward(), so the accumulated gradient is mathematically identical to what
+    you would get from a single forward pass over the full batch.
+
+    optimizer.step() + scheduler.step() fire exactly once per DataLoader
+    iteration, keeping OneCycleLR's internal step counter perfectly aligned
+    with `steps_per_epoch = len(train_loader)`.
+    """
+    logger.info("Starting base-model training …")
+
+    use_ddp = dist.is_available() and dist.is_initialized()
+    rank    = dist.get_rank() if use_ddp else 0
+
+    (
+        train_loader, val_loader,
+        train_dataset, val_dataset,
+        train_sampler, val_sampler,
+    ) = create_dataloaders(config)
+
+    # ── Optimizer ─────────────────────────────────────────────────────────────
+    optimizer = torch.optim.AdamW(
+        model.parameters(),
+        lr           = config.predictor_learning_rate,
+        betas        = (config.adam_beta1, config.adam_beta2),
+        weight_decay = config.adam_weight_decay,
+    )
+
+    # ── Scheduler ─────────────────────────────────────────────────────────────
+    pct_start  = getattr(config, 'basemodel_pct_start',  0.03)
+    div_factor = getattr(config, 'basemodel_div_factor', 10.0)
+
+    scheduler = torch.optim.lr_scheduler.OneCycleLR(
+        optimizer,
+        max_lr          = config.predictor_learning_rate,
+        steps_per_epoch = len(train_loader),   # 1 step  ==  1 DataLoader batch
+        epochs          = config.basemodel_epochs,
+        pct_start       = pct_start,
+        div_factor      = div_factor,
+    )
+
+    # ── DDP wrapping (after scheduler construction) ────────────────────────────
+    if use_ddp:
+        local_rank = int(os.environ.get("LOCAL_RANK", "0"))
+        model = DDP(
+            model,
+            device_ids          = [local_rank],
+            output_device       = local_rank,
+            find_unused_parameters = False,
+        )
+
+    # ── Hyper-parameters from config ──────────────────────────────────────────
+    max_grad_norm     = getattr(config, 'basemodel_max_grad_norm', 3.0)
+    accumulation_steps = getattr(config, 'accumulation_steps', 1)
+
+    # Convenience alias: unwrap DDP only once per call-site
+    def raw_model():
+        return model.module if use_ddp else model
+
+    # ── Epoch loop ────────────────────────────────────────────────────────────
+    best_val_loss   = float('inf')
+    batch_idx_global = 0
+
+    for epoch in range(config.basemodel_epochs):
+        epoch_start = time.time()
+        model.train()
+
+        # Deterministic-but-varied shuffling per epoch
+        train_dataset.set_epoch_seed(epoch * 10_000)
+        val_dataset.set_epoch_seed(0)
+        if train_sampler is not None:
+            train_sampler.set_epoch(epoch)
+
+        epoch_train_loss = 0.0
+        train_batches    = 0
+
+        # ── Inner batch loop ──────────────────────────────────────────────────
+        for batch_idx, (ori_batch_x, ori_batch_x_stamp) in enumerate(train_loader):
+            ori_batch_x       = ori_batch_x.to(device, non_blocking=True)
+            ori_batch_x_stamp = ori_batch_x_stamp.to(device, non_blocking=True)
+
+            # Zero gradients BEFORE the accumulation loop (not after step)
+            optimizer.zero_grad()
+
+            micro_size            = ori_batch_x.shape[0] // accumulation_steps
+            current_batch_total_loss = 0.0
+
+            # ── Micro-batch (gradient accumulation) loop ──────────────────────
+            for j in range(accumulation_steps):
+                start = j       * micro_size
+                end   = (j + 1) * micro_size
+
+                batch_x       = ori_batch_x[start:end]
+                batch_x_stamp = ori_batch_x_stamp[start:end]
+
+                # Tokenizer is frozen — skip its grad computation entirely
+                with torch.no_grad():
+                    token_seq_0, token_seq_1 = tokenizer.encode(batch_x, half=True)
+
+                token_in  = [token_seq_0[:, :-1], token_seq_1[:, :-1]]
+                token_out = [token_seq_0[:, 1:],  token_seq_1[:, 1:]]
+
+                logits = raw_model()(
+                    token_in[0], token_in[1], batch_x_stamp[:, :-1, :]
+                )
+                loss, s1_loss, s2_loss = raw_model().head.compute_loss(
+                    logits[0], logits[1], token_out[0], token_out[1]
+                )
+
+                # Scale loss so accumulated gradient == full-batch gradient
+                loss_scaled = loss / accumulation_steps
+                loss_scaled.backward()
+
+                current_batch_total_loss += loss.item()
+
+            # ── Optimizer step (once per DataLoader batch) ────────────────────
+            torch.nn.utils.clip_grad_norm_(
+                raw_model().parameters(),
+                max_norm=max_grad_norm,
+            )
+            optimizer.step()
+            scheduler.step()
+
+            # Logging uses the *average* loss across micro-batches
+            avg_loss          = current_batch_total_loss / accumulation_steps
+            epoch_train_loss += avg_loss
+            train_batches    += 1
+
+            if (batch_idx_global + 1) % config.log_interval == 0:
+                lr      = optimizer.param_groups[0]['lr']
+                log_msg = (
+                    f"[Epoch {epoch+1}/{config.basemodel_epochs}, "
+                    f"Step {batch_idx+1}/{len(train_loader)}] "
+                    f"LR: {lr:.6f}  Loss: {avg_loss:.4f}"
+                )
+                logger.info(log_msg)
+                if rank == 0:
+                    print(log_msg)
+
+            batch_idx_global += 1
+
+        # ── Validation ────────────────────────────────────────────────────────
+        model.eval()
+        val_loss_sum   = 0.0
+        val_sample_cnt = 0
+
+        with torch.no_grad():
+            for batch_x, batch_x_stamp in val_loader:
+                batch_x       = batch_x.to(device, non_blocking=True)
+                batch_x_stamp = batch_x_stamp.to(device, non_blocking=True)
+
+                token_seq_0, token_seq_1 = tokenizer.encode(batch_x, half=True)
+                token_in  = [token_seq_0[:, :-1], token_seq_1[:, :-1]]
+                token_out = [token_seq_0[:, 1:],  token_seq_1[:, 1:]]
+
+                logits = raw_model()(
+                    token_in[0], token_in[1], batch_x_stamp[:, :-1, :]
+                )
+                loss, _, _ = raw_model().head.compute_loss(
+                    logits[0], logits[1], token_out[0], token_out[1]
+                )
+
+                # Sample-weighted accumulation (correct across variable-size batches)
+                n               = batch_x.size(0)
+                val_loss_sum   += loss.item() * n
+                val_sample_cnt += n
+
+        # ── DDP aggregation ───────────────────────────────────────────────────
+        if use_ddp:
+            agg = torch.tensor(
+                [epoch_train_loss, float(train_batches),
+                 val_loss_sum,     float(val_sample_cnt)],
+                dtype=torch.float64, device=device,
+            )
+            dist.all_reduce(agg, op=dist.ReduceOp.SUM)
+            avg_train_loss = agg[0].item() / agg[1].item() if agg[1].item() > 0 else 0.0
+            avg_val_loss   = agg[2].item() / agg[3].item() if agg[3].item() > 0 else 0.0
+        else:
+            avg_train_loss = epoch_train_loss / train_batches if train_batches > 0 else 0.0
+            avg_val_loss   = val_loss_sum / val_sample_cnt    if val_sample_cnt > 0 else 0.0
+
+        epoch_time    = time.time() - epoch_start
+        epoch_summary = (
+            f"\n--- Epoch {epoch+1}/{config.basemodel_epochs} Summary ---\n"
+            f"  Train Loss : {avg_train_loss:.6f}\n"
+            f"  Val   Loss : {avg_val_loss:.6f}\n"
+            f"  Epoch Time : {format_time(epoch_time)}\n"
+        )
+        logger.info(epoch_summary)
+        if rank == 0:
+            print(epoch_summary)
+
+        # ── Checkpoint (rank-0 only) ───────────────────────────────────────────
+        if avg_val_loss < best_val_loss:
+            best_val_loss = avg_val_loss
+            if rank == 0:
+                ckpt_dir = os.path.join(save_dir, "best_model")
+                os.makedirs(ckpt_dir, exist_ok=True)
+                raw_model().save_pretrained(ckpt_dir)
+                save_msg = (
+                    f"✓ Best model saved → {ckpt_dir}  "
+                    f"(val loss: {best_val_loss:.6f})"
+                )
+                logger.info(save_msg)
+                print(save_msg)
+
+    return best_val_loss
+
+
+# ── Entry point ───────────────────────────────────────────────────────────────
+
+def main():
+    import argparse
+
+    parser = argparse.ArgumentParser(description='Nos Base-Model Fine-tuning')
+    parser.add_argument(
+        '--config', type=str, default='config.yaml',
+        help='Path to YAML config file (default: config.yaml)',
+    )
+    args   = parser.parse_args()
+    config = CustomFinetuneConfig(args.config)
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Device: {device}")
+
+    os.makedirs(config.basemodel_save_path, exist_ok=True)
+
+    log_dir = os.path.join(config.base_save_path, "logs")
+    logger  = setup_logging(config.exp_name, log_dir, rank=0)
+
+    # Reproducibility
+    random.seed(config.seed)
+    np.random.seed(config.seed)
+    torch.manual_seed(config.seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(config.seed)
+
+    # ── Tokenizer ─────────────────────────────────────────────────────────────
+    logger.info("Loading tokenizer …")
+    if getattr(config, 'pre_trained_tokenizer', True):
+        tokenizer = NosTokenizer.from_pretrained(config.finetuned_tokenizer_path)
+    else:
+        logger.info("pre_trained_tokenizer=False — random init")
+        cfg_path = os.path.join(config.pretrained_tokenizer_path, 'config.json')
+        with open(cfg_path) as fh:
+            arch = json.load(fh)
+        tokenizer = NosTokenizer(
+            d_in            = arch.get('d_in',             6),
+            d_model         = arch.get('d_model',         256),
+            n_heads         = arch.get('n_heads',           4),
+            ff_dim          = arch.get('ff_dim',          512),
+            n_enc_layers    = arch.get('n_enc_layers',      4),
+            n_dec_layers    = arch.get('n_dec_layers',      4),
+            ffn_dropout_p   = arch.get('ffn_dropout_p',  0.0),
+            attn_dropout_p  = arch.get('attn_dropout_p', 0.0),
+            resid_dropout_p = arch.get('resid_dropout_p',0.0),
+            s1_bits         = arch.get('s1_bits',          10),
+            s2_bits         = arch.get('s2_bits',          10),
+            beta            = arch.get('beta',           0.05),
+            gamma0          = arch.get('gamma0',          1.0),
+            gamma           = arch.get('gamma',           1.1),
+            zeta            = arch.get('zeta',           0.05),
+            group_size      = arch.get('group_size',        4),
+        )
+
+    # ── Predictor ─────────────────────────────────────────────────────────────
+    logger.info("Loading predictor …")
+    if getattr(config, 'pre_trained_predictor', True):
+        model = Nos.from_pretrained(config.pretrained_predictor_path)
+    else:
+        logger.info("pre_trained_predictor=False — random init")
+        cfg_path = os.path.join(config.pretrained_predictor_path, 'config.json')
+        with open(cfg_path) as fh:
+            arch = json.load(fh)
+        model = Nos(
+            s1_bits         = arch.get('s1_bits',          10),
+            s2_bits         = arch.get('s2_bits',          10),
+            n_layers        = arch.get('n_layers',          12),
+            d_model         = arch.get('d_model',          832),
+            n_heads         = arch.get('n_heads',           16),
+            ff_dim          = arch.get('ff_dim',          2048),
+            ffn_dropout_p   = arch.get('ffn_dropout_p',   0.2),
+            attn_dropout_p  = arch.get('attn_dropout_p',  0.0),
+            resid_dropout_p = arch.get('resid_dropout_p', 0.2),
+            token_dropout_p = arch.get('token_dropout_p', 0.0),
+            learn_te        = arch.get('learn_te',        True),
+        )
+
+    tokenizer = tokenizer.to(device)
+    model     = model.to(device)
+
+    logger.info(f"Tokenizer size : {get_model_size(tokenizer)}")
+    logger.info(f"Model size     : {get_model_size(model)}")
+    print(f"Tokenizer: {get_model_size(tokenizer)}  |  Model: {get_model_size(model)}")
+
+    # ── Config summary ────────────────────────────────────────────────────────
+    logger.info("=== Training Configuration ===")
+    for key, val in [
+        ("data_path",           config.data_path),
+        ("lookback_window",     config.lookback_window),
+        ("predict_window",      config.predict_window),
+        ("batch_size",          config.batch_size),
+        ("accumulation_steps",  getattr(config, 'accumulation_steps', 1)),
+        ("learning_rate",       config.predictor_learning_rate),
+        ("epochs",              config.basemodel_epochs),
+        ("device",              device),
+        ("tokenizer_path",      config.finetuned_tokenizer_path),
+        ("predictor_path",      config.pretrained_predictor_path),
+    ]:
+        logger.info(f"  {key:<22}: {val}")
+
+    # ── Train ─────────────────────────────────────────────────────────────────
+    best_val_loss = train_model(
+        model, tokenizer, device, config,
+        config.basemodel_save_path, logger,
+    )
+
+    final_msg = (
+        f"Training complete.  Best val loss: {best_val_loss:.6f}\n"
+        f"Checkpoint: {config.basemodel_save_path}"
+    )
+    logger.info(final_msg)
+    print(final_msg)
+
+
+if __name__ == "__main__":
+    main()
+```
+
+---
+
+### `finetune_tokenizer.py`
+
+```python
+import os
+import sys
+import json
+import time
+import random
+import numpy as np
+import torch
+import torch.nn.functional as F
+from torch.utils.data import DataLoader
+from torch.utils.data.distributed import DistributedSampler
+from time import gmtime, strftime
+import datetime
+import logging
+from logging.handlers import RotatingFileHandler
+import torch.distributed as dist
+from torch.nn.parallel import DistributedDataParallel as DDP
+
+sys.path.append("../")
+from model import NosTokenizer
+from finetune_base_model import CustomKlineDataset
+from config_loader import CustomFinetuneConfig
+
+
+def set_seed(seed: int, rank: int = 0):
+    actual_seed = seed
+    random.seed(actual_seed)
+    np.random.seed(actual_seed)
+    torch.manual_seed(actual_seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(actual_seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+
+
+def get_model_size(model: torch.nn.Module) -> str:
+    total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    if total_params >= 1e9:
+        return f"{total_params / 1e9:.1f}B"
+    elif total_params >= 1e6:
+        return f"{total_params / 1e6:.1f}M"
+    else:
+        return f"{total_params / 1e3:.1f}K"
+
+
+def format_time(seconds: float) -> str:
+    return str(datetime.timedelta(seconds=int(seconds)))
+
+
+def setup_logging(exp_name: str, log_dir: str, rank: int = 0) -> logging.Logger:
+    os.makedirs(log_dir, exist_ok=True)
+    
+    logger = logging.getLogger(f"tokenizer_training_rank_{rank}")
+    logger.setLevel(logging.INFO)
+    
+    if logger.handlers:
+        return logger
+    
+    log_file = os.path.join(log_dir, f"tokenizer_training_rank_{rank}.log")
+    file_handler = RotatingFileHandler(
+        log_file, 
+        maxBytes=10*1024*1024,
+        backupCount=5,
+        encoding='utf-8'
+    )
+    file_handler.setLevel(logging.INFO)
+    
+    console_handler = None
+    if rank == 0:
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.INFO)
+    
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    file_handler.setFormatter(formatter)
+    if console_handler is not None:
+        console_handler.setFormatter(formatter)
+    
+    logger.addHandler(file_handler)
+    if console_handler is not None:
+        logger.addHandler(console_handler)
+    
+    logger.info(f"=== Tokenizer Training Started ===")
+    logger.info(f"Experiment Name: {exp_name}")
+    logger.info(f"Log Directory: {log_dir}")
+    logger.info(f"Rank: {rank}")
+    logger.info(f"Timestamp: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    
+    return logger
+
+
+def create_dataloaders(config):
+    if not dist.is_available() or not dist.is_initialized() or dist.get_rank() == 0:
+        print("Creating tokenizer training data loaders...")
+    
+    train_dataset = CustomKlineDataset(
+        data_path=config.data_path,
+        data_type="train",
+        lookback_window=config.lookback_window,
+        predict_window=config.predict_window,
+        clip=config.clip,
+        seed=config.seed,
+        train_ratio=config.train_ratio,
+        val_ratio=config.val_ratio,
+        test_ratio=config.test_ratio
+    )
+    
+    val_dataset = CustomKlineDataset(
+        data_path=config.data_path,
+        data_type="val",
+        lookback_window=config.lookback_window,
+        predict_window=config.predict_window,
+        clip=config.clip,
+        seed=config.seed + 1,
+        train_ratio=config.train_ratio,
+        val_ratio=config.val_ratio,
+        test_ratio=config.test_ratio
+    )
+    
+    use_ddp = dist.is_available() and dist.is_initialized()
+    train_sampler = DistributedSampler(train_dataset, num_replicas=dist.get_world_size(), rank=dist.get_rank(), shuffle=True) if use_ddp else None
+    val_sampler = DistributedSampler(val_dataset, num_replicas=dist.get_world_size(), rank=dist.get_rank(), shuffle=False, drop_last=False) if use_ddp else None
+
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=config.batch_size,
+        shuffle=(train_sampler is None),
+        num_workers=config.num_workers,
+        pin_memory=True,
+        drop_last=True,
+        sampler=train_sampler
+    )
+    
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=config.batch_size,
+        shuffle=False,
+        num_workers=config.num_workers,
+        pin_memory=True,
+        drop_last=False,
+        sampler=val_sampler
+    )
+    
+    if not dist.is_available() or not dist.is_initialized() or dist.get_rank() == 0:
+        print(f"Training set size: {len(train_dataset)}, Validation set size: {len(val_dataset)}")
+    
+    return train_loader, val_loader, train_dataset, val_dataset, train_sampler, val_sampler
+
+
+
+def train_tokenizer(model, device, config, save_dir, logger):
+    """
+    All previously hardcoded values (pct_start, div_factor, max_norm)
+    are now read from config with safe fallbacks.
+    """
+    logger.info("Starting tokenizer training...")
+    use_ddp = dist.is_available() and dist.is_initialized()
+    rank = dist.get_rank() if use_ddp else 0
+
+    train_loader, val_loader, train_dataset, val_dataset, \
+        train_sampler, val_sampler = create_dataloaders(config)
+
+    optimizer = torch.optim.AdamW(
+        model.parameters(),
+        lr=config.tokenizer_learning_rate,
+        betas=(config.adam_beta1, config.adam_beta2),   # ← beta1/beta2 now used
+        weight_decay=config.adam_weight_decay
+    )
+
+    # ── Scheduler: read from config ───────────────────────────────
+    pct_start = getattr(config, 'tokenizer_pct_start', 0.03)
+    div_factor = getattr(config, 'tokenizer_div_factor', 10.0)
+
+    scheduler = torch.optim.lr_scheduler.OneCycleLR(
+        optimizer,
+        max_lr=config.tokenizer_learning_rate,
+        steps_per_epoch=len(train_loader),
+        epochs=config.tokenizer_epochs,
+        pct_start=pct_start,
+        div_factor=div_factor
+    )
+
+    if use_ddp:
+        local_rank = int(os.environ.get("LOCAL_RANK", "0"))
+        model = DDP(model, device_ids=[local_rank],
+                    output_device=local_rank, find_unused_parameters=False)
+
+    # ── Grad clip: read from config ───────────────────────────────
+    max_grad_norm = getattr(config, 'tokenizer_max_grad_norm', 2.0)
+
+    best_val_loss = float("inf")
+    batch_idx_global = 0
+    accumulation_steps = getattr(config, 'accumulation_steps', 1)
+
+    for epoch in range(config.tokenizer_epochs):
+        epoch_start_time = time.time()
+        model.train()
+
+        train_dataset.set_epoch_seed(epoch * 10000)
+        val_dataset.set_epoch_seed(0)
+        if train_sampler is not None:
+            train_sampler.set_epoch(epoch)
+
+        for batch_idx, (ori_batch_x, _) in enumerate(train_loader):
+            ori_batch_x = ori_batch_x.to(device, non_blocking=True)
+
+            current_batch_total_loss = 0.0
+            for j in range(accumulation_steps):
+                start_idx = j * (ori_batch_x.shape[0] // accumulation_steps)
+                end_idx = (j + 1) * (ori_batch_x.shape[0] // accumulation_steps)
+                batch_x = ori_batch_x[start_idx:end_idx]
+
+                zs, bsq_loss, _, _ = (model.module if use_ddp else model)(batch_x)
+                z_pre, z = zs
+
+                recon_loss_pre = F.mse_loss(z_pre, batch_x)
+                recon_loss_all = F.mse_loss(z, batch_x)
+                recon_loss = recon_loss_pre + recon_loss_all
+                loss = (recon_loss + bsq_loss) / 2
+
+                loss_scaled = loss / accumulation_steps
+                current_batch_total_loss += loss.item()
+                loss_scaled.backward()
+
+            # ── Grad clip from config ─────────────────────────
+            torch.nn.utils.clip_grad_norm_(
+                (model.module if use_ddp else model).parameters(),
+                max_norm=max_grad_norm
+            )
+            optimizer.step()
+            scheduler.step()
+            optimizer.zero_grad()
+
+            if (batch_idx_global + 1) % config.log_interval == 0:
+                avg_loss = current_batch_total_loss / accumulation_steps
+                lr = optimizer.param_groups[0]["lr"]
+                log_msg = (
+                    f"[Epoch {epoch+1}/{config.tokenizer_epochs}, "
+                    f"Step {batch_idx+1}/{len(train_loader)}] "
+                    f"LR: {lr:.6f}, Loss: {avg_loss:.4f}"
+                )
+                logger.info(log_msg)
+                if rank == 0:
+                    print(log_msg)
+
+            batch_idx_global += 1
+
+        # ── Validation ────────────────────────────────────────────
+        model.eval()
+        tot_val_loss_sum_rank = 0.0
+        val_sample_count_rank = 0
+
+        with torch.no_grad():
+            for ori_batch_x, _ in val_loader:
+                ori_batch_x = ori_batch_x.to(device, non_blocking=True)
+                zs, _, _, _ = (model.module if use_ddp else model)(ori_batch_x)
+                _, z = zs
+                val_loss_item = F.mse_loss(z, ori_batch_x)
+                tot_val_loss_sum_rank += val_loss_item.item() * ori_batch_x.size(0)
+                val_sample_count_rank += ori_batch_x.size(0)
+
+        if use_ddp:
+            tensor_sum = torch.tensor(
+                [tot_val_loss_sum_rank, val_sample_count_rank],
+                dtype=torch.float64, device=device
+            )
+            dist.all_reduce(tensor_sum, op=dist.ReduceOp.SUM)
+            avg_val_loss = (tensor_sum[0].item() / tensor_sum[1].item()
+                            if tensor_sum[1].item() > 0 else 0.0)
+        else:
+            avg_val_loss = (tot_val_loss_sum_rank / val_sample_count_rank
+                            if val_sample_count_rank > 0 else 0)
+
+        epoch_time = time.time() - epoch_start_time
+        epoch_summary = (
+            f"\n--- Epoch {epoch+1}/{config.tokenizer_epochs} Summary ---\n"
+            f"Validation Loss: {avg_val_loss:.6f}\n"
+            f"Epoch Time: {format_time(epoch_time)}\n"
+        )
+        logger.info(epoch_summary)
+        if rank == 0:
+            print(epoch_summary)
+
+        if avg_val_loss < best_val_loss:
+            best_val_loss = avg_val_loss
+            if rank == 0:
+                model_save_path = os.path.join(save_dir, "best_model")
+                os.makedirs(model_save_path, exist_ok=True)
+                (model.module if use_ddp else model).save_pretrained(model_save_path)
+                save_msg = (f"Best model saved: {model_save_path} "
+                            f"(val loss: {best_val_loss:.6f})")
+                logger.info(save_msg)
+                print(save_msg)
+
+    return best_val_loss
+
+
+def main():
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Nos Tokenizer Fine-tuning Training')
+    parser.add_argument('--config', type=str, default='config.yaml', 
+                       help='Configuration file path (default: config.yaml)')
+    args = parser.parse_args()
+    
+    config = CustomFinetuneConfig(args.config)
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
+    
+    config = CustomFinetuneConfig(args.config)
+    
+    os.makedirs(config.tokenizer_save_path, exist_ok=True)
+    
+    log_dir = os.path.join(config.base_save_path, "logs")
+    logger = setup_logging(config.exp_name, log_dir, 0)
+    
+    set_seed(config.seed)
+    
+    # 加载预训练tokenizer
+    if getattr(config, 'pre_trained_tokenizer', True):
+        logger.info("Loading pretrained tokenizer...")
+        print("Loading pretrained tokenizer...")
+        tokenizer = NosTokenizer.from_pretrained(config.pretrained_tokenizer_path)
+    else:
+        print("pre_trained_tokenizer=False, randomly initializing Tokenizer architecture")
+        import json, os
+        cfg_path = os.path.join(config.pretrained_tokenizer_path, 'config.json')
+        with open(cfg_path, 'r') as f:
+            arch = json.load(f)
+        tokenizer = NosTokenizer(
+            d_in=arch.get('d_in', 6),
+            d_model=arch.get('d_model', 256),
+            n_heads=arch.get('n_heads', 4),
+            ff_dim=arch.get('ff_dim', 512),
+            n_enc_layers=arch.get('n_enc_layers', 4),
+            n_dec_layers=arch.get('n_dec_layers', 4),
+            ffn_dropout_p=arch.get('ffn_dropout_p', 0.0),
+            attn_dropout_p=arch.get('attn_dropout_p', 0.0),
+            resid_dropout_p=arch.get('resid_dropout_p', 0.0),
+            s1_bits=arch.get('s1_bits', 10),
+            s2_bits=arch.get('s2_bits', 10),
+            beta=arch.get('beta', 0.05),
+            gamma0=arch.get('gamma0', 1.0),
+            gamma=arch.get('gamma', 1.1),
+            zeta=arch.get('zeta', 0.05),
+            group_size=arch.get('group_size', 4)
+        )
+    tokenizer = tokenizer.to(device)
+    
+    model_size = get_model_size(tokenizer)
+    logger.info(f"Tokenizer parameters: {model_size}")
+    print(f"Tokenizer parameters: {model_size}")
+    
+    logger.info("=== Training Configuration ===")
+    logger.info(f"Data path: {config.data_path}")
+    logger.info(f"Lookback window: {config.lookback_window}")
+    logger.info(f"Predict window: {config.predict_window}")
+    logger.info(f"Batch size: {config.batch_size}")
+    logger.info(f"Learning rate: {config.tokenizer_learning_rate}")
+    logger.info(f"Training epochs: {config.tokenizer_epochs}")
+    logger.info(f"Device: {device}")
+    logger.info(f"Distributed training: False")
+    
+    logger.info("Starting tokenizer fine-tuning training...")
+    print("Starting tokenizer fine-tuning training...")
+    best_val_loss = train_tokenizer(tokenizer, device, config, config.tokenizer_save_path, logger)
+    
+    final_msg = f"Tokenizer training completed! Best validation loss: {best_val_loss:.4f}\nModel saved to: {config.tokenizer_save_path}"
+    logger.info(final_msg)
+    print(final_msg)
+
+
+if __name__ == "__main__":
+    main()
+    
+
+```
+
+---
+
+### `train_sequential.py`
+
+```python
+"""
+train_sequential.py
+
+Sequential fine-tuning pipeline for the Nos model.
+Runs tokenizer and basemodel training phases in order, with optional
+HPO parameter injection via apply_bsq_overrides and apply_dropout_overrides.
+
+Launch (single GPU):
+    python train_sequential.py --config config.yaml
+
+Launch (multi-GPU via torchrun):
+    torchrun --nproc_per_node=8 train_sequential.py --config config.yaml
+"""
+
+import os
+import sys
+import time
+import argparse
+import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader
+import torch.distributed as dist
+
+sys.path.append('../')
+from model import Nos, NosTokenizer, NosPredictor
+
+from config_loader import CustomFinetuneConfig
+from finetune_tokenizer import train_tokenizer, set_seed, setup_logging as setup_tokenizer_logging
+from finetune_base_model import train_model, create_dataloaders, setup_logging as setup_basemodel_logging
+
+# ── HPO override helpers ───────────────────────────────────────────────────────
+# Reusing these functions from hpo_tuner.py guarantees that the dropout and BSQ
+# parameter injection logic is identical during HPO search and final training.
+from hpo_tuner import apply_dropout_overrides, apply_bsq_overrides
+
+
+class SequentialTrainer:
+    """
+    Orchestrates sequential fine-tuning of the Nos tokenizer and basemodel.
+
+    Handles device setup, distributed training initialisation, directory
+    creation, and delegates to the phase-specific training functions.
+    """
+
+    def __init__(self, config_path: str = None):
+        self.config = CustomFinetuneConfig(config_path)
+        self.rank = int(os.environ.get("RANK", "0"))
+        self.world_size = int(os.environ.get("WORLD_SIZE", "1"))
+        self.local_rank = int(
+            os.environ.get(
+                "LOCAL_RANK",
+                str(self.config.device_id if hasattr(self.config, 'device_id') else 0)
+            )
+        )
+        self.device = self._setup_device()
+
+        self.config.print_config_summary()
+
+    # ── Device / Distributed Setup ─────────────────────────────────────────────
+
+    def _setup_device(self):
+        if self.config.use_cuda and torch.cuda.is_available():
+            torch.cuda.set_device(self.local_rank)
+            device = torch.device(f"cuda:{self.local_rank}")
+        else:
+            device = torch.device("cpu")
+
+        if self.rank == 0:
+            print(
+                f"Using device: {device} "
+                f"(rank={self.rank}, world_size={self.world_size}, "
+                f"local_rank={self.local_rank})"
+            )
+        return device
+
+    def _setup_distributed(self):
+        if self.world_size > 1 and torch.cuda.is_available():
+            backend = os.environ.get("DIST_BACKEND", "nccl").lower()
+            if not dist.is_initialized():
+                dist.init_process_group(backend=backend)
+            if self.rank == 0:
+                print(
+                    f"Distributed training initialised: "
+                    f"backend={backend}, world_size={self.world_size}"
+                )
+        else:
+            if self.rank == 0:
+                print(
+                    "Distributed training not enabled, "
+                    "using single GPU/CPU training"
+                )
+
+    # ── Directory / Model Existence Helpers ────────────────────────────────────
+
+    def _check_existing_models(self):
+        tokenizer_exists = os.path.exists(self.config.tokenizer_best_model_path)
+        basemodel_exists = os.path.exists(self.config.basemodel_best_model_path)
+
+        print(f"Tokenizer model exists: {tokenizer_exists}")
+        print(f"Basemodel model exists: {basemodel_exists}")
+
+        return tokenizer_exists, basemodel_exists
+
+    def _create_directories(self):
+        os.makedirs(self.config.tokenizer_save_path, exist_ok=True)
+        os.makedirs(self.config.basemodel_save_path, exist_ok=True)
+        print(f"Created directory: {self.config.tokenizer_save_path}")
+        print(f"Created directory: {self.config.basemodel_save_path}")
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # Phase 1: Tokenizer Fine-tuning
+    # ══════════════════════════════════════════════════════════════════════════
+
+    def train_tokenizer_phase(self):
+        """
+        Fine-tunes the NosTokenizer.
+
+        Model is loaded (pretrained or randomly initialised), HPO-derived
+        architecture overrides are injected *before* the model is moved to
+        the GPU, then standard tokenizer training proceeds.
+        """
+        print("\n" + "=" * 60)
+        print("Starting Tokenizer Fine-tuning Phase")
+        print("=" * 60)
+
+        tokenizer_exists, _ = self._check_existing_models()
+        if tokenizer_exists and self.config.skip_existing:
+            print("Tokenizer model already exists, skipping training")
+            return True
+
+        log_dir = os.path.join(self.config.base_save_path, "logs")
+        logger = setup_tokenizer_logging(self.config.exp_name, log_dir, self.rank)
+
+        set_seed(self.config.seed)
+
+        # ── Model instantiation ────────────────────────────────────────────
+        if getattr(self.config, 'pre_trained_tokenizer', True):
+            logger.info("Loading pretrained tokenizer...")
+            if self.rank == 0:
+                print("Loading pretrained tokenizer...")
+            tokenizer = NosTokenizer.from_pretrained(
+                self.config.pretrained_tokenizer_path
+            )
+        else:
+            if self.rank == 0:
+                print(
+                    "pre_trained_tokenizer=False, "
+                    "randomly initialising Tokenizer architecture"
+                )
+            import json
+            cfg_path = os.path.join(
+                self.config.pretrained_tokenizer_path, 'config.json'
+            )
+            with open(cfg_path, 'r') as f:
+                arch = json.load(f)
+            tokenizer = NosTokenizer(
+                d_in=arch.get('d_in', 6),
+                d_model=arch.get('d_model', 256),
+                n_heads=arch.get('n_heads', 4),
+                ff_dim=arch.get('ff_dim', 512),
+                n_enc_layers=arch.get('n_enc_layers', 4),
+                n_dec_layers=arch.get('n_dec_layers', 4),
+                ffn_dropout_p=arch.get('ffn_dropout_p', 0.0),
+                attn_dropout_p=arch.get('attn_dropout_p', 0.0),
+                resid_dropout_p=arch.get('resid_dropout_p', 0.0),
+                s1_bits=arch.get('s1_bits', 10),
+                s2_bits=arch.get('s2_bits', 10),
+                beta=arch.get('beta', 0.05),
+                gamma0=arch.get('gamma0', 1.0),
+                gamma=arch.get('gamma', 1.1),
+                zeta=arch.get('zeta', 0.05),
+                group_size=arch.get('group_size', 4),
+            )
+
+        # ── HPO parameter injection (must happen BEFORE .to(device)) ──────
+        # Applying overrides on CPU avoids device-mismatch errors that can
+        # occur when modifying module attributes after GPU placement,
+        # particularly inside DDP wrappers.
+        tokenizer = apply_bsq_overrides(tokenizer, self.config)
+        tokenizer = apply_dropout_overrides(tokenizer, self.config)
+
+        # ── Move to device ─────────────────────────────────────────────────
+        tokenizer = tokenizer.to(self.device)
+
+        # ── Diagnostics ───────────────────────────────────────────────────
+        model_size = sum(p.numel() for p in tokenizer.parameters())
+        logger.info(f"Tokenizer parameters: {model_size:,}")
+        if self.rank == 0:
+            print(f"Tokenizer parameters: {model_size:,}")
+
+        logger.info("=== Training Configuration ===")
+        logger.info(f"Data path: {self.config.data_path}")
+        logger.info(f"Lookback window: {self.config.lookback_window}")
+        logger.info(f"Predict window: {self.config.predict_window}")
+        logger.info(f"Batch size: {self.config.batch_size}")
+        logger.info(f"Learning rate: {self.config.tokenizer_learning_rate}")
+        logger.info(f"Training epochs: {self.config.tokenizer_epochs}")
+        logger.info(f"Device: {self.device}")
+        logger.info(f"Distributed training: False")
+
+        # ── Training ───────────────────────────────────────────────────────
+        logger.info("Starting tokenizer fine-tuning training...")
+        if self.rank == 0:
+            print("Starting tokenizer fine-tuning training...")
+
+        start_time = time.time()
+        best_val_loss = train_tokenizer(
+            tokenizer,
+            self.device,
+            self.config,
+            self.config.tokenizer_save_path,
+            logger,
+        )
+        training_time = time.time() - start_time
+
+        final_msg = (
+            f"Tokenizer training completed! "
+            f"Best validation loss: {best_val_loss:.4f}\n"
+            f"Training time: {training_time / 60:.2f} minutes\n"
+            f"Model saved to: {self.config.tokenizer_save_path}"
+        )
+        logger.info(final_msg)
+        if self.rank == 0:
+            print(f"\n{final_msg}")
+
+        return True
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # Phase 2: Basemodel (Predictor) Fine-tuning
+    # ══════════════════════════════════════════════════════════════════════════
+
+    def train_basemodel_phase(self):
+        """
+        Fine-tunes the Nos predictor with a (optionally frozen) tokenizer.
+
+        Both the tokenizer and predictor receive HPO-derived overrides before
+        being moved to the GPU.  The tokenizer receives both BSQ and dropout
+        overrides; the predictor receives only dropout overrides (BSQ lives
+        exclusively in the tokenizer architecture).
+        """
+        print("\n" + "=" * 60)
+        print("Starting Basemodel Fine-tuning Phase")
+        print("=" * 60)
+
+        if getattr(self.config, 'pre_trained_tokenizer', True):
+            if not os.path.exists(self.config.finetuned_tokenizer_path):
+                raise FileNotFoundError(
+                    f"Fine-tuned tokenizer does not exist: "
+                    f"{self.config.finetuned_tokenizer_path}"
+                )
+
+        _, basemodel_exists = self._check_existing_models()
+        if basemodel_exists and self.config.skip_existing:
+            print("Basemodel model already exists, skipping training")
+            return True
+
+        log_dir = os.path.join(self.config.base_save_path, "logs")
+        logger = setup_basemodel_logging(self.config.exp_name, log_dir, self.rank)
+
+        set_seed(self.config.seed)
+
+        # ── Tokenizer instantiation ────────────────────────────────────────
+        if getattr(self.config, 'pre_trained_tokenizer', True):
+            logger.info("Loading fine-tuned tokenizer...")
+            if self.rank == 0:
+                print("Loading fine-tuned tokenizer...")
+            tokenizer = NosTokenizer.from_pretrained(
+                self.config.finetuned_tokenizer_path
+            )
+        else:
+            if self.rank == 0:
+                print(
+                    "pre_trained_tokenizer=False, "
+                    "randomly initialising Tokenizer architecture "
+                    "for Predictor training"
+                )
+            import json
+            cfg_path = os.path.join(
+                self.config.pretrained_tokenizer_path, 'config.json'
+            )
+            with open(cfg_path, 'r') as f:
+                arch = json.load(f)
+            tokenizer = NosTokenizer(
+                d_in=arch.get('d_in', 6),
+                d_model=arch.get('d_model', 256),
+                n_heads=arch.get('n_heads', 4),
+                ff_dim=arch.get('ff_dim', 512),
+                n_enc_layers=arch.get('n_enc_layers', 4),
+                n_dec_layers=arch.get('n_dec_layers', 4),
+                ffn_dropout_p=arch.get('ffn_dropout_p', 0.0),
+                attn_dropout_p=arch.get('attn_dropout_p', 0.0),
+                resid_dropout_p=arch.get('resid_dropout_p', 0.0),
+                s1_bits=arch.get('s1_bits', 10),
+                s2_bits=arch.get('s2_bits', 10),
+                beta=arch.get('beta', 0.05),
+                gamma0=arch.get('gamma0', 1.0),
+                gamma=arch.get('gamma', 1.1),
+                zeta=arch.get('zeta', 0.05),
+                group_size=arch.get('group_size', 4),
+            )
+
+        # ── HPO injection into the frozen tokenizer (CPU, before .to()) ───
+        tokenizer = apply_bsq_overrides(tokenizer, self.config)
+        tokenizer = apply_dropout_overrides(tokenizer, self.config)
+
+        # ── Move tokenizer to device ───────────────────────────────────────
+        tokenizer = tokenizer.to(self.device)
+
+        # ── Predictor instantiation ────────────────────────────────────────
+        if getattr(self.config, 'pre_trained_predictor', True):
+            logger.info("Loading pretrained predictor...")
+            if self.rank == 0:
+                print("Loading pretrained predictor...")
+            model = Nos.from_pretrained(self.config.pretrained_predictor_path)
+        else:
+            if self.rank == 0:
+                print(
+                    "pre_trained_predictor=False, "
+                    "randomly initialising Predictor architecture"
+                )
+            import json
+            cfg_path = os.path.join(
+                self.config.pretrained_predictor_path, 'config.json'
+            )
+            with open(cfg_path, 'r') as f:
+                arch = json.load(f)
+            print("model_config: ", arch)
+            model = Nos(
+                s1_bits=arch.get('s1_bits', 10),
+                s2_bits=arch.get('s2_bits', 10),
+                n_layers=arch.get('n_layers', 12),
+                d_model=arch.get('d_model', 832),
+                n_heads=arch.get('n_heads', 16),
+                ff_dim=arch.get('ff_dim', 2048),
+                ffn_dropout_p=arch.get('ffn_dropout_p', 0.2),
+                attn_dropout_p=arch.get('attn_dropout_p', 0.0),
+                resid_dropout_p=arch.get('resid_dropout_p', 0.2),
+                token_dropout_p=arch.get('token_dropout_p', 0.0),
+                learn_te=arch.get('learn_te', True),
+            )
+
+        # ── HPO dropout injection into predictor (CPU, before .to()) ──────
+        # BSQ overrides are intentionally omitted here — the BSQ quantizer
+        # lives inside the tokenizer, not the predictor.
+        model = apply_dropout_overrides(model, self.config)
+
+        # ── Move predictor to device ───────────────────────────────────────
+        model = model.to(self.device)
+
+        # ── Diagnostics ───────────────────────────────────────────────────
+        model_size = sum(p.numel() for p in model.parameters())
+        logger.info(f"Model parameters: {model_size:,}")
+        if self.rank == 0:
+            print(f"Model parameters: {model_size:,}")
+
+        logger.info("=== Training Configuration ===")
+        logger.info(f"Data path: {self.config.data_path}")
+        logger.info(f"Lookback window: {self.config.lookback_window}")
+        logger.info(f"Predict window: {self.config.predict_window}")
+        logger.info(f"Batch size: {self.config.batch_size}")
+        logger.info(f"Learning rate: {self.config.predictor_learning_rate}")
+        logger.info(f"Training epochs: {self.config.basemodel_epochs}")
+        logger.info(f"Device: {self.device}")
+        logger.info(f"Tokenizer path: {self.config.finetuned_tokenizer_path}")
+        logger.info(f"Pretrained model path: {self.config.pretrained_predictor_path}")
+
+        # ── Training ───────────────────────────────────────────────────────
+        logger.info("Starting fine-tuning training...")
+        if self.rank == 0:
+            print("Starting fine-tuning training...")
+
+        start_time = time.time()
+        best_val_loss = train_model(
+            model,
+            tokenizer,
+            self.device,
+            self.config,
+            self.config.basemodel_save_path,
+            logger,
+        )
+        training_time = time.time() - start_time
+
+        final_msg = (
+            f"Basemodel training completed! "
+            f"Best validation loss: {best_val_loss:.4f}\n"
+            f"Training time: {training_time / 60:.2f} minutes\n"
+            f"Model saved to: {self.config.basemodel_save_path}"
+        )
+        logger.info(final_msg)
+        if self.rank == 0:
+            print(f"\n{final_msg}")
+
+        return True
+
+    # ══════════════════════════════════════════════════════════════════════════
+    # Top-level Orchestration
+    # ══════════════════════════════════════════════════════════════════════════
+
+    def run_training(self):
+        if self.rank == 0:
+            print("Starting Nos model sequential fine-tuning training")
+            print(f"Experiment name: {self.config.experiment_name}")
+            print(f"Experiment description: {self.config.experiment_description}")
+
+        self._setup_distributed()
+        self._create_directories()
+
+        total_start_time = time.time()
+
+        try:
+            if self.config.train_tokenizer:
+                success = self.train_tokenizer_phase()
+                if not success:
+                    print("Tokenizer training failed, terminating training")
+                    return False
+            else:
+                print("Skipping Tokenizer training phase")
+
+            if self.config.train_basemodel:
+                success = self.train_basemodel_phase()
+                if not success:
+                    print("Basemodel training failed, terminating training")
+                    return False
+            else:
+                print("Skipping Basemodel training phase")
+
+            total_time = time.time() - total_start_time
+
+            if self.rank == 0:
+                print("\n" + "=" * 60)
+                print("Training completed!")
+                print("=" * 60)
+                print(f"Total training time: {total_time / 60:.2f} minutes")
+                print(f"Tokenizer model: {self.config.tokenizer_best_model_path}")
+                print(f"Basemodel model: {self.config.basemodel_best_model_path}")
+                print("=" * 60)
+
+            return True
+
+        except Exception as e:
+            if self.rank == 0:
+                print(f"Error occurred during training: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return False
+
+        finally:
+            pass
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -2620,67 +6663,58 @@ def _get_silent_logger(name: str) -> logging.Logger:
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Automatic Hyperparameter Tuning for Nos Finetuning'
+        description='Nos Model Sequential Fine-tuning Training'
     )
     parser.add_argument(
-        '--config', type=str, default='configs/config_test_1h.yaml',
-        help='Path to config YAML'
+        '--config',
+        type=str,
+        default='config.yaml',
+        help='Configuration file path (default: config.yaml)',
     )
     parser.add_argument(
-        '--phase', type=str, default='both',
-        choices=['tokenizer', 'basemodel', 'both'],
-        help='Which phase to tune'
+        '--skip-tokenizer',
+        action='store_true',
+        help='Skip tokenizer training phase',
     )
     parser.add_argument(
-        '--n-trials', type=int, default=None,
-        help='Override number of trials from config'
+        '--skip-basemodel',
+        action='store_true',
+        help='Skip basemodel training phase',
     )
     parser.add_argument(
-        '--apply-best', action='store_true',
-        help='Write best params back to a new config file after tuning'
+        '--skip-existing',
+        action='store_true',
+        help='Skip training for existing models',
     )
-    parser.add_argument(
-        '--tokenizer-path', type=str, default=None,
-        help='Path to finetuned tokenizer (for basemodel-only HPO)'
-    )
-    parser.add_argument(
-        '--output-config', type=str, default=None,
-        help='Output path for best config (default: original_name_hpo_best.yaml)'
-    )
+
     args = parser.parse_args()
 
-    if not OPTUNA_AVAILABLE:
-        print("ERROR: Install optuna first: pip install optuna plotly")
+    trainer = SequentialTrainer(args.config)
+
+    if args.skip_tokenizer:
+        trainer.config.train_tokenizer = False
+    if args.skip_basemodel:
+        trainer.config.train_basemodel = False
+    if args.skip_existing:
+        trainer.config.skip_existing = True
+
+    success = trainer.run_training()
+
+    if success:
+        print("Training completed successfully!")
+        if dist.is_available() and dist.is_initialized():
+            dist.barrier()
+            dist.destroy_process_group()
+        sys.exit(0)
+    else:
+        print("Training failed!")
+        if dist.is_available() and dist.is_initialized():
+            try:
+                dist.barrier()
+                dist.destroy_process_group()
+            except Exception:
+                pass
         sys.exit(1)
-
-    tuner = NosHPOTuner(args.config)
-
-    print(f"HPO Configuration:")
-    print(f"  Phase: {args.phase}")
-    print(f"  Trials: {args.n_trials or tuner.config.hpo_n_trials}")
-    print(f"  Sampler: {tuner.config.hpo_sampler}")
-    print(f"  Pruner: {tuner.config.hpo_pruner}")
-    print(f"  Device: {tuner.device}")
-
-    start = time.time()
-
-    if args.phase == 'both':
-        results = tuner.tune_full_pipeline()
-    elif args.phase == 'tokenizer':
-        results = tuner.tune_tokenizer(n_trials=args.n_trials)
-    elif args.phase == 'basemodel':
-        results = tuner.tune_basemodel(
-            tokenizer_path=args.tokenizer_path,
-            n_trials=args.n_trials
-        )
-
-    elapsed = time.time() - start
-    print(f"\n⏱  Total HPO time: {elapsed/60:.1f} minutes")
-
-    if args.apply_best:
-        tuner.apply_best_to_config(args.output_config)
-
-    tuner.print_importance_report()
 
 
 if __name__ == "__main__":

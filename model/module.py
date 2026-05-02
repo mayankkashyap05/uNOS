@@ -1,35 +1,55 @@
 import math
 
 from einops import rearrange, reduce
+from typing import Tuple
 import torch
 import torch.nn as nn
 from torch.autograd import Function
 import torch.nn.functional as F
 
-
 class DifferentiableEntropyFunction(Function):
     @staticmethod
     def forward(ctx, zq, basis, K, eps):
-        zb = (zq + 1) / 2
+        # FORCE FP32: Prevents eps=1e-8 from rounding to 0.0 in autocast (FP16),
+        # which would otherwise cause torch.log(0.0) -> NaNs.
+        zq_32 = zq.float()
+        zb = (zq_32 + 1) / 2
         zi = ((zb * basis).sum(-1)).to(torch.int64)
-        cnt = torch.scatter_reduce(torch.zeros(2 ** K, device=zq.device, dtype=zq.dtype),
-                                   0,
-                                   zi.flatten(),
-                                   torch.ones_like(zi.flatten()).to(zq.dtype),
-                                   'sum')
+
+        # Initialize counts and compute probabilities entirely in float32
+        cnt = torch.scatter_reduce(
+            torch.zeros(2 ** K, device=zq.device, dtype=torch.float32),
+            0,
+            zi.flatten(),
+            torch.ones_like(zi.flatten(), dtype=torch.float32),
+            'sum'
+        )
+        
         prob = (cnt + eps) / (cnt + eps).sum()
         H = -(prob * torch.log(prob)).sum()
+        
+        # Save tensors needed for backward. prob is already float32.
         ctx.save_for_backward(zq, zi, prob)
         ctx.K = K
-        return H
+        
+        # Return loss cast back to the original mixed-precision dtype
+        return H.to(zq.dtype)
 
     @staticmethod
     def backward(ctx, grad_output):
         zq, zi, prob = ctx.saved_tensors
-        grad_array = -grad_output * (torch.log(prob) + 1) / zi.numel() / ctx.K
+        
+        # Force incoming gradients to FP32 for numerical stability
+        grad_output_32 = grad_output.float()
+        
+        grad_array = -grad_output_32 * (torch.log(prob) + 1) / zi.numel() / ctx.K
         reord_grad = grad_array[zi.flatten()].reshape(zi.shape)
-        grad_input = reord_grad.unsqueeze(-1) * zq
-        return grad_input, None, None, None, None
+        
+        # Compute final input gradient and cast back to original dtype
+        grad_input = (reord_grad.unsqueeze(-1) * zq.float()).to(zq.dtype)
+        
+        # Return gradients for (zq, basis, K, eps)
+        return grad_input, None, None, None
 
 
 def codebook_entropy(zq, basis, K, eps=1e-4):
@@ -88,8 +108,6 @@ class BinarySphericalQuantizer(nn.Module):
         return z + (zhat - z).detach()
 
     def forward(self, z):
-        # if self.input_format == 'bchw':
-        #     z = rearrange(z, 'b c h w -> b h w c')
         zq = self.quantize(z)
 
         indices = self.codes_to_indexes(zq.detach())
@@ -115,9 +133,6 @@ class BinarySphericalQuantizer(nn.Module):
         # commit loss
         commit_loss = self.beta * torch.mean(((zq.detach() - z) ** 2).sum(dim=-1))
 
-        # if self.input_format == 'bchw':
-        #     zq = rearrange(zq, 'b h w c -> b c h w')
-
         return (
             zq,
             commit_loss + self.zeta * entropy_penalty / self.inv_temperature,
@@ -126,12 +141,9 @@ class BinarySphericalQuantizer(nn.Module):
         )
 
     def soft_entropy_loss(self, z):
-        # if we divide the code in subgroups of size group_size, the codebook will be of size 2 ** group_size
-        # the sub-code is the last group_size bits of the full code
         group_code_book = self.group_codebook / (self.embed_dim ** 0.5 if self.l2_norm else 1)
         divided_z = rearrange(z, '... (g c) -> ... g c', c=self.group_size)
 
-        # we calculate the distance between the divided_z and the codebook for each subgroup
         distance = - 2 * torch.einsum('... g c, d c ->... g d', divided_z, group_code_book)
         prob = (-distance * self.inv_temperature).softmax(dim=-1)
         if self.persample_entropy_compute == 'analytical':
@@ -144,11 +156,9 @@ class BinarySphericalQuantizer(nn.Module):
         else:
             per_sample_entropy = self.get_entropy(prob, dim=-1, normalize=False).sum(dim=-1).mean()
 
-        # macro average of the probability of each subgroup
         avg_prob = reduce(prob, '... g d ->g d', 'mean')
         codebook_entropy = self.get_entropy(avg_prob, dim=-1, normalize=False)
 
-        # the approximation of the entropy is the sum of the entropy of each subgroup
         return per_sample_entropy, codebook_entropy.sum(), avg_prob
 
     def get_hard_per_sample_entropy(self, zb_by_sample):
@@ -158,23 +168,14 @@ class BinarySphericalQuantizer(nn.Module):
         return persample_entropy.mean()
 
     def codes_to_indexes(self, zhat):
-        """Converts a `code` to an index in the codebook.
-        Args:
-            zhat: A tensor of shape (B, ..., C) containing the codes. must be in {-1, 1}
-        """
         assert zhat.shape[-1] == self.embed_dim, f"Expected {self.embed_dim} dimensions, got {zhat.shape[-1]}"
         return ((zhat + 1) / 2 * self.basis).sum(axis=-1).to(torch.int64)
 
     def codes_to_group_indexes(self, zhat):
-        """Converts a `code` to a list of indexes (in groups) in the codebook.
-        Args:
-            zhat: A tensor of shape (B, ..., C) containing the codes. must be in {-1, 1}
-        """
         zhat_in_group = rearrange(zhat, 'b ... (g c) -> b ... g c', c=self.group_size)
         return ((zhat_in_group + 1) / 2 * self.group_basis).sum(axis=-1).to(torch.int64)
 
     def indexes_to_codes(self, indices):
-        """Inverse of `indexes_to_codes`."""
         indices = indices.unsqueeze(-1)
         codes_non_centered = torch.remainder(
             torch.floor_divide(indices, self.basis), 2
@@ -182,7 +183,6 @@ class BinarySphericalQuantizer(nn.Module):
         return codes_non_centered * 2 - 1
 
     def group_indexes_to_codes(self, group_indices):
-        """Inverse of `group_indexes_to_codes`."""
         group_indices = group_indices.unsqueeze(-1)
         codes_non_centered = torch.remainder(
             torch.floor_divide(group_indices, self.group_basis), 2
@@ -220,7 +220,6 @@ class BinarySphericalQuantizer(nn.Module):
 
 
 class BSQuantizer(nn.Module):
-
     def __init__(self, s1_bits, s2_bits, beta, gamma0, gamma, zeta, group_size):
         super().__init__()
         self.codebook_dim = s1_bits + s2_bits
@@ -279,62 +278,104 @@ class FeedForward(nn.Module):
 
 
 class RotaryPositionalEmbedding(nn.Module):
-    def __init__(self, dim):
+    def __init__(self, dim: int) -> None:
         super().__init__()
-        inv_freq = 1.0 / (10000 ** (torch.arange(0, dim, 2).float() / dim))
-        self.register_buffer("inv_freq", inv_freq)
-        self.seq_len_cached = None
-        self.cos_cached = None
-        self.sin_cached = None
+        if dim % 2 != 0:
+            raise ValueError(
+                f"RotaryPositionalEmbedding requires an even head dimension. "
+                f"Got dim={dim}."
+            )
+        inv_freq = 1.0 / (
+            10000 ** (torch.arange(0, dim, 2, dtype=torch.float32) / dim)
+        )
+        self.register_buffer("inv_freq", inv_freq, persistent=True)
 
-    def _update_cos_sin_cache(self, x, seq_len):
-        if seq_len != self.seq_len_cached:
-            self.seq_len_cached = seq_len
-            t = torch.arange(seq_len, device=x.device).type_as(self.inv_freq)
-            freqs = torch.einsum('i,j->ij', t, self.inv_freq)
-            emb = torch.cat((freqs, freqs), dim=-1).to(x.device)
-            self.cos_cached = emb.cos()[None, None, :, :]
-            self.sin_cached = emb.sin()[None, None, :, :]
+        self.register_buffer(
+            "cos_cached", torch.empty(0, dtype=torch.float32), persistent=False
+        )
+        self.register_buffer(
+            "sin_cached", torch.empty(0, dtype=torch.float32), persistent=False
+        )
+        self._seq_len_cached: int = 0
+
+    def _update_cos_sin_cache(
+        self, x: torch.Tensor, seq_len: int
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        if seq_len != self._seq_len_cached:
+            self._seq_len_cached = seq_len
+
+            t = torch.arange(
+                seq_len,
+                device=self.inv_freq.device,
+                dtype=self.inv_freq.dtype,
+            )
+            freqs = torch.einsum("i,j->ij", t, self.inv_freq)
+            emb = torch.cat((freqs, freqs), dim=-1)
+
+            self.cos_cached = emb.cos()[None, None, :, :].to(dtype=x.dtype)
+            self.sin_cached = emb.sin()[None, None, :, :].to(dtype=x.dtype)
+
         return self.cos_cached, self.sin_cached
 
-    def forward(self, q, k):
-        cos, sin = self._update_cos_sin_cache(q, q.shape[-2])
-        return (
-            (q * cos) + (self._rotate_half(q) * sin),
-            (k * cos) + (self._rotate_half(k) * sin),
-        )
-
-    def _rotate_half(self, x):
+    @staticmethod
+    def _rotate_half(x: torch.Tensor) -> torch.Tensor:
         x1, x2 = x.chunk(2, dim=-1)
         return torch.cat((-x2, x1), dim=-1)
 
+    def forward(
+        self,
+        q: torch.Tensor,
+        k: torch.Tensor,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        seq_len = q.shape[-2]
+        cos, sin = self._update_cos_sin_cache(q, seq_len)
 
-def scaled_dot_product_attention(query, key, value, attn_mask=None, dropout_p=0.0, is_causal=False, scale=None, training=True) -> torch.Tensor:
-    L, S = query.size(-2), key.size(-2)
-    scale_factor = 1 / math.sqrt(query.size(-1)) if scale is None else scale
-    attn_bias = torch.zeros(L, S, dtype=query.dtype).to(query.device)
+        rotated_q = (q * cos) + (self._rotate_half(q) * sin)
+        rotated_k = (k * cos) + (self._rotate_half(k) * sin)
+        return rotated_q, rotated_k
 
-    if is_causal:
-        assert attn_mask is None
-        temp_mask = torch.ones(L, S, dtype=torch.bool).tril(diagonal=0).to(query.device)
-        attn_bias.masked_fill_(temp_mask.logical_not(), float("-inf"))
-        attn_bias.to(query.dtype)
 
-    attn_weight = query @ key.transpose(-2, -1) * scale_factor
-    attn_weight += attn_bias
+def scaled_dot_product_attention(
+    query: torch.Tensor, 
+    key: torch.Tensor, 
+    value: torch.Tensor, 
+    attn_mask: torch.Tensor = None, 
+    dropout_p: float = 0.0, 
+    is_causal: bool = False, 
+    scale: float = None, 
+    training: bool = True
+) -> torch.Tensor:
+    """
+    Delegates directly to PyTorch 2.0+ optimized C++ kernels.
+    Resolves O(N^2) memory scaling by avoiding explicit attention matrix materialization.
+    """
+    # PyTorch SDPA expects dropout to be exactly 0.0 during evaluation
+    effective_dropout = dropout_p if training else 0.0
 
+    # Fast-path for causal attention without custom masks
+    if is_causal and attn_mask is None:
+        return F.scaled_dot_product_attention(
+            query, key, value, 
+            dropout_p=effective_dropout, 
+            is_causal=True, 
+            scale=scale
+        )
+    
+    # Handle custom masks
     if attn_mask is not None:
-        attn_mask_bias = torch.zeros_like(attn_weight)
         if attn_mask.dtype == torch.bool:
-            attn_mask_bias.masked_fill_(attn_mask, float("-inf"))
-        else:
-            attn_mask_bias += attn_mask
-        attn_weight += attn_mask_bias
+            # F.sdpa expects True for elements that *are* allowed to attend.
+            # Standard Transformer convention usually uses True to mask *out*.
+            # Invert the boolean mask to match F.sdpa's expectation.
+            attn_mask = ~attn_mask 
 
-    attn_weight = torch.softmax(attn_weight, dim=-1)
-    attn_weight = torch.dropout(attn_weight, dropout_p, train=training)
-    return attn_weight @ value
-
+    return F.scaled_dot_product_attention(
+        query, key, value, 
+        attn_mask=attn_mask, 
+        dropout_p=effective_dropout, 
+        is_causal=False, 
+        scale=scale
+    )
 
 class MultiHeadAttentionWithRoPE(nn.Module):
     def __init__(self, d_model, n_heads, attn_dropout_p=0.0, resid_dropout_p=0.0):
@@ -441,10 +482,6 @@ class HierarchicalEmbedding(nn.Module):
         nn.init.normal_(self.emb_s2.weight, mean=0, std=d_model ** -0.5)
 
     def forward(self, token_ids):
-        """Inputs:
-        token_ids: [batch_size, seq_len] token ID
-        Output: [batch_size, seq_len, d_model]
-        """
         if isinstance(token_ids, tuple) or isinstance(token_ids, list):
             s1_ids, s2_ids = token_ids
         else:
@@ -461,9 +498,6 @@ class DependencyAwareLayer(nn.Module):
         self.norm = RMSNorm(d_model)
 
     def forward(self, hidden_states, sibling_embed, key_padding_mask=None):
-        """hidden_states: [batch, seq_len, d_model]
-        sibling_embed: Embedding from another subtoken
-        """
         attn_out = self.cross_attn(
             query=sibling_embed,
             key=hidden_states,
@@ -571,11 +605,3 @@ class TemporalEmbedding(nn.Module):
         month_x = self.month_embed(x[:, :, 4])
 
         return hour_x + weekday_x + day_x + month_x + minute_x
-
-
-
-
-
-
-
-

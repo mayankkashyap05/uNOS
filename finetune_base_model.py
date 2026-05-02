@@ -8,12 +8,12 @@ import pandas as pd
 import numpy as np
 import torch
 import torch.nn as nn
+import datetime
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.distributed import DistributedSampler
 from time import gmtime, strftime
 import logging
 from logging.handlers import RotatingFileHandler
-import datetime
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 
@@ -22,309 +22,402 @@ from model import Nos, NosTokenizer, NosPredictor
 from config_loader import CustomFinetuneConfig
 
 
+# ── Utilities ─────────────────────────────────────────────────────────────────
+
+def format_time(seconds: float) -> str:
+    """Convert a duration in seconds to a human-readable string."""
+    return str(datetime.timedelta(seconds=int(seconds)))
+
+
+def get_model_size(model: torch.nn.Module) -> str:
+    total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    if total_params >= 1_000_000_000:
+        return f"{total_params / 1e9:.1f}B"
+    elif total_params >= 1_000_000:
+        return f"{total_params / 1e6:.1f}M"
+    else:
+        return f"{total_params / 1e3:.1f}K"
+
+
+# ── Dataset ───────────────────────────────────────────────────────────────────
+
 class CustomKlineDataset(Dataset):
-    
-    def __init__(self, data_path, data_type='train', lookback_window=90, predict_window=10, 
-                 clip=5.0, seed=100, train_ratio=0.7, val_ratio=0.15, test_ratio=0.15):
-        self.data_path = data_path
-        self.data_type = data_type
+    """
+    Memory-mapped Kline dataset.
+
+    The first call for a given (data_path, data_type) pair builds numpy cache
+    files alongside the CSV.  Subsequent calls load them via mmap — zero-copy
+    and safe across multiple DataLoader workers and DDP ranks.
+    """
+
+    FEATURE_COLS      = ['open', 'high', 'low', 'close', 'volume', 'amount']
+    TIME_FEATURE_COLS = ['minute', 'hour', 'weekday', 'day', 'month']
+
+    def __init__(
+        self,
+        data_path: str,
+        data_type: str = 'train',
+        lookback_window: int = 90,
+        predict_window: int = 10,
+        clip: float = 5.0,
+        seed: int = 100,
+        train_ratio: float = 0.70,
+        val_ratio: float  = 0.15,
+        test_ratio: float = 0.15,
+    ):
+        self.data_path       = data_path
+        self.data_type       = data_type
         self.lookback_window = lookback_window
-        self.predict_window = predict_window
-        self.window = lookback_window + predict_window + 1
-        self.clip = clip
-        self.seed = seed
-        self.train_ratio = train_ratio
-        self.val_ratio = val_ratio
-        self.test_ratio = test_ratio
-        
-        self.feature_list = ['open', 'high', 'low', 'close', 'volume', 'amount']
-        self.time_feature_list = ['minute', 'hour', 'weekday', 'day', 'month']
-        
-        self.py_rng = random.Random(seed)
-        
-        self._load_and_preprocess_data()
-        self._split_data_by_time()
-        
-        self.n_samples = len(self.data) - self.window + 1
-            
-        print(f"[{data_type.upper()}] Data length: {len(self.data)}, Available samples: {self.n_samples}")
-    
-    def _load_and_preprocess_data(self):
+        self.predict_window  = predict_window
+        self.window          = lookback_window + predict_window + 1
+        self.clip            = clip
+        self.seed            = seed
+        self.train_ratio     = train_ratio
+        self.val_ratio       = val_ratio
+        self.test_ratio      = test_ratio
+
+        self.py_rng      = random.Random(seed)
+        self.current_epoch = 0
+
+        self._load_or_build_cache()
+
+        self.n_samples = len(self.x_data) - self.window + 1
+        if self.n_samples <= 0:
+            raise ValueError(
+                f"[{data_type.upper()}] Not enough data rows ({len(self.x_data)}) "
+                f"for window size {self.window}."
+            )
+        print(
+            f"[{data_type.upper()}] Rows: {len(self.x_data):,}  "
+            f"Samples: {self.n_samples:,}"
+        )
+
+    # ------------------------------------------------------------------
+    def _load_or_build_cache(self):
+        cache_x     = f"{self.data_path}.{self.data_type}.x.npy"
+        cache_stamp = f"{self.data_path}.{self.data_type}.stamp.npy"
+
+        if os.path.exists(cache_x) and os.path.exists(cache_stamp):
+            self.x_data     = np.load(cache_x,     mmap_mode='r')
+            self.stamp_data = np.load(cache_stamp, mmap_mode='r')
+            return
+
+        print(f"[{self.data_type.upper()}] Building mmap cache …")
         df = pd.read_csv(self.data_path)
-        
         df['timestamps'] = pd.to_datetime(df['timestamps'])
         df = df.sort_values('timestamps').reset_index(drop=True)
-        
-        self.timestamps = df['timestamps'].copy()
-        
-        df['minute'] = df['timestamps'].dt.minute
-        df['hour'] = df['timestamps'].dt.hour
+
+        # Temporal features
+        df['minute']  = df['timestamps'].dt.minute
+        df['hour']    = df['timestamps'].dt.hour
         df['weekday'] = df['timestamps'].dt.weekday
-        df['day'] = df['timestamps'].dt.day
-        df['month'] = df['timestamps'].dt.month
-        
-        self.data = df[self.feature_list + self.time_feature_list].copy()
-        
-        if self.data.isnull().any().any():
-            print("Warning: Missing values found in data, performing forward fill")
-            self.data = self.data.fillna(method='ffill')
-        
-        print(f"Original data time range: {self.timestamps.min()} to {self.timestamps.max()}")
-        print(f"Original data total length: {len(df)} records")
-    
-    def _split_data_by_time(self):
-        total_length = len(self.data)
-        
-        train_end = int(total_length * self.train_ratio)
-        val_end = int(total_length * (self.train_ratio + self.val_ratio))
-        
-        if self.data_type == 'train':
-            self.data = self.data.iloc[:train_end].copy()
-            self.timestamps = self.timestamps.iloc[:train_end].copy()
-            print(f"[{self.data_type.upper()}] Training set: first {train_end} time points ({self.train_ratio})")
-            print(f"[{self.data_type.upper()}] Training set time range: {self.timestamps.min()} to {self.timestamps.max()}")
-        elif self.data_type == 'val':
-            self.data = self.data.iloc[train_end:val_end].copy()
-            self.timestamps = self.timestamps.iloc[train_end:val_end].copy()
-            print(f"[{self.data_type.upper()}] Validation set: time points {train_end+1} to {val_end} ({self.val_ratio})")
-            print(f"[{self.data_type.upper()}] Validation set time range: {self.timestamps.min()} to {self.timestamps.max()}")
-        elif self.data_type == 'test':
-            self.data = self.data.iloc[val_end:].copy()
-            self.timestamps = self.timestamps.iloc[val_end:].copy()
-            print(f"[{self.data_type.upper()}] Test set: after time point {val_end+1}")
-            print(f"[{self.data_type.upper()}] Test set time range: {self.timestamps.min()} to {self.timestamps.max()}")
-        
-        print(f"[{self.data_type.upper()}] Data length after split: {len(self.data)} records")
-    
-    def set_epoch_seed(self, epoch):
-        epoch_seed = self.seed + epoch
-        self.py_rng.seed(epoch_seed)
+        df['day']     = df['timestamps'].dt.day
+        df['month']   = df['timestamps'].dt.month
+
+        if df.isnull().any().any():
+            df = df.ffill()
+
+        # Chronological split
+        n = len(df)
+        train_end = int(n * self.train_ratio)
+        val_end   = int(n * (self.train_ratio + self.val_ratio))
+
+        slices = {'train': slice(None, train_end),
+                  'val':   slice(train_end, val_end),
+                  'test':  slice(val_end, None)}
+        df = df.iloc[slices[self.data_type]]
+
+        x_arr     = df[self.FEATURE_COLS].values.astype(np.float32)
+        stamp_arr = df[self.TIME_FEATURE_COLS].values.astype(np.float32)
+
+        np.save(cache_x,     x_arr)
+        np.save(cache_stamp, stamp_arr)
+        del df
+
+        self.x_data     = np.load(cache_x,     mmap_mode='r')
+        self.stamp_data = np.load(cache_stamp, mmap_mode='r')
+
+    # ------------------------------------------------------------------
+    def set_epoch_seed(self, epoch: int):
+        self.py_rng.seed(self.seed + epoch)
         self.current_epoch = epoch
-    
-    def __len__(self):
+
+    def __len__(self) -> int:
         return self.n_samples
-    
-    def __getitem__(self, idx):
-        max_start = len(self.data) - self.window
-        if max_start <= 0:
-            raise ValueError("Data length insufficient to create samples")
-        
+
+    def __getitem__(self, idx: int):
+        max_start = len(self.x_data) - self.window
+
         if self.data_type == 'train':
-            epoch = getattr(self, 'current_epoch', 0)
-            start_idx = (idx * 9973 + (epoch + 1) * 104729) % (max_start + 1)
+            epoch      = self.current_epoch
+            start_idx  = (idx * 9973 + (epoch + 1) * 104729) % (max_start + 1)
         else:
-            start_idx = idx % (max_start + 1)
-        
+            start_idx  = idx % (max_start + 1)
+
         end_idx = start_idx + self.window
-        
-        window_data = self.data.iloc[start_idx:end_idx]
-        
-        x = window_data[self.feature_list].values.astype(np.float32)
-        x_stamp = window_data[self.time_feature_list].values.astype(np.float32)
-        
-        x_mean, x_std = np.mean(x, axis=0), np.std(x, axis=0)
+
+        # Copy out of mmap so workers get writable arrays
+        x       = self.x_data[start_idx:end_idx].copy()
+        x_stamp = self.stamp_data[start_idx:end_idx].copy()
+
+        # Per-sample z-score + clip
+        x_mean = x.mean(axis=0)
+        x_std  = x.std(axis=0)
         x = (x - x_mean) / (x_std + 1e-5)
         x = np.clip(x, -self.clip, self.clip)
-        
-        x_tensor = torch.from_numpy(x)
-        x_stamp_tensor = torch.from_numpy(x_stamp)
-        
-        return x_tensor, x_stamp_tensor
+
+        return torch.from_numpy(x), torch.from_numpy(x_stamp)
 
 
-
+# ── Logging ───────────────────────────────────────────────────────────────────
 
 def setup_logging(exp_name: str, log_dir: str, rank: int = 0) -> logging.Logger:
     os.makedirs(log_dir, exist_ok=True)
-    
+
     logger = logging.getLogger(f"basemodel_training_rank_{rank}")
     logger.setLevel(logging.INFO)
-    
+
+    # Idempotent – do not attach duplicate handlers on re-import
     if logger.handlers:
         return logger
-    
-    log_file = os.path.join(log_dir, f"basemodel_training_rank_{rank}.log")
+
+    log_file     = os.path.join(log_dir, f"basemodel_training_rank_{rank}.log")
     file_handler = RotatingFileHandler(
-        log_file, 
-        maxBytes=10*1024*1024,
-        backupCount=5,
-        encoding='utf-8'
+        log_file, maxBytes=10 * 1024 * 1024, backupCount=5, encoding='utf-8'
     )
     file_handler.setLevel(logging.INFO)
-    
-    console_handler = None
-    if rank == 0:
-        console_handler = logging.StreamHandler()
+
+    console_handler = logging.StreamHandler() if rank == 0 else None
+    if console_handler:
         console_handler.setLevel(logging.INFO)
-    
+
     formatter = logging.Formatter(
         '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
+        datefmt='%Y-%m-%d %H:%M:%S',
     )
     file_handler.setFormatter(formatter)
-    if console_handler is not None:
+    if console_handler:
         console_handler.setFormatter(formatter)
-    
+
     logger.addHandler(file_handler)
-    if console_handler is not None:
+    if console_handler:
         logger.addHandler(console_handler)
-    
-    logger.info(f"=== Basemodel Training Started ===")
-    logger.info(f"Experiment Name: {exp_name}")
-    logger.info(f"Log Directory: {log_dir}")
-    logger.info(f"Rank: {rank}")
-    logger.info(f"Timestamp: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    
+
+    logger.info("=== Basemodel Training Started ===")
+    logger.info(f"Experiment: {exp_name}")
+    logger.info(f"Log dir:    {log_dir}")
+    logger.info(f"Rank:       {rank}")
+    logger.info(f"Timestamp:  {datetime.datetime.now():%Y-%m-%d %H:%M:%S}")
+
     return logger
 
 
+# ── DataLoaders ───────────────────────────────────────────────────────────────
+
 def create_dataloaders(config):
-    if not dist.is_available() or not dist.is_initialized() or dist.get_rank() == 0:
-        print("Creating data loaders...")
-    
-    train_dataset = CustomKlineDataset(
-        data_path=config.data_path,
-        data_type='train',
-        lookback_window=config.lookback_window,
-        predict_window=config.predict_window,
-        clip=config.clip,
-        seed=config.seed,
-        train_ratio=config.train_ratio,
-        val_ratio=config.val_ratio,
-        test_ratio=config.test_ratio
+    is_main = (
+        not dist.is_available()
+        or not dist.is_initialized()
+        or dist.get_rank() == 0
     )
-    
-    val_dataset = CustomKlineDataset(
-        data_path=config.data_path,
-        data_type='val',
-        lookback_window=config.lookback_window,
-        predict_window=config.predict_window,
-        clip=config.clip,
-        seed=config.seed + 1,
-        train_ratio=config.train_ratio,
-        val_ratio=config.val_ratio,
-        test_ratio=config.test_ratio
+    if is_main:
+        print("Creating data loaders …")
+
+    shared_kw = dict(
+        data_path       = config.data_path,
+        lookback_window = config.lookback_window,
+        predict_window  = config.predict_window,
+        clip            = config.clip,
+        train_ratio     = config.train_ratio,
+        val_ratio       = config.val_ratio,
+        test_ratio      = config.test_ratio,
     )
-    
+
+    train_dataset = CustomKlineDataset(data_type='train', seed=config.seed,     **shared_kw)
+    val_dataset   = CustomKlineDataset(data_type='val',   seed=config.seed + 1, **shared_kw)
+
     use_ddp = dist.is_available() and dist.is_initialized()
-    train_sampler = DistributedSampler(train_dataset, num_replicas=dist.get_world_size(), rank=dist.get_rank(), shuffle=True) if use_ddp else None
-    val_sampler = DistributedSampler(val_dataset, num_replicas=dist.get_world_size(), rank=dist.get_rank(), shuffle=False, drop_last=False) if use_ddp else None
+    train_sampler = (
+        DistributedSampler(train_dataset, shuffle=True)  if use_ddp else None
+    )
+    val_sampler = (
+        DistributedSampler(val_dataset, shuffle=False, drop_last=False) if use_ddp else None
+    )
+
+    loader_kw = dict(num_workers=config.num_workers, pin_memory=True)
 
     train_loader = DataLoader(
         train_dataset,
-        batch_size=config.batch_size,
-        shuffle=(train_sampler is None),
-        num_workers=config.num_workers,
-        pin_memory=True,
-        drop_last=True,
-        sampler=train_sampler
+        batch_size = config.batch_size,
+        shuffle    = (train_sampler is None),
+        drop_last  = True,
+        sampler    = train_sampler,
+        **loader_kw,
     )
-    
     val_loader = DataLoader(
         val_dataset,
-        batch_size=config.batch_size,
-        shuffle=False,
-        num_workers=config.num_workers,
-        pin_memory=True,
-        drop_last=False,
-        sampler=val_sampler
+        batch_size = config.batch_size,
+        shuffle    = False,
+        drop_last  = False,
+        sampler    = val_sampler,
+        **loader_kw,
     )
-    
-    if not dist.is_available() or not dist.is_initialized() or dist.get_rank() == 0:
-        print(f"Training set size: {len(train_dataset)}, Validation set size: {len(val_dataset)}")
-    
-    return train_loader, val_loader, train_dataset, val_dataset, train_sampler, val_sampler
+
+    if is_main:
+        print(
+            f"Train samples: {len(train_dataset):,}  "
+            f"Val samples: {len(val_dataset):,}"
+        )
+
+    return (
+        train_loader, val_loader,
+        train_dataset, val_dataset,
+        train_sampler, val_sampler,
+    )
 
 
+# ── Training Loop ─────────────────────────────────────────────────────────────
 
 def train_model(model, tokenizer, device, config, save_dir, logger):
-    logger.info("Starting training...")
+    """
+    Fine-tunes *model* (NosPredictor / Nos) with the frozen *tokenizer*.
+
+    Gradient accumulation
+    ─────────────────────
+    Each DataLoader batch is sliced into `accumulation_steps` equal micro-batches.
+    The loss for each micro-batch is scaled by (1 / accumulation_steps) before
+    .backward(), so the accumulated gradient is mathematically identical to what
+    you would get from a single forward pass over the full batch.
+
+    optimizer.step() + scheduler.step() fire exactly once per DataLoader
+    iteration, keeping OneCycleLR's internal step counter perfectly aligned
+    with `steps_per_epoch = len(train_loader)`.
+    """
+    logger.info("Starting base-model training …")
+
     use_ddp = dist.is_available() and dist.is_initialized()
-    rank = dist.get_rank() if use_ddp else 0
+    rank    = dist.get_rank() if use_ddp else 0
 
-    train_loader, val_loader, train_dataset, val_dataset, \
-        train_sampler, val_sampler = create_dataloaders(config)
+    (
+        train_loader, val_loader,
+        train_dataset, val_dataset,
+        train_sampler, val_sampler,
+    ) = create_dataloaders(config)
 
+    # ── Optimizer ─────────────────────────────────────────────────────────────
     optimizer = torch.optim.AdamW(
         model.parameters(),
-        lr=config.predictor_learning_rate,
-        betas=(config.adam_beta1, config.adam_beta2),
-        weight_decay=config.adam_weight_decay
+        lr           = config.predictor_learning_rate,
+        betas        = (config.adam_beta1, config.adam_beta2),
+        weight_decay = config.adam_weight_decay,
     )
 
-    # ── Scheduler: read from config ───────────────────────────────
-    pct_start = getattr(config, 'basemodel_pct_start', 0.03)
+    # ── Scheduler ─────────────────────────────────────────────────────────────
+    pct_start  = getattr(config, 'basemodel_pct_start',  0.03)
     div_factor = getattr(config, 'basemodel_div_factor', 10.0)
 
     scheduler = torch.optim.lr_scheduler.OneCycleLR(
         optimizer,
-        max_lr=config.predictor_learning_rate,
-        steps_per_epoch=len(train_loader),
-        epochs=config.basemodel_epochs,
-        pct_start=pct_start,
-        div_factor=div_factor
+        max_lr          = config.predictor_learning_rate,
+        steps_per_epoch = len(train_loader),   # 1 step  ==  1 DataLoader batch
+        epochs          = config.basemodel_epochs,
+        pct_start       = pct_start,
+        div_factor      = div_factor,
     )
 
+    # ── DDP wrapping (after scheduler construction) ────────────────────────────
     if use_ddp:
         local_rank = int(os.environ.get("LOCAL_RANK", "0"))
-        model = DDP(model, device_ids=[local_rank],
-                    output_device=local_rank, find_unused_parameters=False)
+        model = DDP(
+            model,
+            device_ids          = [local_rank],
+            output_device       = local_rank,
+            find_unused_parameters = False,
+        )
 
-    # ── Grad clip: read from config ───────────────────────────────
-    max_grad_norm = getattr(config, 'basemodel_max_grad_norm', 3.0)
+    # ── Hyper-parameters from config ──────────────────────────────────────────
+    max_grad_norm     = getattr(config, 'basemodel_max_grad_norm', 3.0)
+    accumulation_steps = getattr(config, 'accumulation_steps', 1)
 
-    best_val_loss = float('inf')
+    # Convenience alias: unwrap DDP only once per call-site
+    def raw_model():
+        return model.module if use_ddp else model
+
+    # ── Epoch loop ────────────────────────────────────────────────────────────
+    best_val_loss   = float('inf')
     batch_idx_global = 0
 
     for epoch in range(config.basemodel_epochs):
-        epoch_start_time = time.time()
+        epoch_start = time.time()
         model.train()
 
-        train_dataset.set_epoch_seed(epoch * 10000)
+        # Deterministic-but-varied shuffling per epoch
+        train_dataset.set_epoch_seed(epoch * 10_000)
         val_dataset.set_epoch_seed(0)
         if train_sampler is not None:
             train_sampler.set_epoch(epoch)
 
         epoch_train_loss = 0.0
-        train_batches = 0
+        train_batches    = 0
 
-        for batch_idx, (batch_x, batch_x_stamp) in enumerate(train_loader):
-            batch_x = batch_x.to(device, non_blocking=True)
-            batch_x_stamp = batch_x_stamp.to(device, non_blocking=True)
+        # ── Inner batch loop ──────────────────────────────────────────────────
+        for batch_idx, (ori_batch_x, ori_batch_x_stamp) in enumerate(train_loader):
+            ori_batch_x       = ori_batch_x.to(device, non_blocking=True)
+            ori_batch_x_stamp = ori_batch_x_stamp.to(device, non_blocking=True)
 
-            with torch.no_grad():
-                token_seq_0, token_seq_1 = tokenizer.encode(batch_x, half=True)
-
-            token_in = [token_seq_0[:, :-1], token_seq_1[:, :-1]]
-            token_out = [token_seq_0[:, 1:], token_seq_1[:, 1:]]
-
-            logits = (model.module if use_ddp else model)(
-                token_in[0], token_in[1], batch_x_stamp[:, :-1, :]
-            )
-            loss, s1_loss, s2_loss = (model.module if use_ddp else model).head.compute_loss(
-                logits[0], logits[1], token_out[0], token_out[1]
-            )
-
+            # Zero gradients BEFORE the accumulation loop (not after step)
             optimizer.zero_grad()
-            loss.backward()
 
-            # ── Grad clip from config ─────────────────────────
+            micro_size            = ori_batch_x.shape[0] // accumulation_steps
+            current_batch_total_loss = 0.0
+
+            # ── Micro-batch (gradient accumulation) loop ──────────────────────
+            for j in range(accumulation_steps):
+                start = j       * micro_size
+                end   = (j + 1) * micro_size
+
+                batch_x       = ori_batch_x[start:end]
+                batch_x_stamp = ori_batch_x_stamp[start:end]
+
+                # Tokenizer is frozen — skip its grad computation entirely
+                with torch.no_grad():
+                    token_seq_0, token_seq_1 = tokenizer.encode(batch_x, half=True)
+
+                token_in  = [token_seq_0[:, :-1], token_seq_1[:, :-1]]
+                token_out = [token_seq_0[:, 1:],  token_seq_1[:, 1:]]
+
+                logits = raw_model()(
+                    token_in[0], token_in[1], batch_x_stamp[:, :-1, :]
+                )
+                loss, s1_loss, s2_loss = raw_model().head.compute_loss(
+                    logits[0], logits[1], token_out[0], token_out[1]
+                )
+
+                # Scale loss so accumulated gradient == full-batch gradient
+                loss_scaled = loss / accumulation_steps
+                loss_scaled.backward()
+
+                current_batch_total_loss += loss.item()
+
+            # ── Optimizer step (once per DataLoader batch) ────────────────────
             torch.nn.utils.clip_grad_norm_(
-                (model.module if use_ddp else model).parameters(),
-                max_norm=max_grad_norm
+                raw_model().parameters(),
+                max_norm=max_grad_norm,
             )
             optimizer.step()
             scheduler.step()
 
-            epoch_train_loss += loss.item()
-            train_batches += 1
+            # Logging uses the *average* loss across micro-batches
+            avg_loss          = current_batch_total_loss / accumulation_steps
+            epoch_train_loss += avg_loss
+            train_batches    += 1
 
             if (batch_idx_global + 1) % config.log_interval == 0:
-                lr = optimizer.param_groups[0]['lr']
+                lr      = optimizer.param_groups[0]['lr']
                 log_msg = (
                     f"[Epoch {epoch+1}/{config.basemodel_epochs}, "
                     f"Step {batch_idx+1}/{len(train_loader)}] "
-                    f"LR: {lr:.6f}, Loss: {loss.item():.4f}"
+                    f"LR: {lr:.6f}  Loss: {avg_loss:.4f}"
                 )
                 logger.info(log_msg)
                 if rank == 0:
@@ -332,165 +425,186 @@ def train_model(model, tokenizer, device, config, save_dir, logger):
 
             batch_idx_global += 1
 
-        # ── Validation ────────────────────────────────────────────
+        # ── Validation ────────────────────────────────────────────────────────
         model.eval()
-        val_loss = 0.0
-        val_batches = 0
+        val_loss_sum   = 0.0
+        val_sample_cnt = 0
 
         with torch.no_grad():
             for batch_x, batch_x_stamp in val_loader:
-                batch_x = batch_x.to(device, non_blocking=True)
+                batch_x       = batch_x.to(device, non_blocking=True)
                 batch_x_stamp = batch_x_stamp.to(device, non_blocking=True)
 
                 token_seq_0, token_seq_1 = tokenizer.encode(batch_x, half=True)
-                token_in = [token_seq_0[:, :-1], token_seq_1[:, :-1]]
-                token_out = [token_seq_0[:, 1:], token_seq_1[:, 1:]]
+                token_in  = [token_seq_0[:, :-1], token_seq_1[:, :-1]]
+                token_out = [token_seq_0[:, 1:],  token_seq_1[:, 1:]]
 
-                logits = (model.module if use_ddp else model)(
+                logits = raw_model()(
                     token_in[0], token_in[1], batch_x_stamp[:, :-1, :]
                 )
-                loss, _, _ = (model.module if use_ddp else model).head.compute_loss(
+                loss, _, _ = raw_model().head.compute_loss(
                     logits[0], logits[1], token_out[0], token_out[1]
                 )
-                val_loss += loss.item()
-                val_batches += 1
 
+                # Sample-weighted accumulation (correct across variable-size batches)
+                n               = batch_x.size(0)
+                val_loss_sum   += loss.item() * n
+                val_sample_cnt += n
+
+        # ── DDP aggregation ───────────────────────────────────────────────────
         if use_ddp:
-            tensor_sum = torch.tensor(
-                [epoch_train_loss, train_batches, val_loss, val_batches],
-                dtype=torch.float64, device=device
+            agg = torch.tensor(
+                [epoch_train_loss, float(train_batches),
+                 val_loss_sum,     float(val_sample_cnt)],
+                dtype=torch.float64, device=device,
             )
-            dist.all_reduce(tensor_sum, op=dist.ReduceOp.SUM)
-            avg_train_loss = (tensor_sum[0].item() / tensor_sum[1].item()
-                              if tensor_sum[1].item() > 0 else 0.0)
-            avg_val_loss = (tensor_sum[2].item() / tensor_sum[3].item()
-                            if tensor_sum[3].item() > 0 else 0.0)
+            dist.all_reduce(agg, op=dist.ReduceOp.SUM)
+            avg_train_loss = agg[0].item() / agg[1].item() if agg[1].item() > 0 else 0.0
+            avg_val_loss   = agg[2].item() / agg[3].item() if agg[3].item() > 0 else 0.0
         else:
-            avg_train_loss = (epoch_train_loss / train_batches
-                              if train_batches > 0 else 0)
-            avg_val_loss = val_loss / val_batches if val_batches > 0 else 0
+            avg_train_loss = epoch_train_loss / train_batches if train_batches > 0 else 0.0
+            avg_val_loss   = val_loss_sum / val_sample_cnt    if val_sample_cnt > 0 else 0.0
 
-        epoch_time = time.time() - epoch_start_time
+        epoch_time    = time.time() - epoch_start
         epoch_summary = (
             f"\n--- Epoch {epoch+1}/{config.basemodel_epochs} Summary ---\n"
-            f"Training Loss: {avg_train_loss:.4f}\n"
-            f"Validation Loss: {avg_val_loss:.4f}\n"
-            f"Epoch Time: {epoch_time:.2f} seconds\n"
+            f"  Train Loss : {avg_train_loss:.6f}\n"
+            f"  Val   Loss : {avg_val_loss:.6f}\n"
+            f"  Epoch Time : {format_time(epoch_time)}\n"
         )
         logger.info(epoch_summary)
         if rank == 0:
             print(epoch_summary)
 
+        # ── Checkpoint (rank-0 only) ───────────────────────────────────────────
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
             if rank == 0:
-                model_save_path = os.path.join(save_dir, "best_model")
-                os.makedirs(model_save_path, exist_ok=True)
-                (model.module if use_ddp else model).save_pretrained(model_save_path)
-                save_msg = (f"Best model saved: {model_save_path} "
-                            f"(val loss: {best_val_loss:.4f})")
+                ckpt_dir = os.path.join(save_dir, "best_model")
+                os.makedirs(ckpt_dir, exist_ok=True)
+                raw_model().save_pretrained(ckpt_dir)
+                save_msg = (
+                    f"✓ Best model saved → {ckpt_dir}  "
+                    f"(val loss: {best_val_loss:.6f})"
+                )
                 logger.info(save_msg)
                 print(save_msg)
 
     return best_val_loss
 
 
+# ── Entry point ───────────────────────────────────────────────────────────────
+
 def main():
     import argparse
-    
-    parser = argparse.ArgumentParser(description='Nos Basemodel Fine-tuning Training')
-    parser.add_argument('--config', type=str, default='config.yaml', 
-                       help='Configuration file path (default: config.yaml)')
-    args = parser.parse_args()
-    
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device: {device}")
-    
+
+    parser = argparse.ArgumentParser(description='Nos Base-Model Fine-tuning')
+    parser.add_argument(
+        '--config', type=str, default='config.yaml',
+        help='Path to YAML config file (default: config.yaml)',
+    )
+    args   = parser.parse_args()
     config = CustomFinetuneConfig(args.config)
-    
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Device: {device}")
+
     os.makedirs(config.basemodel_save_path, exist_ok=True)
-    
+
     log_dir = os.path.join(config.base_save_path, "logs")
-    logger = setup_logging(config.exp_name, log_dir, 0)
-    
-    torch.manual_seed(config.seed)
-    np.random.seed(config.seed)
+    logger  = setup_logging(config.exp_name, log_dir, rank=0)
+
+    # Reproducibility
     random.seed(config.seed)
-    
-    logger.info("Loading pretrained model or random initialization...")
-    print("Loading pretrained model or random initialization...")
+    np.random.seed(config.seed)
+    torch.manual_seed(config.seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(config.seed)
+
+    # ── Tokenizer ─────────────────────────────────────────────────────────────
+    logger.info("Loading tokenizer …")
     if getattr(config, 'pre_trained_tokenizer', True):
         tokenizer = NosTokenizer.from_pretrained(config.finetuned_tokenizer_path)
     else:
-        import json, os
-        print("pre_trained_tokenizer=False, randomly initializing Tokenizer architecture for training")
-        cfg_path_tok = os.path.join(config.pretrained_tokenizer_path if hasattr(config, 'pretrained_tokenizer_path') else config.finetuned_tokenizer_path, 'config.json')
-        with open(cfg_path_tok, 'r') as f:
-            arch_t = json.load(f)
+        logger.info("pre_trained_tokenizer=False — random init")
+        cfg_path = os.path.join(config.pretrained_tokenizer_path, 'config.json')
+        with open(cfg_path) as fh:
+            arch = json.load(fh)
         tokenizer = NosTokenizer(
-            d_in=arch_t.get('d_in', 6),
-            d_model=arch_t.get('d_model', 256),
-            n_heads=arch_t.get('n_heads', 4),
-            ff_dim=arch_t.get('ff_dim', 512),
-            n_enc_layers=arch_t.get('n_enc_layers', 4),
-            n_dec_layers=arch_t.get('n_dec_layers', 4),
-            ffn_dropout_p=arch_t.get('ffn_dropout_p', 0.0),
-            attn_dropout_p=arch_t.get('attn_dropout_p', 0.0),
-            resid_dropout_p=arch_t.get('resid_dropout_p', 0.0),
-            s1_bits=arch_t.get('s1_bits', 10),
-            s2_bits=arch_t.get('s2_bits', 10),
-            beta=arch_t.get('beta', 0.05),
-            gamma0=arch_t.get('gamma0', 1.0),
-            gamma=arch_t.get('gamma', 1.1),
-            zeta=arch_t.get('zeta', 0.05),
-            group_size=arch_t.get('group_size', 4)
+            d_in            = arch.get('d_in',             6),
+            d_model         = arch.get('d_model',         256),
+            n_heads         = arch.get('n_heads',           4),
+            ff_dim          = arch.get('ff_dim',          512),
+            n_enc_layers    = arch.get('n_enc_layers',      4),
+            n_dec_layers    = arch.get('n_dec_layers',      4),
+            ffn_dropout_p   = arch.get('ffn_dropout_p',  0.0),
+            attn_dropout_p  = arch.get('attn_dropout_p', 0.0),
+            resid_dropout_p = arch.get('resid_dropout_p',0.0),
+            s1_bits         = arch.get('s1_bits',          10),
+            s2_bits         = arch.get('s2_bits',          10),
+            beta            = arch.get('beta',           0.05),
+            gamma0          = arch.get('gamma0',          1.0),
+            gamma           = arch.get('gamma',           1.1),
+            zeta            = arch.get('zeta',           0.05),
+            group_size      = arch.get('group_size',        4),
         )
 
+    # ── Predictor ─────────────────────────────────────────────────────────────
+    logger.info("Loading predictor …")
     if getattr(config, 'pre_trained_predictor', True):
         model = Nos.from_pretrained(config.pretrained_predictor_path)
     else:
-        import json, os
-        print("pre_trained_predictor=False, randomly initializing Predictor architecture for training")
+        logger.info("pre_trained_predictor=False — random init")
         cfg_path = os.path.join(config.pretrained_predictor_path, 'config.json')
-        with open(cfg_path, 'r') as f:
-            arch = json.load(f)
+        with open(cfg_path) as fh:
+            arch = json.load(fh)
         model = Nos(
-            s1_bits=arch.get('s1_bits', 10),
-            s2_bits=arch.get('s2_bits', 10),
-            n_layers=arch.get('n_layers', 12),
-            d_model=arch.get('d_model', 832),
-            n_heads=arch.get('n_heads', 16),
-            ff_dim=arch.get('ff_dim', 2048),
-            ffn_dropout_p=arch.get('ffn_dropout_p', 0.2),
-            attn_dropout_p=arch.get('attn_dropout_p', 0.0),
-            resid_dropout_p=arch.get('resid_dropout_p', 0.2),
-            token_dropout_p=arch.get('token_dropout_p', 0.0),
-            learn_te=arch.get('learn_te', True)
+            s1_bits         = arch.get('s1_bits',          10),
+            s2_bits         = arch.get('s2_bits',          10),
+            n_layers        = arch.get('n_layers',          12),
+            d_model         = arch.get('d_model',          832),
+            n_heads         = arch.get('n_heads',           16),
+            ff_dim          = arch.get('ff_dim',          2048),
+            ffn_dropout_p   = arch.get('ffn_dropout_p',   0.2),
+            attn_dropout_p  = arch.get('attn_dropout_p',  0.0),
+            resid_dropout_p = arch.get('resid_dropout_p', 0.2),
+            token_dropout_p = arch.get('token_dropout_p', 0.0),
+            learn_te        = arch.get('learn_te',        True),
         )
-    
+
     tokenizer = tokenizer.to(device)
-    model = model.to(device)
-    
-    model_size = sum(p.numel() for p in model.parameters())
-    logger.info(f"Model parameters: {model_size:,}")
-    print(f"Model parameters: {model_size:,}")
-    
+    model     = model.to(device)
+
+    logger.info(f"Tokenizer size : {get_model_size(tokenizer)}")
+    logger.info(f"Model size     : {get_model_size(model)}")
+    print(f"Tokenizer: {get_model_size(tokenizer)}  |  Model: {get_model_size(model)}")
+
+    # ── Config summary ────────────────────────────────────────────────────────
     logger.info("=== Training Configuration ===")
-    logger.info(f"Data path: {config.data_path}")
-    logger.info(f"Lookback window: {config.lookback_window}")
-    logger.info(f"Predict window: {config.predict_window}")
-    logger.info(f"Batch size: {config.batch_size}")
-    logger.info(f"Learning rate: {config.predictor_learning_rate}")
-    logger.info(f"Training epochs: {config.basemodel_epochs}")
-    logger.info(f"Device: {device}")
-    logger.info(f"Tokenizer path: {config.finetuned_tokenizer_path}")
-    logger.info(f"Pretrained model path: {config.pretrained_predictor_path}")
-    
-    logger.info("Starting fine-tuning training...")
-    print("Starting fine-tuning training...")
-    best_val_loss = train_model(model, tokenizer, device, config, config.basemodel_save_path, logger)
-    
-    final_msg = f"Training completed! Best validation loss: {best_val_loss:.4f}\nModel saved to: {config.basemodel_save_path}"
+    for key, val in [
+        ("data_path",           config.data_path),
+        ("lookback_window",     config.lookback_window),
+        ("predict_window",      config.predict_window),
+        ("batch_size",          config.batch_size),
+        ("accumulation_steps",  getattr(config, 'accumulation_steps', 1)),
+        ("learning_rate",       config.predictor_learning_rate),
+        ("epochs",              config.basemodel_epochs),
+        ("device",              device),
+        ("tokenizer_path",      config.finetuned_tokenizer_path),
+        ("predictor_path",      config.pretrained_predictor_path),
+    ]:
+        logger.info(f"  {key:<22}: {val}")
+
+    # ── Train ─────────────────────────────────────────────────────────────────
+    best_val_loss = train_model(
+        model, tokenizer, device, config,
+        config.basemodel_save_path, logger,
+    )
+
+    final_msg = (
+        f"Training complete.  Best val loss: {best_val_loss:.6f}\n"
+        f"Checkpoint: {config.basemodel_save_path}"
+    )
     logger.info(final_msg)
     print(final_msg)
 

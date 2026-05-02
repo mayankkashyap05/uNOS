@@ -1,4 +1,12 @@
-- configs/config.yaml
-- model/
+- configs/
+- data/1h.csv
+#- finetuned/
+- model/__init__.py
+- model/module.py
+- model/nos.py
 - config_loader.py
 - hpo_tuner.py
+- launch_hpo.sh
+- finetune_base_model.py
+- finetune_tokenizer.py
+- train_sequential.py
