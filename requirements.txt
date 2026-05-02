@@ -1,0 +1,17 @@
+# Core Deep Learning & Math
+torch>=2.0.0
+numpy
+pandas
+einops
+
+# Model Hub & Progress Tracking
+huggingface-hub
+tqdm
+
+# Configuration Parsing
+PyYAML
+
+# Hyperparameter Optimization (HPO)
+optuna
+plotly
+SQLAlchemy
