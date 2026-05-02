@@ -1,0 +1,141 @@
+data:
+  data_path: "data/1h.csv"
+  # 512 hours = ~21.3 days of context. 48 hours = 2 days forward prediction.
+  lookback_window: 512
+  predict_window: 48
+  max_context: 512
+  clip: 5.0
+  train_ratio: 0.8
+  val_ratio: 0.2
+  test_ratio: 0.0
+
+training:
+  tokenizer_epochs: 30
+  basemodel_epochs: 20
+  batch_size: 64      # Safely fits in 16GB+ VRAM, highly accelerates epochs
+  log_interval: 20
+  num_workers: 4      # Safe concurrency for GPU processing
+  pin_memory: true
+  persistent_workers: true
+  seed: 42
+  
+  tokenizer_learning_rate: 0.0002
+  predictor_learning_rate: 0.00004
+  adam_beta1: 0.9
+  adam_beta2: 0.95
+  adam_weight_decay: 0.1
+  accumulation_steps: 1
+  
+  tokenizer_max_grad_norm: 2.0
+  basemodel_max_grad_norm: 3.0
+
+model_paths:
+  pretrained_tokenizer: "models/nos_tokenizer_2k"
+  pretrained_predictor: "models/nos_mini"
+  exp_name: "1h_fast_hpo"
+  base_path: "finetuned"
+  base_save_path: ""
+  finetuned_tokenizer: ""
+  tokenizer_save_name: "tokenizer"
+  basemodel_save_name: "basemodel"
+
+experiment:
+  name: "Nos_1h_FastHPO"
+  description: "Aggressive Hyperband HPO for 2hr limit on T4/A40"
+  use_comet: false
+  train_tokenizer: true
+  train_basemodel: true
+  skip_existing: false
+
+device:
+  use_cuda: true
+  device_id: 0
+
+# ── Hyperparameter Search Space ──────────────────────────────────
+hpo:
+  enabled: true
+  n_trials: 25          # Elevated trial count due to aggressive pruning
+  direction: "minimize"
+  sampler: "tpe"
+  pruner: "hyperband"   # CRITICAL: Replaced median with hyperband for 2hr limit
+  storage: "sqlite:///nos_1h_t4_hpo.db?timeout=60"
+  study_name: "nos_1h_hyperband"
+
+  optimize_tokenizer: true
+  optimize_basemodel: true
+
+  # 4/3 split is the minimum required for OneCycleLR to form a valid curve
+  hpo_tokenizer_epochs: 4
+  hpo_basemodel_epochs: 3
+
+  search_space:
+    # ── Learning Rates (Slightly narrowed to avoid wasted TPE exploration)
+    tokenizer_learning_rate:
+      type: float
+      low: 5.0e-5
+      high: 1.0e-3
+      log: true
+
+    predictor_learning_rate:
+      type: float
+      low: 1.0e-6
+      high: 5.0e-5
+      log: true
+
+    adam_weight_decay:
+      type: float
+      low: 0.01
+      high: 0.2
+      log: true
+
+    # ── Architecture sizing
+    batch_size:
+      type: categorical
+      choices: [32, 64] # Keeps GPU utilization high, cuts step time
+
+    # ── Scheduler
+    tokenizer_pct_start:
+      type: float
+      low: 0.02
+      high: 0.1
+      log: false
+
+    basemodel_pct_start:
+      type: float
+      low: 0.02
+      high: 0.1
+      log: false
+
+    tokenizer_div_factor:
+      type: categorical
+      choices: [10.0, 25.0]
+
+    basemodel_div_factor:
+      type: categorical
+      choices: [10.0, 25.0]
+
+    # ── Regularization (Focusing only on the highest-impact dropouts)
+    ffn_dropout_p:
+      type: float
+      low: 0.0
+      high: 0.2
+      log: false
+
+    resid_dropout_p:
+      type: float
+      low: 0.0
+      high: 0.2
+      log: false
+
+    # ── BSQ Loss Weights (Tightened search radius)
+    bsq_beta:
+      type: float
+      low: 0.05
+      high: 0.15
+      log: true
+
+    bsq_zeta:
+      type: float
+      low: 0.05
+      high: 0.15
+      log: true

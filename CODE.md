@@ -4,7 +4,7 @@
 
 | Field | Value |
 | ----- | ----- |
-| **Generated** | `2026-04-27 23:07:10` |
+| **Generated** | `2026-05-02 23:42:06` |
 | **Source mode** | YAML config (`codebase.yaml`) |
 | **Base directory** | `C:\Users\kashy\OneDrive\Documents\uNOS` |
 | **Total files** | 13 |
