@@ -128,6 +128,7 @@ def create_dataloaders(config):
         shuffle=(train_sampler is None),
         num_workers=config.num_workers,
         pin_memory=True,
+        persistent_workers=config.persistent_workers if config.num_workers > 0 else False,
         drop_last=True,
         sampler=train_sampler
     )
@@ -138,6 +139,7 @@ def create_dataloaders(config):
         shuffle=False,
         num_workers=config.num_workers,
         pin_memory=True,
+        persistent_workers=config.persistent_workers if config.num_workers > 0 else False,
         drop_last=False,
         sampler=val_sampler
     )
@@ -149,7 +151,7 @@ def create_dataloaders(config):
 
 
 
-def train_tokenizer(model, device, config, save_dir, logger):
+def train_tokenizer(model, device, config, save_dir, logger, trial=None):
     """
     All previously hardcoded values (pct_start, div_factor, max_norm)
     are now read from config with safe fallbacks.
@@ -205,10 +207,15 @@ def train_tokenizer(model, device, config, save_dir, logger):
         for batch_idx, (ori_batch_x, _) in enumerate(train_loader):
             ori_batch_x = ori_batch_x.to(device, non_blocking=True)
 
+            micro_size = (ori_batch_x.shape[0] + accumulation_steps - 1) // accumulation_steps
             current_batch_total_loss = 0.0
             for j in range(accumulation_steps):
-                start_idx = j * (ori_batch_x.shape[0] // accumulation_steps)
-                end_idx = (j + 1) * (ori_batch_x.shape[0] // accumulation_steps)
+                start_idx = j * micro_size
+                end_idx = min((j + 1) * micro_size, ori_batch_x.shape[0])
+                
+                if start_idx >= end_idx:
+                    break
+
                 batch_x = ori_batch_x[start_idx:end_idx]
 
                 zs, bsq_loss, _, _ = (model.module if use_ddp else model)(batch_x)
@@ -281,6 +288,18 @@ def train_tokenizer(model, device, config, save_dir, logger):
         logger.info(epoch_summary)
         if rank == 0:
             print(epoch_summary)
+
+        # ── Optuna Pruning Hook ───────────────────────────────────────────────
+        if trial is not None:
+            import optuna 
+            trial.report(avg_val_loss, epoch)
+            
+            if trial.should_prune():
+                prune_msg = f"Trial {trial.number} pruned at epoch {epoch} (val_loss: {avg_val_loss:.6f})"
+                logger.info(prune_msg)
+                if rank == 0:
+                    print(prune_msg)
+                raise optuna.exceptions.TrialPruned()
 
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss

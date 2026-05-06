@@ -126,9 +126,10 @@ class NosTokenizer(nn.Module, PyTorchModelHubMixin):
         if half:
             x1 = x[0] # Assuming x is a tuple of indices if half is True
             x2 = x[1]
-            mask = 2 ** torch.arange(self.codebook_dim//2, device=x1.device, dtype=torch.long) # Create a mask for bit extraction
-            x1 = (x1.unsqueeze(-1) & mask) != 0 # Extract bits for the first half
-            x2 = (x2.unsqueeze(-1) & mask) != 0 # Extract bits for the second half
+            mask1 = 2 ** torch.arange(self.s1_bits, device=x1.device, dtype=torch.long)
+            mask2 = 2 ** torch.arange(self.s2_bits, device=x2.device, dtype=torch.long)
+            x1 = (x1.unsqueeze(-1) & mask1) != 0 
+            x2 = (x2.unsqueeze(-1) & mask2) != 0 
             x = torch.cat([x1, x2], dim=-1) # Concatenate the bit representations
         else:
             mask = 2 ** torch.arange(self.codebook_dim, device=x.device, dtype=torch.long) # Create a mask for bit extraction
@@ -218,9 +219,8 @@ class Nos(nn.Module, PyTorchModelHubMixin):
             for _ in range(self.n_layers)
         ])
         self.norm = RMSNorm(self.d_model)
-        self.dep_layer = DependencyAwareLayer(self.d_model)
+        self.dep_layer = DependencyAwareLayer(self.d_model, n_heads=self.n_heads) # <--- FIXED
         self.head = DualHead(self.s1_bits, self.s2_bits, self.d_model)
-        self.apply(self._init_weights)
 
     def _init_weights(self, module):
 
@@ -264,10 +264,17 @@ class Nos(nn.Module, PyTorchModelHubMixin):
 
         s1_logits = self.head(x)
 
-        if use_teacher_forcing:
+        if use_teacher_forcing and s1_targets is not None:
+            # State 1: Explicit Teacher Forcing (Standard for early training/finetuning)
             sibling_embed = self.embedding.emb_s1(s1_targets)
+        elif self.training:
+            # State 2: Autoregressive Training (Maintains gradient graph)
+            # Uses Straight-Through Gumbel-Softmax so S2 can backpropagate into S1
+            s1_probs = F.gumbel_softmax(s1_logits, tau=1.0, hard=True)
+            sibling_embed = torch.matmul(s1_probs, self.embedding.emb_s1.weight)
         else:
-            s1_probs = F.softmax(s1_logits.detach(), dim=-1)
+            # State 3: Standard Inference (Detached, memory-efficient)
+            s1_probs = F.softmax(s1_logits.detach() / 1.0, dim=-1) # Can inject temp here later
             sample_s1_ids = torch.multinomial(s1_probs.view(-1, self.s1_vocab_size), 1).view(s1_ids.shape)
             sibling_embed = self.embedding.emb_s1(sample_s1_ids)
 

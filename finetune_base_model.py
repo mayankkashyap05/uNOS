@@ -147,12 +147,9 @@ class CustomKlineDataset(Dataset):
 
     def __getitem__(self, idx: int):
         max_start = len(self.x_data) - self.window
-
-        if self.data_type == 'train':
-            epoch      = self.current_epoch
-            start_idx  = (idx * 9973 + (epoch + 1) * 104729) % (max_start + 1)
-        else:
-            start_idx  = idx % (max_start + 1)
+        
+        # PyTorch handles robust index shuffling internally.
+        start_idx = idx % (max_start + 1)
 
         end_idx = start_idx + self.window
 
@@ -160,9 +157,14 @@ class CustomKlineDataset(Dataset):
         x       = self.x_data[start_idx:end_idx].copy()
         x_stamp = self.stamp_data[start_idx:end_idx].copy()
 
-        # Per-sample z-score + clip
-        x_mean = x.mean(axis=0)
-        x_std  = x.std(axis=0)
+        # ---------------------------------------------------------
+        # 🛠️ FIX: Calculate mean and std ONLY on the lookback window
+        # ---------------------------------------------------------
+        lookback_x = x[:self.lookback_window]
+        x_mean = lookback_x.mean(axis=0)
+        x_std  = lookback_x.std(axis=0)
+    
+        # Apply historical stats to the ENTIRE window (history + future)
         x = (x - x_mean) / (x_std + 1e-5)
         x = np.clip(x, -self.clip, self.clip)
 
@@ -244,7 +246,11 @@ def create_dataloaders(config):
         DistributedSampler(val_dataset, shuffle=False, drop_last=False) if use_ddp else None
     )
 
-    loader_kw = dict(num_workers=config.num_workers, pin_memory=True)
+    loader_kw = dict(
+        num_workers=config.num_workers, 
+        pin_memory=True,
+        persistent_workers=config.persistent_workers if config.num_workers > 0 else False
+    )
 
     train_loader = DataLoader(
         train_dataset,
@@ -278,7 +284,7 @@ def create_dataloaders(config):
 
 # ── Training Loop ─────────────────────────────────────────────────────────────
 
-def train_model(model, tokenizer, device, config, save_dir, logger):
+def train_model(model, tokenizer, device, config, save_dir, logger, trial=None):
     """
     Fine-tunes *model* (NosPredictor / Nos) with the frozen *tokenizer*.
 
@@ -351,6 +357,12 @@ def train_model(model, tokenizer, device, config, save_dir, logger):
         epoch_start = time.time()
         model.train()
 
+        # ── NEW: Scheduled Sampling Probability ──
+        # Linear decay from 100% to 0% over the first 75% of training.
+        # The final 25% of epochs will be pure autoregressive training.
+        tf_decay_epochs = max(1, int(config.basemodel_epochs * 0.75))
+        tf_prob = max(0.0, 1.0 - (epoch / tf_decay_epochs))
+
         # Deterministic-but-varied shuffling per epoch
         train_dataset.set_epoch_seed(epoch * 10_000)
         val_dataset.set_epoch_seed(0)
@@ -368,13 +380,17 @@ def train_model(model, tokenizer, device, config, save_dir, logger):
             # Zero gradients BEFORE the accumulation loop (not after step)
             optimizer.zero_grad()
 
-            micro_size            = ori_batch_x.shape[0] // accumulation_steps
+            # Use ceiling division to prevent truncation
+            micro_size = (ori_batch_x.shape[0] + accumulation_steps - 1) // accumulation_steps
             current_batch_total_loss = 0.0
 
             # ── Micro-batch (gradient accumulation) loop ──────────────────────
             for j in range(accumulation_steps):
-                start = j       * micro_size
-                end   = (j + 1) * micro_size
+                start = j * micro_size
+                end   = min((j + 1) * micro_size, ori_batch_x.shape[0])
+                
+                if start >= end:
+                    break # Safely handle cases where accumulation_steps > batch_size
 
                 batch_x       = ori_batch_x[start:end]
                 batch_x_stamp = ori_batch_x_stamp[start:end]
@@ -386,9 +402,19 @@ def train_model(model, tokenizer, device, config, save_dir, logger):
                 token_in  = [token_seq_0[:, :-1], token_seq_1[:, :-1]]
                 token_out = [token_seq_0[:, 1:],  token_seq_1[:, 1:]]
 
+                # ── NEW: Apply Scheduled Sampling ──
+                # Randomly decide whether to use Teacher Forcing for this batch
+                use_tf = random.random() < tf_prob
+
+                # Pass targets to enable teacher forcing natively
                 logits = raw_model()(
-                    token_in[0], token_in[1], batch_x_stamp[:, :-1, :]
+                    s1_ids=token_in[0], 
+                    s2_ids=token_in[1], 
+                    stamp=batch_x_stamp[:, :-1, :],
+                    use_teacher_forcing=use_tf, 
+                    s1_targets=token_out[0] if use_tf else None
                 )
+                
                 loss, s1_loss, s2_loss = raw_model().head.compute_loss(
                     logits[0], logits[1], token_out[0], token_out[1]
                 )
@@ -440,7 +466,10 @@ def train_model(model, tokenizer, device, config, save_dir, logger):
                 token_out = [token_seq_0[:, 1:],  token_seq_1[:, 1:]]
 
                 logits = raw_model()(
-                    token_in[0], token_in[1], batch_x_stamp[:, :-1, :]
+                    s1_ids=token_in[0], 
+                    s2_ids=token_in[1], 
+                    stamp=batch_x_stamp[:, :-1, :],
+                    use_teacher_forcing=False
                 )
                 loss, _, _ = raw_model().head.compute_loss(
                     logits[0], logits[1], token_out[0], token_out[1]
@@ -475,6 +504,19 @@ def train_model(model, tokenizer, device, config, save_dir, logger):
         logger.info(epoch_summary)
         if rank == 0:
             print(epoch_summary)
+
+        # ── Optuna Pruning Hook ───────────────────────────────────────────────
+        if trial is not None:
+            import optuna 
+            trial.report(avg_val_loss, epoch)
+            
+            if trial.should_prune():
+                prune_msg = f"Trial {trial.number} pruned at epoch {epoch} (val_loss: {avg_val_loss:.6f})"
+                logger.info(prune_msg)
+                if rank == 0:
+                    print(prune_msg)
+                raise optuna.exceptions.TrialPruned()    
+        
 
         # ── Checkpoint (rank-0 only) ───────────────────────────────────────────
         if avg_val_loss < best_val_loss:

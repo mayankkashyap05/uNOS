@@ -4,10 +4,10 @@
 
 | Field | Value |
 | ----- | ----- |
-| **Generated** | `2026-05-02 23:42:06` |
+| **Generated** | `2026-05-06 13:57:16` |
 | **Source mode** | YAML config (`codebase.yaml`) |
 | **Base directory** | `C:\Users\kashy\OneDrive\Documents\uNOS` |
-| **Total files** | 13 |
+| **Total files** | 15 |
 
 ## 📑 Table of Contents
 
@@ -16,6 +16,7 @@
    - [configs/config.yaml](#configsconfigyaml)
    - [configs/config_mx110_hpo_fulltest.yaml](#configsconfig-mx110-hpo-fulltestyaml)
    - [configs/config_mx110_hpo_winner.yaml](#configsconfig-mx110-hpo-winneryaml)
+   - [configs/config_t40_hpo_fulltest.yaml](#configsconfig-t40-hpo-fulltestyaml)
    - [data/1h.csv](#data1hcsv)
    - [model/__init__.py](#model--init--py)
    - [model/module.py](#modelmodulepy)
@@ -26,6 +27,7 @@
    - [finetune_base_model.py](#finetune-base-modelpy)
    - [finetune_tokenizer.py](#finetune-tokenizerpy)
    - [train_sequential.py](#train-sequentialpy)
+   - [requirements.txt](#requirementstxt)
 
 ## 📁 Project Structure
 
@@ -34,7 +36,8 @@
 ├── configs
 │   ├── config.yaml
 │   ├── config_mx110_hpo_fulltest.yaml
-│   └── config_mx110_hpo_winner.yaml
+│   ├── config_mx110_hpo_winner.yaml
+│   └── config_t40_hpo_fulltest.yaml
 ├── data
 │   └── 1h.csv
 ├── model
@@ -46,7 +49,8 @@
 ├── launch_hpo.sh
 ├── finetune_base_model.py
 ├── finetune_tokenizer.py
-└── train_sequential.py
+├── train_sequential.py
+└── requirements.txt
 ```
 
 ## 📄 File Contents
@@ -751,17 +755,165 @@ hpo:
 
 ---
 
+### `configs/config_t40_hpo_fulltest.yaml`
+
+```yaml
+data:
+  data_path: "data/1h.csv"
+  # 512 hours = ~21.3 days of context. 48 hours = 2 days forward prediction.
+  lookback_window: 512
+  predict_window: 48
+  max_context: 512
+  clip: 5.0
+  train_ratio: 0.8
+  val_ratio: 0.2
+  test_ratio: 0.0
+
+training:
+  tokenizer_epochs: 30
+  basemodel_epochs: 20
+  batch_size: 64      # Safely fits in 16GB+ VRAM, highly accelerates epochs
+  log_interval: 20
+  num_workers: 4      # Safe concurrency for GPU processing
+  pin_memory: true
+  persistent_workers: true
+  seed: 42
+  
+  tokenizer_learning_rate: 0.0002
+  predictor_learning_rate: 0.00004
+  adam_beta1: 0.9
+  adam_beta2: 0.95
+  adam_weight_decay: 0.1
+  accumulation_steps: 1
+  
+  tokenizer_max_grad_norm: 2.0
+  basemodel_max_grad_norm: 3.0
+
+model_paths:
+  pretrained_tokenizer: "models/nos_tokenizer_2k"
+  pretrained_predictor: "models/nos_mini"
+  exp_name: "1h_fast_hpo"
+  base_path: "finetuned"
+  base_save_path: ""
+  finetuned_tokenizer: ""
+  tokenizer_save_name: "tokenizer"
+  basemodel_save_name: "basemodel"
+
+experiment:
+  name: "Nos_1h_FastHPO"
+  description: "Aggressive Hyperband HPO for 2hr limit on T4/A40"
+  use_comet: false
+  train_tokenizer: true
+  train_basemodel: true
+  skip_existing: false
+
+device:
+  use_cuda: true
+  device_id: 0
+
+# ── Hyperparameter Search Space ──────────────────────────────────
+hpo:
+  enabled: true
+  n_trials: 25          # Elevated trial count due to aggressive pruning
+  direction: "minimize"
+  sampler: "tpe"
+  pruner: "hyperband"   # CRITICAL: Replaced median with hyperband for 2hr limit
+  storage: "sqlite:///nos_1h_t4_hpo.db?timeout=60"
+  study_name: "nos_1h_hyperband"
+
+  optimize_tokenizer: true
+  optimize_basemodel: true
+
+  # 4/3 split is the minimum required for OneCycleLR to form a valid curve
+  hpo_tokenizer_epochs: 4
+  hpo_basemodel_epochs: 3
+
+  search_space:
+    # ── Learning Rates (Slightly narrowed to avoid wasted TPE exploration)
+    tokenizer_learning_rate:
+      type: float
+      low: 5.0e-5
+      high: 1.0e-3
+      log: true
+
+    predictor_learning_rate:
+      type: float
+      low: 1.0e-6
+      high: 5.0e-5
+      log: true
+
+    adam_weight_decay:
+      type: float
+      low: 0.01
+      high: 0.2
+      log: true
+
+    # ── Architecture sizing
+    batch_size:
+      type: categorical
+      choices: [32, 64] # Keeps GPU utilization high, cuts step time
+
+    # ── Scheduler
+    tokenizer_pct_start:
+      type: float
+      low: 0.02
+      high: 0.1
+      log: false
+
+    basemodel_pct_start:
+      type: float
+      low: 0.02
+      high: 0.1
+      log: false
+
+    tokenizer_div_factor:
+      type: categorical
+      choices: [10.0, 25.0]
+
+    basemodel_div_factor:
+      type: categorical
+      choices: [10.0, 25.0]
+
+    # ── Regularization (Focusing only on the highest-impact dropouts)
+    ffn_dropout_p:
+      type: float
+      low: 0.0
+      high: 0.2
+      log: false
+
+    resid_dropout_p:
+      type: float
+      low: 0.0
+      high: 0.2
+      log: false
+
+    # ── BSQ Loss Weights (Tightened search radius)
+    bsq_beta:
+      type: float
+      low: 0.05
+      high: 0.15
+      log: true
+
+    bsq_zeta:
+      type: float
+      low: 0.05
+      high: 0.15
+      log: true
+```
+
+---
+
 ### `data/1h.csv`
 
 ```text
 timestamps,open,high,low,close,volume,amount
-2020-08-11 06:00:00,2.85,3.47,2.85,2.9515,20032.26,0
-2020-08-11 07:00:00,2.9515,3.1355,2.88,2.9224,42069.37,0
-2020-08-11 08:00:00,2.9224,3.0,2.9144,2.96,24280.76,0
-2020-08-11 09:00:00,2.96,2.9736,2.85,2.8543,26371.23,0
-2020-08-11 10:00:00,2.8566,2.9329,2.8433,2.8976,26685.94,0
+2020-08-11 06:00:00,2.85,3.47,2.85,2.9515,20032.26,61645.682011666664
+2020-08-11 07:00:00,2.9515,3.1355,2.88,2.9224,42069.37,125369.83249100001
+2020-08-11 08:00:00,2.9224,3.0,2.9144,2.96,24280.760000000002,71563.62180800001
+2020-08-11 09:00:00,2.96,2.9736,2.85,2.8543,26371.230000000003,77229.62143766668
+2020-08-11 10:00:00,2.8566,2.9329,2.8433,2.8976,26685.94,77057.350831
 
-# ⚠️  Preview — showing 5 of 12835 data rows (12830 rows hidden).
+# ⚠️  Preview — showing 5 of 47956 data rows (47951 rows hidden).
 ```
 
 ---
@@ -1122,12 +1274,25 @@ class RotaryPositionalEmbedding(nn.Module):
         self,
         q: torch.Tensor,
         k: torch.Tensor,
+        q_offset: int = 0  # <--- NEW: Offset parameter for AR generation
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        seq_len = q.shape[-2]
-        cos, sin = self._update_cos_sin_cache(q, seq_len)
+        q_len = q.shape[-2]
+        k_len = k.shape[-2]
+        
+        # Cache must be large enough to cover the absolute maximum position needed
+        max_len = max(q_len + q_offset, k_len)
+        cos, sin = self._update_cos_sin_cache(q, max_len)
 
-        rotated_q = (q * cos) + (self._rotate_half(q) * sin)
-        rotated_k = (k * cos) + (self._rotate_half(k) * sin)
+        # Slice cache for Query based on its precise temporal offset
+        q_cos = cos[:, :, q_offset : q_offset + q_len, :]
+        q_sin = sin[:, :, q_offset : q_offset + q_len, :]
+        
+        # Slice cache for Key based on its full length (always starts at t=0)
+        k_cos = cos[:, :, :k_len, :]
+        k_sin = sin[:, :, :k_len, :]
+
+        rotated_q = (q * q_cos) + (self._rotate_half(q) * q_sin)
+        rotated_k = (k * k_cos) + (self._rotate_half(k) * k_sin)
         return rotated_q, rotated_k
 
 
@@ -1195,6 +1360,7 @@ class MultiHeadAttentionWithRoPE(nn.Module):
         k = self.k_proj(x).view(batch_size, seq_len, self.n_heads, self.head_dim).transpose(1, 2)
         v = self.v_proj(x).view(batch_size, seq_len, self.n_heads, self.head_dim).transpose(1, 2)
 
+        # Self-attention always processes aligned sequences, so q_offset remains 0
         q, k = self.rotary(q, k)
 
         if key_padding_mask is not None:
@@ -1238,7 +1404,9 @@ class MultiHeadCrossAttentionWithRoPE(nn.Module):
         k = self.k_proj(key).view(batch_size, seq_len, self.n_heads, self.head_dim).transpose(1, 2)
         v = self.v_proj(value).view(batch_size, seq_len, self.n_heads, self.head_dim).transpose(1, 2)
 
-        q, k = self.rotary(q, k)
+        # <--- NEW: Dynamically infer the offset based on sequence lengths
+        q_offset = seq_len - q_len if q_len < seq_len else 0
+        q, k = self.rotary(q, k, q_offset=q_offset)
 
         if key_padding_mask is not None:
             attn_mask = key_padding_mask.unsqueeze(1).unsqueeze(2)
@@ -1246,7 +1414,7 @@ class MultiHeadCrossAttentionWithRoPE(nn.Module):
         else:
             attn_mask = None
 
-        is_causal_flag = self.training
+        is_causal_flag = q_len > 1
 
         attn_output = scaled_dot_product_attention(
             q, k, v,
@@ -1258,7 +1426,6 @@ class MultiHeadCrossAttentionWithRoPE(nn.Module):
 
         attn_output = attn_output.transpose(1, 2).contiguous().view(batch_size, q_len, self.d_model)
         return self.resid_dropout(self.out_proj(attn_output))
-
 
 class HierarchicalEmbedding(nn.Module):
     def __init__(self, s1_bits, s2_bits, d_model=256):
@@ -1300,7 +1467,12 @@ class DependencyAwareLayer(nn.Module):
             value=hidden_states,
             key_padding_mask=key_padding_mask
         )
-        return self.norm(hidden_states + attn_out)
+        
+        # <--- FIXED: Slice residual to match query length dynamically
+        q_len = sibling_embed.shape[1]
+        residual = hidden_states[:, -q_len:, :]
+        
+        return self.norm(residual + attn_out)
 
 
 class TransformerBlock(nn.Module):
@@ -1536,9 +1708,10 @@ class NosTokenizer(nn.Module, PyTorchModelHubMixin):
         if half:
             x1 = x[0] # Assuming x is a tuple of indices if half is True
             x2 = x[1]
-            mask = 2 ** torch.arange(self.codebook_dim//2, device=x1.device, dtype=torch.long) # Create a mask for bit extraction
-            x1 = (x1.unsqueeze(-1) & mask) != 0 # Extract bits for the first half
-            x2 = (x2.unsqueeze(-1) & mask) != 0 # Extract bits for the second half
+            mask1 = 2 ** torch.arange(self.s1_bits, device=x1.device, dtype=torch.long)
+            mask2 = 2 ** torch.arange(self.s2_bits, device=x2.device, dtype=torch.long)
+            x1 = (x1.unsqueeze(-1) & mask1) != 0 
+            x2 = (x2.unsqueeze(-1) & mask2) != 0 
             x = torch.cat([x1, x2], dim=-1) # Concatenate the bit representations
         else:
             mask = 2 ** torch.arange(self.codebook_dim, device=x.device, dtype=torch.long) # Create a mask for bit extraction
@@ -1628,9 +1801,8 @@ class Nos(nn.Module, PyTorchModelHubMixin):
             for _ in range(self.n_layers)
         ])
         self.norm = RMSNorm(self.d_model)
-        self.dep_layer = DependencyAwareLayer(self.d_model)
+        self.dep_layer = DependencyAwareLayer(self.d_model, n_heads=self.n_heads) # <--- FIXED
         self.head = DualHead(self.s1_bits, self.s2_bits, self.d_model)
-        self.apply(self._init_weights)
 
     def _init_weights(self, module):
 
@@ -1674,10 +1846,17 @@ class Nos(nn.Module, PyTorchModelHubMixin):
 
         s1_logits = self.head(x)
 
-        if use_teacher_forcing:
+        if use_teacher_forcing and s1_targets is not None:
+            # State 1: Explicit Teacher Forcing (Standard for early training/finetuning)
             sibling_embed = self.embedding.emb_s1(s1_targets)
+        elif self.training:
+            # State 2: Autoregressive Training (Maintains gradient graph)
+            # Uses Straight-Through Gumbel-Softmax so S2 can backpropagate into S1
+            s1_probs = F.gumbel_softmax(s1_logits, tau=1.0, hard=True)
+            sibling_embed = torch.matmul(s1_probs, self.embedding.emb_s1.weight)
         else:
-            s1_probs = F.softmax(s1_logits.detach(), dim=-1)
+            # State 3: Standard Inference (Detached, memory-efficient)
+            s1_probs = F.softmax(s1_logits.detach() / 1.0, dim=-1) # Can inject temp here later
             sample_s1_ids = torch.multinomial(s1_probs.view(-1, self.s1_vocab_size), 1).view(s1_ids.shape)
             sibling_embed = self.embedding.emb_s1(sample_s1_ids)
 
@@ -2203,6 +2382,7 @@ class CustomFinetuneConfig:
         self.batch_size = training_config.get('batch_size', 160)
         self.log_interval = training_config.get('log_interval', 50)
         self.num_workers = training_config.get('num_workers', 6)
+        self.persistent_workers = training_config.get('persistent_workers', False)
         self.seed = training_config.get('seed', 100)
 
         self.adam_beta1 = training_config.get('adam_beta1', 0.9)
@@ -3173,7 +3353,7 @@ class TokenizerObjective:
             try:
                 from finetune_tokenizer import train_tokenizer  # type: ignore
                 val_loss: float = train_tokenizer(
-                    tokenizer, self.device, trial_config, trial_dir, trial_logger
+                    tokenizer, self.device, trial_config, trial_dir, trial_logger, trial=trial
                 )
             except optuna.exceptions.TrialPruned:
                 raise  # Pruning signals must propagate — never catch them
@@ -3355,7 +3535,7 @@ class BasemodelObjective:
                 from finetune_base_model import train_model  # type: ignore
                 val_loss: float = train_model(
                     model, tokenizer, self.device,
-                    trial_config, trial_dir, trial_logger,
+                    trial_config, trial_dir, trial_logger, trial=trial
                 )
             except optuna.exceptions.TrialPruned:
                 raise
@@ -5351,12 +5531,9 @@ class CustomKlineDataset(Dataset):
 
     def __getitem__(self, idx: int):
         max_start = len(self.x_data) - self.window
-
-        if self.data_type == 'train':
-            epoch      = self.current_epoch
-            start_idx  = (idx * 9973 + (epoch + 1) * 104729) % (max_start + 1)
-        else:
-            start_idx  = idx % (max_start + 1)
+        
+        # PyTorch handles robust index shuffling internally.
+        start_idx = idx % (max_start + 1)
 
         end_idx = start_idx + self.window
 
@@ -5364,9 +5541,14 @@ class CustomKlineDataset(Dataset):
         x       = self.x_data[start_idx:end_idx].copy()
         x_stamp = self.stamp_data[start_idx:end_idx].copy()
 
-        # Per-sample z-score + clip
-        x_mean = x.mean(axis=0)
-        x_std  = x.std(axis=0)
+        # ---------------------------------------------------------
+        # 🛠️ FIX: Calculate mean and std ONLY on the lookback window
+        # ---------------------------------------------------------
+        lookback_x = x[:self.lookback_window]
+        x_mean = lookback_x.mean(axis=0)
+        x_std  = lookback_x.std(axis=0)
+    
+        # Apply historical stats to the ENTIRE window (history + future)
         x = (x - x_mean) / (x_std + 1e-5)
         x = np.clip(x, -self.clip, self.clip)
 
@@ -5448,7 +5630,11 @@ def create_dataloaders(config):
         DistributedSampler(val_dataset, shuffle=False, drop_last=False) if use_ddp else None
     )
 
-    loader_kw = dict(num_workers=config.num_workers, pin_memory=True)
+    loader_kw = dict(
+        num_workers=config.num_workers, 
+        pin_memory=True,
+        persistent_workers=config.persistent_workers if config.num_workers > 0 else False
+    )
 
     train_loader = DataLoader(
         train_dataset,
@@ -5482,7 +5668,7 @@ def create_dataloaders(config):
 
 # ── Training Loop ─────────────────────────────────────────────────────────────
 
-def train_model(model, tokenizer, device, config, save_dir, logger):
+def train_model(model, tokenizer, device, config, save_dir, logger, trial=None):
     """
     Fine-tunes *model* (NosPredictor / Nos) with the frozen *tokenizer*.
 
@@ -5555,6 +5741,12 @@ def train_model(model, tokenizer, device, config, save_dir, logger):
         epoch_start = time.time()
         model.train()
 
+        # ── NEW: Scheduled Sampling Probability ──
+        # Linear decay from 100% to 0% over the first 75% of training.
+        # The final 25% of epochs will be pure autoregressive training.
+        tf_decay_epochs = max(1, int(config.basemodel_epochs * 0.75))
+        tf_prob = max(0.0, 1.0 - (epoch / tf_decay_epochs))
+
         # Deterministic-but-varied shuffling per epoch
         train_dataset.set_epoch_seed(epoch * 10_000)
         val_dataset.set_epoch_seed(0)
@@ -5572,13 +5764,17 @@ def train_model(model, tokenizer, device, config, save_dir, logger):
             # Zero gradients BEFORE the accumulation loop (not after step)
             optimizer.zero_grad()
 
-            micro_size            = ori_batch_x.shape[0] // accumulation_steps
+            # Use ceiling division to prevent truncation
+            micro_size = (ori_batch_x.shape[0] + accumulation_steps - 1) // accumulation_steps
             current_batch_total_loss = 0.0
 
             # ── Micro-batch (gradient accumulation) loop ──────────────────────
             for j in range(accumulation_steps):
-                start = j       * micro_size
-                end   = (j + 1) * micro_size
+                start = j * micro_size
+                end   = min((j + 1) * micro_size, ori_batch_x.shape[0])
+                
+                if start >= end:
+                    break # Safely handle cases where accumulation_steps > batch_size
 
                 batch_x       = ori_batch_x[start:end]
                 batch_x_stamp = ori_batch_x_stamp[start:end]
@@ -5590,9 +5786,19 @@ def train_model(model, tokenizer, device, config, save_dir, logger):
                 token_in  = [token_seq_0[:, :-1], token_seq_1[:, :-1]]
                 token_out = [token_seq_0[:, 1:],  token_seq_1[:, 1:]]
 
+                # ── NEW: Apply Scheduled Sampling ──
+                # Randomly decide whether to use Teacher Forcing for this batch
+                use_tf = random.random() < tf_prob
+
+                # Pass targets to enable teacher forcing natively
                 logits = raw_model()(
-                    token_in[0], token_in[1], batch_x_stamp[:, :-1, :]
+                    s1_ids=token_in[0], 
+                    s2_ids=token_in[1], 
+                    stamp=batch_x_stamp[:, :-1, :],
+                    use_teacher_forcing=use_tf, 
+                    s1_targets=token_out[0] if use_tf else None
                 )
+                
                 loss, s1_loss, s2_loss = raw_model().head.compute_loss(
                     logits[0], logits[1], token_out[0], token_out[1]
                 )
@@ -5644,7 +5850,10 @@ def train_model(model, tokenizer, device, config, save_dir, logger):
                 token_out = [token_seq_0[:, 1:],  token_seq_1[:, 1:]]
 
                 logits = raw_model()(
-                    token_in[0], token_in[1], batch_x_stamp[:, :-1, :]
+                    s1_ids=token_in[0], 
+                    s2_ids=token_in[1], 
+                    stamp=batch_x_stamp[:, :-1, :],
+                    use_teacher_forcing=False
                 )
                 loss, _, _ = raw_model().head.compute_loss(
                     logits[0], logits[1], token_out[0], token_out[1]
@@ -5679,6 +5888,19 @@ def train_model(model, tokenizer, device, config, save_dir, logger):
         logger.info(epoch_summary)
         if rank == 0:
             print(epoch_summary)
+
+        # ── Optuna Pruning Hook ───────────────────────────────────────────────
+        if trial is not None:
+            import optuna 
+            trial.report(avg_val_loss, epoch)
+            
+            if trial.should_prune():
+                prune_msg = f"Trial {trial.number} pruned at epoch {epoch} (val_loss: {avg_val_loss:.6f})"
+                logger.info(prune_msg)
+                if rank == 0:
+                    print(prune_msg)
+                raise optuna.exceptions.TrialPruned()    
+        
 
         # ── Checkpoint (rank-0 only) ───────────────────────────────────────────
         if avg_val_loss < best_val_loss:
@@ -5952,6 +6174,7 @@ def create_dataloaders(config):
         shuffle=(train_sampler is None),
         num_workers=config.num_workers,
         pin_memory=True,
+        persistent_workers=config.persistent_workers if config.num_workers > 0 else False,
         drop_last=True,
         sampler=train_sampler
     )
@@ -5962,6 +6185,7 @@ def create_dataloaders(config):
         shuffle=False,
         num_workers=config.num_workers,
         pin_memory=True,
+        persistent_workers=config.persistent_workers if config.num_workers > 0 else False,
         drop_last=False,
         sampler=val_sampler
     )
@@ -5973,7 +6197,7 @@ def create_dataloaders(config):
 
 
 
-def train_tokenizer(model, device, config, save_dir, logger):
+def train_tokenizer(model, device, config, save_dir, logger, trial=None):
     """
     All previously hardcoded values (pct_start, div_factor, max_norm)
     are now read from config with safe fallbacks.
@@ -6029,10 +6253,15 @@ def train_tokenizer(model, device, config, save_dir, logger):
         for batch_idx, (ori_batch_x, _) in enumerate(train_loader):
             ori_batch_x = ori_batch_x.to(device, non_blocking=True)
 
+            micro_size = (ori_batch_x.shape[0] + accumulation_steps - 1) // accumulation_steps
             current_batch_total_loss = 0.0
             for j in range(accumulation_steps):
-                start_idx = j * (ori_batch_x.shape[0] // accumulation_steps)
-                end_idx = (j + 1) * (ori_batch_x.shape[0] // accumulation_steps)
+                start_idx = j * micro_size
+                end_idx = min((j + 1) * micro_size, ori_batch_x.shape[0])
+                
+                if start_idx >= end_idx:
+                    break
+
                 batch_x = ori_batch_x[start_idx:end_idx]
 
                 zs, bsq_loss, _, _ = (model.module if use_ddp else model)(batch_x)
@@ -6105,6 +6334,18 @@ def train_tokenizer(model, device, config, save_dir, logger):
         logger.info(epoch_summary)
         if rank == 0:
             print(epoch_summary)
+
+        # ── Optuna Pruning Hook ───────────────────────────────────────────────
+        if trial is not None:
+            import optuna 
+            trial.report(avg_val_loss, epoch)
+            
+            if trial.should_prune():
+                prune_msg = f"Trial {trial.number} pruned at epoch {epoch} (val_loss: {avg_val_loss:.6f})"
+                logger.info(prune_msg)
+                if rank == 0:
+                    print(prune_msg)
+                raise optuna.exceptions.TrialPruned()
 
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
@@ -6719,6 +6960,30 @@ def main():
 
 if __name__ == "__main__":
     main()
+```
+
+---
+
+### `requirements.txt`
+
+```text
+# Core Deep Learning & Math
+torch>=2.0.0
+numpy
+pandas
+einops
+
+# Model Hub & Progress Tracking
+huggingface-hub
+tqdm
+
+# Configuration Parsing
+PyYAML
+
+# Hyperparameter Optimization (HPO)
+optuna
+plotly
+SQLAlchemy
 ```
 
 ---

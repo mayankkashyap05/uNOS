@@ -10,3 +10,4 @@
 - finetune_base_model.py
 - finetune_tokenizer.py
 - train_sequential.py
+- requirements.txt

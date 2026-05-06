@@ -326,12 +326,25 @@ class RotaryPositionalEmbedding(nn.Module):
         self,
         q: torch.Tensor,
         k: torch.Tensor,
+        q_offset: int = 0  # <--- NEW: Offset parameter for AR generation
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        seq_len = q.shape[-2]
-        cos, sin = self._update_cos_sin_cache(q, seq_len)
+        q_len = q.shape[-2]
+        k_len = k.shape[-2]
+        
+        # Cache must be large enough to cover the absolute maximum position needed
+        max_len = max(q_len + q_offset, k_len)
+        cos, sin = self._update_cos_sin_cache(q, max_len)
 
-        rotated_q = (q * cos) + (self._rotate_half(q) * sin)
-        rotated_k = (k * cos) + (self._rotate_half(k) * sin)
+        # Slice cache for Query based on its precise temporal offset
+        q_cos = cos[:, :, q_offset : q_offset + q_len, :]
+        q_sin = sin[:, :, q_offset : q_offset + q_len, :]
+        
+        # Slice cache for Key based on its full length (always starts at t=0)
+        k_cos = cos[:, :, :k_len, :]
+        k_sin = sin[:, :, :k_len, :]
+
+        rotated_q = (q * q_cos) + (self._rotate_half(q) * q_sin)
+        rotated_k = (k * k_cos) + (self._rotate_half(k) * k_sin)
         return rotated_q, rotated_k
 
 
@@ -399,6 +412,7 @@ class MultiHeadAttentionWithRoPE(nn.Module):
         k = self.k_proj(x).view(batch_size, seq_len, self.n_heads, self.head_dim).transpose(1, 2)
         v = self.v_proj(x).view(batch_size, seq_len, self.n_heads, self.head_dim).transpose(1, 2)
 
+        # Self-attention always processes aligned sequences, so q_offset remains 0
         q, k = self.rotary(q, k)
 
         if key_padding_mask is not None:
@@ -442,7 +456,9 @@ class MultiHeadCrossAttentionWithRoPE(nn.Module):
         k = self.k_proj(key).view(batch_size, seq_len, self.n_heads, self.head_dim).transpose(1, 2)
         v = self.v_proj(value).view(batch_size, seq_len, self.n_heads, self.head_dim).transpose(1, 2)
 
-        q, k = self.rotary(q, k)
+        # <--- NEW: Dynamically infer the offset based on sequence lengths
+        q_offset = seq_len - q_len if q_len < seq_len else 0
+        q, k = self.rotary(q, k, q_offset=q_offset)
 
         if key_padding_mask is not None:
             attn_mask = key_padding_mask.unsqueeze(1).unsqueeze(2)
@@ -450,7 +466,7 @@ class MultiHeadCrossAttentionWithRoPE(nn.Module):
         else:
             attn_mask = None
 
-        is_causal_flag = self.training
+        is_causal_flag = q_len > 1
 
         attn_output = scaled_dot_product_attention(
             q, k, v,
@@ -462,7 +478,6 @@ class MultiHeadCrossAttentionWithRoPE(nn.Module):
 
         attn_output = attn_output.transpose(1, 2).contiguous().view(batch_size, q_len, self.d_model)
         return self.resid_dropout(self.out_proj(attn_output))
-
 
 class HierarchicalEmbedding(nn.Module):
     def __init__(self, s1_bits, s2_bits, d_model=256):
@@ -504,7 +519,12 @@ class DependencyAwareLayer(nn.Module):
             value=hidden_states,
             key_padding_mask=key_padding_mask
         )
-        return self.norm(hidden_states + attn_out)
+        
+        # <--- FIXED: Slice residual to match query length dynamically
+        q_len = sibling_embed.shape[1]
+        residual = hidden_states[:, -q_len:, :]
+        
+        return self.norm(residual + attn_out)
 
 
 class TransformerBlock(nn.Module):

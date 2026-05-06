@@ -611,7 +611,7 @@ class TokenizerObjective:
             try:
                 from finetune_tokenizer import train_tokenizer  # type: ignore
                 val_loss: float = train_tokenizer(
-                    tokenizer, self.device, trial_config, trial_dir, trial_logger
+                    tokenizer, self.device, trial_config, trial_dir, trial_logger, trial=trial
                 )
             except optuna.exceptions.TrialPruned:
                 raise  # Pruning signals must propagate — never catch them
@@ -793,7 +793,7 @@ class BasemodelObjective:
                 from finetune_base_model import train_model  # type: ignore
                 val_loss: float = train_model(
                     model, tokenizer, self.device,
-                    trial_config, trial_dir, trial_logger,
+                    trial_config, trial_dir, trial_logger, trial=trial
                 )
             except optuna.exceptions.TrialPruned:
                 raise

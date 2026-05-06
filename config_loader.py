@@ -159,6 +159,7 @@ class CustomFinetuneConfig:
         self.batch_size = training_config.get('batch_size', 160)
         self.log_interval = training_config.get('log_interval', 50)
         self.num_workers = training_config.get('num_workers', 6)
+        self.persistent_workers = training_config.get('persistent_workers', False)
         self.seed = training_config.get('seed', 100)
 
         self.adam_beta1 = training_config.get('adam_beta1', 0.9)

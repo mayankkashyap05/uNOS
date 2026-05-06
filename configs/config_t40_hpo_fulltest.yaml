@@ -1,38 +1,50 @@
 data:
-  data_path: "data/1h.csv"
-  # 512 hours = ~21.3 days of context. 48 hours = 2 days forward prediction.
-  lookback_window: 512
-  predict_window: 48
-  max_context: 512
+  data_path: "data/1d.csv"
+  # 5 years of daily data is roughly 1250-1825 rows.
+  # 90 days lookback, 14 days predict is optimal for capturing macro trends.
+  lookback_window: 90
+  predict_window: 14
+  max_context: 90
   clip: 5.0
   train_ratio: 0.8
   val_ratio: 0.2
   test_ratio: 0.0
 
 training:
+  # Base epochs used for the final "apply best" retraining phase
   tokenizer_epochs: 30
   basemodel_epochs: 20
-  batch_size: 64      # Safely fits in 16GB+ VRAM, highly accelerates epochs
-  log_interval: 20
-  num_workers: 4      # Safe concurrency for GPU processing
+  
+  # Scaled up for T4 16GB VRAM
+  batch_size: 64
+  log_interval: 10
+
+  num_workers: 4
   pin_memory: true
   persistent_workers: true
   seed: 42
-  
+
   tokenizer_learning_rate: 0.0002
   predictor_learning_rate: 0.00004
+
   adam_beta1: 0.9
   adam_beta2: 0.95
   adam_weight_decay: 0.1
+
   accumulation_steps: 1
-  
-  tokenizer_max_grad_norm: 2.0
-  basemodel_max_grad_norm: 3.0
+
+  tokenizer_pct_start: 0.03
+  tokenizer_div_factor: 10.0
+  basemodel_pct_start: 0.03
+  basemodel_div_factor: 10.0
+
+  tokenizer_max_grad_norm: 2.0   
+  basemodel_max_grad_norm: 3.0   
 
 model_paths:
   pretrained_tokenizer: "models/nos_tokenizer_2k"
   pretrained_predictor: "models/nos_mini"
-  exp_name: "1h_fast_hpo"
+  exp_name: "1d_t4_hpo"
   base_path: "finetuned"
   base_save_path: ""
   finetuned_tokenizer: ""
@@ -40,8 +52,8 @@ model_paths:
   basemodel_save_name: "basemodel"
 
 experiment:
-  name: "Nos_1h_FastHPO"
-  description: "Aggressive Hyperband HPO for 2hr limit on T4/A40"
+  name: "Nos_1d_T4_HPO"
+  description: "T4 GPU Full HPO for 5-Year Daily Data"
   use_comet: false
   train_tokenizer: true
   train_basemodel: true
@@ -53,89 +65,96 @@ device:
 
 # ── Hyperparameter Search Space ──────────────────────────────────
 hpo:
-  enabled: true
-  n_trials: 25          # Elevated trial count due to aggressive pruning
-  direction: "minimize"
-  sampler: "tpe"
-  pruner: "hyperband"   # CRITICAL: Replaced median with hyperband for 2hr limit
-  storage: "sqlite:///nos_1h_t4_hpo.db?timeout=60"
-  study_name: "nos_1h_hyperband"
+  enabled: true                    
+  n_trials: 40                      
+  direction: "minimize"            
+  sampler: "tpe"                   
+  pruner: "hyperband"              
+  
+  storage: "sqlite:///nos_1d_t4_hpo.db?timeout=60"
+  study_name: "nos_finetune_1d_hpo"
 
   optimize_tokenizer: true
   optimize_basemodel: true
 
-  # 4/3 split is the minimum required for OneCycleLR to form a valid curve
-  hpo_tokenizer_epochs: 4
-  hpo_basemodel_epochs: 3
+  # 1D datasets pass quickly; 5 epochs gives Hyperband enough data to prune accurately
+  hpo_tokenizer_epochs: 5
+  hpo_basemodel_epochs: 5
 
   search_space:
-    # ── Learning Rates (Slightly narrowed to avoid wasted TPE exploration)
+    # ── Tokenizer ──────────────────────────────────────────────
     tokenizer_learning_rate:
       type: float
-      low: 5.0e-5
-      high: 1.0e-3
+      low: 1.0e-5
+      high: 5.0e-3
       log: true
 
+    # ── Predictor ──────────────────────────────────────────────
     predictor_learning_rate:
       type: float
       low: 1.0e-6
-      high: 5.0e-5
+      high: 1.0e-4
       log: true
 
+    # ── Shared Optimizer ───────────────────────────────────────
     adam_weight_decay:
       type: float
-      low: 0.01
-      high: 0.2
+      low: 0.001
+      high: 0.3
       log: true
 
-    # ── Architecture sizing
+    # ── Batch & Accumulation ───────────────────────────────────
     batch_size:
       type: categorical
-      choices: [32, 64] # Keeps GPU utilization high, cuts step time
+      choices: [32, 64, 128]
 
-    # ── Scheduler
+    accumulation_steps:
+      type: categorical
+      choices: [1, 2]
+
+    # ── Scheduler ─────────────────────────────────────────────
     tokenizer_pct_start:
       type: float
-      low: 0.02
-      high: 0.1
+      low: 0.01
+      high: 0.15
       log: false
 
     basemodel_pct_start:
       type: float
-      low: 0.02
-      high: 0.1
+      low: 0.01
+      high: 0.15
       log: false
 
     tokenizer_div_factor:
       type: categorical
-      choices: [10.0, 25.0]
+      choices: [10.0, 25.0, 50.0]
 
     basemodel_div_factor:
       type: categorical
-      choices: [10.0, 25.0]
+      choices: [10.0, 25.0, 50.0]
 
-    # ── Regularization (Focusing only on the highest-impact dropouts)
+    # ── Dropout (Crucial for smaller 5-yr datasets) ────────────
     ffn_dropout_p:
       type: float
       low: 0.0
-      high: 0.2
+      high: 0.4
       log: false
 
     resid_dropout_p:
       type: float
       low: 0.0
-      high: 0.2
+      high: 0.3
       log: false
 
-    # ── BSQ Loss Weights (Tightened search radius)
+    # ── BSQ Loss Weights ──────────────────────────────────────
     bsq_beta:
       type: float
       low: 0.05
-      high: 0.15
+      high: 0.2
       log: true
 
     bsq_zeta:
       type: float
       low: 0.05
-      high: 0.15
+      high: 0.2
       log: true
