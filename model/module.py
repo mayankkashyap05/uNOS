@@ -349,44 +349,67 @@ class RotaryPositionalEmbedding(nn.Module):
 
 
 def scaled_dot_product_attention(
-    query: torch.Tensor, 
-    key: torch.Tensor, 
-    value: torch.Tensor, 
-    attn_mask: torch.Tensor = None, 
-    dropout_p: float = 0.0, 
-    is_causal: bool = False, 
-    scale: float = None, 
+    query: torch.Tensor,
+    key: torch.Tensor,
+    value: torch.Tensor,
+    attn_mask: torch.Tensor = None,
+    dropout_p: float = 0.0,
+    is_causal: bool = False,
+    scale: float = None,
     training: bool = True
 ) -> torch.Tensor:
     """
     Delegates directly to PyTorch 2.0+ optimized C++ kernels.
     Resolves O(N^2) memory scaling by avoiding explicit attention matrix materialization.
     """
-    # PyTorch SDPA expects dropout to be exactly 0.0 during evaluation
     effective_dropout = dropout_p if training else 0.0
 
     # Fast-path for causal attention without custom masks
     if is_causal and attn_mask is None:
         return F.scaled_dot_product_attention(
-            query, key, value, 
-            dropout_p=effective_dropout, 
-            is_causal=True, 
+            query, key, value,
+            dropout_p=effective_dropout,
+            is_causal=True,
             scale=scale
         )
-    
+
     # Handle custom masks
     if attn_mask is not None:
         if attn_mask.dtype == torch.bool:
             # F.sdpa expects True for elements that *are* allowed to attend.
             # Standard Transformer convention usually uses True to mask *out*.
             # Invert the boolean mask to match F.sdpa's expectation.
-            attn_mask = ~attn_mask 
+            attn_mask = ~attn_mask
+
+        # FIXED: Prevent Causal Annihilation
+        # Combine the padding mask with a causal mask if the layer is autoregressive.
+        if is_causal:
+            q_len, k_len = query.size(-2), key.size(-2)
+            # Create a causal mask (True where attention is allowed)
+            causal_mask = torch.tril(
+                torch.ones((q_len, k_len), dtype=torch.bool, device=query.device)
+            )
+
+            if attn_mask.dtype == torch.bool:
+                # Logical AND: A token can be attended to only if BOTH masks allow it
+                attn_mask = attn_mask & causal_mask
+            else:
+                # Mixed-precision safe: use lowest finite value for active dtype
+                # instead of hard -inf to prevent NaN in FP16/BF16 softmax backward
+                mask_value = torch.finfo(query.dtype).min
+                attn_mask = attn_mask.to(query.dtype).masked_fill(~causal_mask, mask_value)
+
+    # Determine final is_causal flag:
+    # - If attn_mask is None and is_causal=True, use PyTorch's built-in causal handling (fast path at line 368 already handled this)
+    # - If attn_mask was provided, we combined it with causal mask above, so use is_causal=False since causal is baked into attn_mask
+    # - If is_causal=False, ensure causal is disabled
+    final_is_causal = is_causal and attn_mask is None
 
     return F.scaled_dot_product_attention(
-        query, key, value, 
-        attn_mask=attn_mask, 
-        dropout_p=effective_dropout, 
-        is_causal=False, 
+        query, key, value,
+        attn_mask=attn_mask,
+        dropout_p=effective_dropout,
+        is_causal=final_is_causal,
         scale=scale
     )
 

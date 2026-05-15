@@ -1,9 +1,10 @@
 - configs/
-- data/1h.csv
-#- finetuned/
+- data/1d.csv
+- finetuned/
 - model/__init__.py
 - model/module.py
 - model/nos.py
+- models/
 - config_loader.py
 - hpo_tuner.py
 - launch_hpo.sh
@@ -11,3 +12,5 @@
 - finetune_tokenizer.py
 - train_sequential.py
 - requirements.txt
+- CLAUDE.md
+

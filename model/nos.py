@@ -512,7 +512,10 @@ class NosPredictor:
         x_stamp = x_time_df.values.astype(np.float32)
         y_stamp = y_time_df.values.astype(np.float32)
 
-        x_mean, x_std = np.mean(x, axis=0), np.std(x, axis=0)
+        # FIX: Compute scaling statistics strictly over the trailing context window
+        # to prevent normalization shift and match CustomKlineDataset training logic.
+        recent_x = x[-self.max_context:] if x.shape[0] > self.max_context else x
+        x_mean, x_std = np.mean(recent_x, axis=0), np.std(recent_x, axis=0)
 
         x = (x - x_mean) / (x_std + 1e-5)
         x = np.clip(x, -self.clip, self.clip)
@@ -597,7 +600,10 @@ class NosPredictor:
             if y_stamp.shape[0] != pred_len:
                 raise ValueError(f"y_timestamp length at index {i} should equal pred_len={pred_len}, got {y_stamp.shape[0]}.")
 
-            x_mean, x_std = np.mean(x, axis=0), np.std(x, axis=0)
+            # FIX: Bound the scaling calculation to the active context window per series
+            recent_x = x[-self.max_context:] if x.shape[0] > self.max_context else x
+            x_mean, x_std = np.mean(recent_x, axis=0), np.std(recent_x, axis=0)
+
             x_norm = (x - x_mean) / (x_std + 1e-5)
             x_norm = np.clip(x_norm, -self.clip, self.clip)
 

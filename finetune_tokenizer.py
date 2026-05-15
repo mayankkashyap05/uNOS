@@ -120,7 +120,9 @@ def create_dataloaders(config):
     
     use_ddp = dist.is_available() and dist.is_initialized()
     train_sampler = DistributedSampler(train_dataset, num_replicas=dist.get_world_size(), rank=dist.get_rank(), shuffle=True) if use_ddp else None
-    val_sampler = DistributedSampler(val_dataset, num_replicas=dist.get_world_size(), rank=dist.get_rank(), shuffle=False, drop_last=False) if use_ddp else None
+    # FIX: Use drop_last=True to prevent DDP padding from duplicating edge-case
+    # samples and artificially skewing the validation loss during HPO.
+    val_sampler = DistributedSampler(val_dataset, num_replicas=dist.get_world_size(), rank=dist.get_rank(), shuffle=False, drop_last=True) if use_ddp else None
 
     train_loader = DataLoader(
         train_dataset,
@@ -155,6 +157,12 @@ def train_tokenizer(model, device, config, save_dir, logger, trial=None):
     """
     All previously hardcoded values (pct_start, div_factor, max_norm)
     are now read from config with safe fallbacks.
+
+    True Gradient Accumulation
+    ──────────────────────────
+    Accumulates gradients across `accumulation_steps` DataLoader batches before
+    performing an optimizer step. This achieves the effective batch size:
+    effective_batch_size = batch_size * accumulation_steps
     """
     logger.info("Starting tokenizer training...")
     use_ddp = dist.is_available() and dist.is_initialized()
@@ -166,18 +174,22 @@ def train_tokenizer(model, device, config, save_dir, logger, trial=None):
     optimizer = torch.optim.AdamW(
         model.parameters(),
         lr=config.tokenizer_learning_rate,
-        betas=(config.adam_beta1, config.adam_beta2),   # ← beta1/beta2 now used
+        betas=(config.adam_beta1, config.adam_beta2),
         weight_decay=config.adam_weight_decay
     )
 
-    # ── Scheduler: read from config ───────────────────────────────
+    # ── Scheduler: use effective steps for true gradient accumulation ────────
     pct_start = getattr(config, 'tokenizer_pct_start', 0.03)
     div_factor = getattr(config, 'tokenizer_div_factor', 10.0)
+    accumulation_steps = getattr(config, 'accumulation_steps', 1)
+
+    import math
+    effective_steps_per_epoch = math.ceil(len(train_loader) / accumulation_steps)
 
     scheduler = torch.optim.lr_scheduler.OneCycleLR(
         optimizer,
         max_lr=config.tokenizer_learning_rate,
-        steps_per_epoch=len(train_loader),
+        steps_per_epoch=effective_steps_per_epoch,
         epochs=config.tokenizer_epochs,
         pct_start=pct_start,
         div_factor=div_factor
@@ -193,7 +205,6 @@ def train_tokenizer(model, device, config, save_dir, logger, trial=None):
 
     best_val_loss = float("inf")
     batch_idx_global = 0
-    accumulation_steps = getattr(config, 'accumulation_steps', 1)
 
     for epoch in range(config.tokenizer_epochs):
         epoch_start_time = time.time()
@@ -204,54 +215,62 @@ def train_tokenizer(model, device, config, save_dir, logger, trial=None):
         if train_sampler is not None:
             train_sampler.set_epoch(epoch)
 
-        for batch_idx, (ori_batch_x, _) in enumerate(train_loader):
-            ori_batch_x = ori_batch_x.to(device, non_blocking=True)
+        current_accum_loss = 0.0
 
-            micro_size = (ori_batch_x.shape[0] + accumulation_steps - 1) // accumulation_steps
-            current_batch_total_loss = 0.0
-            for j in range(accumulation_steps):
-                start_idx = j * micro_size
-                end_idx = min((j + 1) * micro_size, ori_batch_x.shape[0])
-                
-                if start_idx >= end_idx:
-                    break
+        # Zero gradients BEFORE the dataloader loop (true gradient accumulation)
+        optimizer.zero_grad()
 
-                batch_x = ori_batch_x[start_idx:end_idx]
+        # ── Dataloader loop (True Gradient Accumulation) ─────────────────────
+        for batch_idx, (batch_x, _) in enumerate(train_loader):
+            batch_x = batch_x.to(device, non_blocking=True)
 
-                zs, bsq_loss, _, _ = (model.module if use_ddp else model)(batch_x)
-                z_pre, z = zs
+            zs, bsq_loss, _, _ = (model.module if use_ddp else model)(batch_x)
+            z_pre, z = zs
 
-                recon_loss_pre = F.mse_loss(z_pre, batch_x)
-                recon_loss_all = F.mse_loss(z, batch_x)
-                recon_loss = recon_loss_pre + recon_loss_all
-                loss = (recon_loss + bsq_loss) / 2
+            recon_loss_pre = F.mse_loss(z_pre, batch_x)
+            recon_loss_all = F.mse_loss(z, batch_x)
 
-                loss_scaled = loss / accumulation_steps
-                current_batch_total_loss += loss.item()
-                loss_scaled.backward()
-
-            # ── Grad clip from config ─────────────────────────
-            torch.nn.utils.clip_grad_norm_(
-                (model.module if use_ddp else model).parameters(),
-                max_norm=max_grad_norm
+            # FIXED: Apply dynamic loss weights from configuration
+            weighted_recon = (
+                (config.tokenizer_recon_pre_weight * recon_loss_pre) +
+                (config.tokenizer_recon_all_weight * recon_loss_all)
             )
-            optimizer.step()
-            scheduler.step()
-            optimizer.zero_grad()
 
-            if (batch_idx_global + 1) % config.log_interval == 0:
-                avg_loss = current_batch_total_loss / accumulation_steps
-                lr = optimizer.param_groups[0]["lr"]
-                log_msg = (
-                    f"[Epoch {epoch+1}/{config.tokenizer_epochs}, "
-                    f"Step {batch_idx+1}/{len(train_loader)}] "
-                    f"LR: {lr:.6f}, Loss: {avg_loss:.4f}"
+            loss = (config.tokenizer_recon_weight * weighted_recon) + (config.tokenizer_bsq_weight * bsq_loss)
+
+            # Scale loss by accumulation steps for accurate mean gradient
+            loss_scaled = loss / accumulation_steps
+            loss_scaled.backward()
+
+            current_accum_loss += loss.item()
+
+            # ── Optimizer step (once per accumulation cycle) ────────────────
+            if (batch_idx + 1) % accumulation_steps == 0 or (batch_idx + 1) == len(train_loader):
+                # Grad clip from config
+                torch.nn.utils.clip_grad_norm_(
+                    (model.module if use_ddp else model).parameters(),
+                    max_norm=max_grad_norm
                 )
-                logger.info(log_msg)
-                if rank == 0:
-                    print(log_msg)
+                optimizer.step()
+                scheduler.step()
+                optimizer.zero_grad()
 
-            batch_idx_global += 1
+                # Logging
+                avg_loss = current_accum_loss / accumulation_steps
+
+                if (batch_idx_global + 1) % config.log_interval == 0:
+                    lr = optimizer.param_groups[0]["lr"]
+                    log_msg = (
+                        f"[Epoch {epoch+1}/{config.tokenizer_epochs}, "
+                        f"Step {batch_idx_global+1}/{effective_steps_per_epoch}] "
+                        f"LR: {lr:.6f}, Loss: {avg_loss:.4f}"
+                    )
+                    logger.info(log_msg)
+                    if rank == 0:
+                        print(log_msg)
+
+                current_accum_loss = 0.0
+                batch_idx_global += 1
 
         # ── Validation ────────────────────────────────────────────
         model.eval()
@@ -264,8 +283,11 @@ def train_tokenizer(model, device, config, save_dir, logger, trial=None):
                 zs, _, _, _ = (model.module if use_ddp else model)(ori_batch_x)
                 _, z = zs
                 val_loss_item = F.mse_loss(z, ori_batch_x)
-                tot_val_loss_sum_rank += val_loss_item.item() * ori_batch_x.size(0)
-                val_sample_count_rank += ori_batch_x.size(0)
+                # Detect valid samples (non-padding) to ignore DDP dummy padding
+                valid_mask = (ori_batch_x != 0).any(dim=-1).any(dim=-1)
+                valid_count = valid_mask.sum().item()
+                tot_val_loss_sum_rank += val_loss_item.item() * valid_count
+                val_sample_count_rank += valid_count
 
         if use_ddp:
             tensor_sum = torch.tensor(

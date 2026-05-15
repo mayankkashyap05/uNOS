@@ -96,44 +96,58 @@ class CustomKlineDataset(Dataset):
     def _load_or_build_cache(self):
         cache_x     = f"{self.data_path}.{self.data_type}.x.npy"
         cache_stamp = f"{self.data_path}.{self.data_type}.stamp.npy"
+        lock_path   = f"{self.data_path}.{self.data_type}.lock"
 
-        if os.path.exists(cache_x) and os.path.exists(cache_stamp):
-            self.x_data     = np.load(cache_x,     mmap_mode='r')
-            self.stamp_data = np.load(cache_stamp, mmap_mode='r')
-            return
+        # Cross-process file locking to prevent race conditions in HPO/distributed
+        from filelock import FileLock
+        with FileLock(lock_path, timeout=600):
+            # Double-check inside lock - another worker may have built it while we waited
+            if os.path.exists(cache_x) and os.path.exists(cache_stamp):
+                self.x_data     = np.load(cache_x,     mmap_mode='r')
+                self.stamp_data = np.load(cache_stamp, mmap_mode='r')
+                return
 
-        print(f"[{self.data_type.upper()}] Building mmap cache …")
-        df = pd.read_csv(self.data_path)
-        df['timestamps'] = pd.to_datetime(df['timestamps'])
-        df = df.sort_values('timestamps').reset_index(drop=True)
+            print(f"[{self.data_type.upper()}] Building mmap cache …")
+            df = pd.read_csv(self.data_path)
+            df['timestamps'] = pd.to_datetime(df['timestamps'])
+            df = df.sort_values('timestamps').reset_index(drop=True)
 
-        # Temporal features
-        df['minute']  = df['timestamps'].dt.minute
-        df['hour']    = df['timestamps'].dt.hour
-        df['weekday'] = df['timestamps'].dt.weekday
-        df['day']     = df['timestamps'].dt.day
-        df['month']   = df['timestamps'].dt.month
+            # Temporal features
+            df['minute']  = df['timestamps'].dt.minute
+            df['hour']    = df['timestamps'].dt.hour
+            df['weekday'] = df['timestamps'].dt.weekday
+            df['day']     = df['timestamps'].dt.day
+            df['month']   = df['timestamps'].dt.month
 
-        if df.isnull().any().any():
-            df = df.ffill()
+            if df.isnull().any().any():
+                df = df.ffill()
 
-        # Chronological split
-        n = len(df)
-        train_end = int(n * self.train_ratio)
-        val_end   = int(n * (self.train_ratio + self.val_ratio))
+            # Chronological split
+            n = len(df)
+            train_end = int(n * self.train_ratio)
+            val_end   = int(n * (self.train_ratio + self.val_ratio))
 
-        slices = {'train': slice(None, train_end),
-                  'val':   slice(train_end, val_end),
-                  'test':  slice(val_end, None)}
-        df = df.iloc[slices[self.data_type]]
+            slices = {'train': slice(None, train_end),
+                      'val':   slice(train_end, val_end),
+                      'test':  slice(val_end, None)}
+            df = df.iloc[slices[self.data_type]]
 
-        x_arr     = df[self.FEATURE_COLS].values.astype(np.float32)
-        stamp_arr = df[self.TIME_FEATURE_COLS].values.astype(np.float32)
+            x_arr     = df[self.FEATURE_COLS].values.astype(np.float32)
+            stamp_arr = df[self.TIME_FEATURE_COLS].values.astype(np.float32)
 
-        np.save(cache_x,     x_arr)
-        np.save(cache_stamp, stamp_arr)
-        del df
+            del df
 
+            # Atomic writes: write to PID-stamped temp files, then os.replace
+            tmp_x     = f"{cache_x}.tmp.{os.getpid()}.npy"
+            tmp_stamp = f"{cache_stamp}.tmp.{os.getpid()}.npy"
+
+            np.save(tmp_x, x_arr)
+            np.save(tmp_stamp, stamp_arr)
+
+            os.replace(tmp_x, cache_x)
+            os.replace(tmp_stamp, cache_stamp)
+
+        # Outside the lock, memory-map the built files
         self.x_data     = np.load(cache_x,     mmap_mode='r')
         self.stamp_data = np.load(cache_stamp, mmap_mode='r')
 
@@ -242,8 +256,10 @@ def create_dataloaders(config):
     train_sampler = (
         DistributedSampler(train_dataset, shuffle=True)  if use_ddp else None
     )
+    # FIX: Use drop_last=True to prevent DDP padding from duplicating edge-case
+    # samples and artificially skewing the validation loss during HPO.
     val_sampler = (
-        DistributedSampler(val_dataset, shuffle=False, drop_last=False) if use_ddp else None
+        DistributedSampler(val_dataset, shuffle=False, drop_last=True) if use_ddp else None
     )
 
     loader_kw = dict(
@@ -288,16 +304,14 @@ def train_model(model, tokenizer, device, config, save_dir, logger, trial=None):
     """
     Fine-tunes *model* (NosPredictor / Nos) with the frozen *tokenizer*.
 
-    Gradient accumulation
-    ─────────────────────
-    Each DataLoader batch is sliced into `accumulation_steps` equal micro-batches.
-    The loss for each micro-batch is scaled by (1 / accumulation_steps) before
-    .backward(), so the accumulated gradient is mathematically identical to what
-    you would get from a single forward pass over the full batch.
+    True Gradient Accumulation
+    ──────────────────────────
+    Accumulates gradients across `accumulation_steps` DataLoader batches before
+    performing an optimizer step. This achieves the effective batch size:
+    effective_batch_size = batch_size * accumulation_steps
 
-    optimizer.step() + scheduler.step() fire exactly once per DataLoader
-    iteration, keeping OneCycleLR's internal step counter perfectly aligned
-    with `steps_per_epoch = len(train_loader)`.
+    The scheduler uses effective_steps_per_epoch to correctly count optimizer
+    steps, not raw DataLoader batches.
     """
     logger.info("Starting base-model training …")
 
@@ -318,14 +332,19 @@ def train_model(model, tokenizer, device, config, save_dir, logger, trial=None):
         weight_decay = config.adam_weight_decay,
     )
 
-    # ── Scheduler ─────────────────────────────────────────────────────────────
+    # ── Scheduler: use effective steps for true gradient accumulation ────────
     pct_start  = getattr(config, 'basemodel_pct_start',  0.03)
     div_factor = getattr(config, 'basemodel_div_factor', 10.0)
+    accumulation_steps = getattr(config, 'accumulation_steps', 1)
+
+    # Effective steps = ceil(total_batches / accumulation_steps)
+    import math
+    effective_steps_per_epoch = math.ceil(len(train_loader) / accumulation_steps)
 
     scheduler = torch.optim.lr_scheduler.OneCycleLR(
         optimizer,
         max_lr          = config.predictor_learning_rate,
-        steps_per_epoch = len(train_loader),   # 1 step  ==  1 DataLoader batch
+        steps_per_epoch = effective_steps_per_epoch,   # 1 step == accumulation_steps batches
         epochs          = config.basemodel_epochs,
         pct_start       = pct_start,
         div_factor      = div_factor,
@@ -343,7 +362,6 @@ def train_model(model, tokenizer, device, config, save_dir, logger, trial=None):
 
     # ── Hyper-parameters from config ──────────────────────────────────────────
     max_grad_norm     = getattr(config, 'basemodel_max_grad_norm', 3.0)
-    accumulation_steps = getattr(config, 'accumulation_steps', 1)
 
     # Convenience alias: unwrap DDP only once per call-site
     def raw_model():
@@ -371,85 +389,72 @@ def train_model(model, tokenizer, device, config, save_dir, logger, trial=None):
 
         epoch_train_loss = 0.0
         train_batches    = 0
+        current_accum_loss = 0.0
 
-        # ── Inner batch loop ──────────────────────────────────────────────────
-        for batch_idx, (ori_batch_x, ori_batch_x_stamp) in enumerate(train_loader):
-            ori_batch_x       = ori_batch_x.to(device, non_blocking=True)
-            ori_batch_x_stamp = ori_batch_x_stamp.to(device, non_blocking=True)
+        # Zero gradients BEFORE the dataloader loop (true gradient accumulation)
+        optimizer.zero_grad()
 
-            # Zero gradients BEFORE the accumulation loop (not after step)
-            optimizer.zero_grad()
+        # ── Dataloader loop (True Gradient Accumulation) ─────────────────────
+        for batch_idx, (batch_x, batch_x_stamp) in enumerate(train_loader):
+            batch_x       = batch_x.to(device, non_blocking=True)
+            batch_x_stamp = batch_x_stamp.to(device, non_blocking=True)
 
-            # Use ceiling division to prevent truncation
-            micro_size = (ori_batch_x.shape[0] + accumulation_steps - 1) // accumulation_steps
-            current_batch_total_loss = 0.0
+            # Tokenizer is frozen — skip its grad computation entirely
+            with torch.no_grad():
+                token_seq_0, token_seq_1 = tokenizer.encode(batch_x, half=True)
 
-            # ── Micro-batch (gradient accumulation) loop ──────────────────────
-            for j in range(accumulation_steps):
-                start = j * micro_size
-                end   = min((j + 1) * micro_size, ori_batch_x.shape[0])
-                
-                if start >= end:
-                    break # Safely handle cases where accumulation_steps > batch_size
+            token_in  = [token_seq_0[:, :-1], token_seq_1[:, :-1]]
+            token_out = [token_seq_0[:, 1:],  token_seq_1[:, 1:]]
 
-                batch_x       = ori_batch_x[start:end]
-                batch_x_stamp = ori_batch_x_stamp[start:end]
+            # ── Apply Scheduled Sampling ──
+            use_tf = random.random() < tf_prob
 
-                # Tokenizer is frozen — skip its grad computation entirely
-                with torch.no_grad():
-                    token_seq_0, token_seq_1 = tokenizer.encode(batch_x, half=True)
-
-                token_in  = [token_seq_0[:, :-1], token_seq_1[:, :-1]]
-                token_out = [token_seq_0[:, 1:],  token_seq_1[:, 1:]]
-
-                # ── NEW: Apply Scheduled Sampling ──
-                # Randomly decide whether to use Teacher Forcing for this batch
-                use_tf = random.random() < tf_prob
-
-                # Pass targets to enable teacher forcing natively
-                logits = raw_model()(
-                    s1_ids=token_in[0], 
-                    s2_ids=token_in[1], 
-                    stamp=batch_x_stamp[:, :-1, :],
-                    use_teacher_forcing=use_tf, 
-                    s1_targets=token_out[0] if use_tf else None
-                )
-                
-                loss, s1_loss, s2_loss = raw_model().head.compute_loss(
-                    logits[0], logits[1], token_out[0], token_out[1]
-                )
-
-                # Scale loss so accumulated gradient == full-batch gradient
-                loss_scaled = loss / accumulation_steps
-                loss_scaled.backward()
-
-                current_batch_total_loss += loss.item()
-
-            # ── Optimizer step (once per DataLoader batch) ────────────────────
-            torch.nn.utils.clip_grad_norm_(
-                raw_model().parameters(),
-                max_norm=max_grad_norm,
+            logits = raw_model()(
+                s1_ids=token_in[0],
+                s2_ids=token_in[1],
+                stamp=batch_x_stamp[:, :-1, :],
+                use_teacher_forcing=use_tf,
+                s1_targets=token_out[0] if use_tf else None
             )
-            optimizer.step()
-            scheduler.step()
 
-            # Logging uses the *average* loss across micro-batches
-            avg_loss          = current_batch_total_loss / accumulation_steps
-            epoch_train_loss += avg_loss
-            train_batches    += 1
+            loss, s1_loss, s2_loss = raw_model().head.compute_loss(
+                logits[0], logits[1], token_out[0], token_out[1]
+            )
 
-            if (batch_idx_global + 1) % config.log_interval == 0:
-                lr      = optimizer.param_groups[0]['lr']
-                log_msg = (
-                    f"[Epoch {epoch+1}/{config.basemodel_epochs}, "
-                    f"Step {batch_idx+1}/{len(train_loader)}] "
-                    f"LR: {lr:.6f}  Loss: {avg_loss:.4f}"
+            # Scale loss by accumulation steps for accurate mean gradient
+            loss_scaled = loss / accumulation_steps
+            loss_scaled.backward()
+
+            current_accum_loss += loss.item()
+
+            # ── Optimizer step (once per accumulation cycle) ────────────────
+            if (batch_idx + 1) % accumulation_steps == 0 or (batch_idx + 1) == len(train_loader):
+                torch.nn.utils.clip_grad_norm_(
+                    raw_model().parameters(),
+                    max_norm=max_grad_norm,
                 )
-                logger.info(log_msg)
-                if rank == 0:
-                    print(log_msg)
+                optimizer.step()
+                scheduler.step()
+                optimizer.zero_grad()
 
-            batch_idx_global += 1
+                # Logging
+                avg_loss = current_accum_loss / accumulation_steps
+                epoch_train_loss += avg_loss
+                train_batches    += 1
+
+                if (batch_idx_global + 1) % config.log_interval == 0:
+                    lr      = optimizer.param_groups[0]['lr']
+                    log_msg = (
+                        f"[Epoch {epoch+1}/{config.basemodel_epochs}, "
+                        f"Step {batch_idx_global+1}/{effective_steps_per_epoch}] "
+                        f"LR: {lr:.6f}  Loss: {avg_loss:.4f}"
+                    )
+                    logger.info(log_msg)
+                    if rank == 0:
+                        print(log_msg)
+
+                current_accum_loss = 0.0
+                batch_idx_global += 1
 
         # ── Validation ────────────────────────────────────────────────────────
         model.eval()
@@ -475,10 +480,11 @@ def train_model(model, tokenizer, device, config, save_dir, logger, trial=None):
                     logits[0], logits[1], token_out[0], token_out[1]
                 )
 
-                # Sample-weighted accumulation (correct across variable-size batches)
-                n               = batch_x.size(0)
-                val_loss_sum   += loss.item() * n
-                val_sample_cnt += n
+                # Detect valid samples (non-padding) to ignore DDP dummy padding
+                valid_mask = (batch_x != 0).any(dim=-1).any(dim=-1)
+                valid_count = valid_mask.sum().item()
+                val_loss_sum   += loss.item() * valid_count
+                val_sample_cnt += valid_count
 
         # ── DDP aggregation ───────────────────────────────────────────────────
         if use_ddp:

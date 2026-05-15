@@ -10,8 +10,8 @@ data:
 
 training:
   # Base epochs kept at 1 for the final "apply best" retraining phase
-  tokenizer_epochs: 5
-  basemodel_epochs: 5
+  tokenizer_epochs: 2
+  basemodel_epochs: 2
   
   # CRITICAL for 2GB VRAM: keep base batch_size tiny
   batch_size: 512
