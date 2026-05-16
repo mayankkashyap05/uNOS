@@ -1,7 +1,5 @@
 data:
   data_path: "data/1d.csv"
-  # 5 years of daily data is roughly 1250-1825 rows.
-  # 90 days lookback, 14 days predict is optimal for capturing macro trends.
   lookback_window: 90
   predict_window: 14
   max_context: 90
@@ -11,21 +9,22 @@ data:
   test_ratio: 0.0
 
 training:
-  # Base epochs used for the final "apply best" retraining phase
-  tokenizer_epochs: 30
-  basemodel_epochs: 20
+  # Increased epochs because larger batch sizes mean fewer steps per epoch
+  tokenizer_epochs: 50
+  basemodel_epochs: 30
   
-  # Scaled up for T4 16GB VRAM
-  batch_size: 64
+  # Base default pushed higher for T4 16GB VRAM
+  batch_size: 128
   log_interval: 10
 
+  # T4 has strong DMA, keeping 4 workers is optimal for data feeding
   num_workers: 4
   pin_memory: true
   persistent_workers: true
   seed: 42
 
-  tokenizer_learning_rate: 0.0002
-  predictor_learning_rate: 0.00004
+  tokenizer_learning_rate: 0.0005
+  predictor_learning_rate: 0.0001
 
   adam_beta1: 0.9
   adam_beta2: 0.95
@@ -33,9 +32,9 @@ training:
 
   accumulation_steps: 1
 
-  tokenizer_pct_start: 0.03
+  tokenizer_pct_start: 0.05
   tokenizer_div_factor: 10.0
-  basemodel_pct_start: 0.03
+  basemodel_pct_start: 0.05
   basemodel_div_factor: 10.0
 
   tokenizer_max_grad_norm: 2.0   
@@ -53,7 +52,7 @@ model_paths:
 
 experiment:
   name: "Nos_1d_T4_HPO"
-  description: "T4 GPU Full HPO for 5-Year Daily Data"
+  description: "T4 16GB Optimized HPO for 5-Year Daily Data"
   use_comet: false
   train_tokenizer: true
   train_basemodel: true
@@ -66,14 +65,12 @@ device:
 # ── Hyperparameter Search Space ──────────────────────────────────
 hpo:
   enabled: true                    
-  n_trials: 40                      
+  n_trials: 10                      
   direction: "minimize"            
   sampler: "tpe"                   
   pruner: "hyperband"
 
-  # TASK 2.1: Local SQLite path to prevent OneDrive lock corruption
-  # The ?timeout=60 parameter prevents "database is locked" errors when
-  # 8 GPU workers finish trials simultaneously.
+  # Local SQLite path to prevent OneDrive lock corruption
   storage: "sqlite:///C:/Temp/nos_t40_hpo.db?timeout=60"
   study_name: "nos_finetune_1d_hpo"
 
@@ -88,44 +85,47 @@ hpo:
     # ── Tokenizer ──────────────────────────────────────────────
     tokenizer_learning_rate:
       type: float
-      low: 1.0e-5
+      low: 5.0e-5    # Shifted up to accommodate larger batch sizes
       high: 5.0e-3
       log: true
 
     # ── Predictor ──────────────────────────────────────────────
     predictor_learning_rate:
       type: float
-      low: 1.0e-6
-      high: 1.0e-4
+      low: 5.0e-6    # Shifted up to accommodate larger batch sizes
+      high: 5.0e-4
       log: true
 
     # ── Shared Optimizer ───────────────────────────────────────
     adam_weight_decay:
       type: float
-      low: 0.001
+      low: 0.01      # Raised floor to force stronger regularization on small dataset
       high: 0.3
       log: true
 
     # ── Batch & Accumulation ───────────────────────────────────
     batch_size:
       type: categorical
-      choices: [32, 64, 128]
+      # T4 can easily handle 256 on nos_mini. 
+      # 256 is the absolute ceiling for a 1,800 row dataset (~7 steps/epoch)
+      choices: [64, 128, 256]
 
     accumulation_steps:
       type: categorical
+      # Keep at 1 or 2 to avoid reducing steps-per-epoch too severely
       choices: [1, 2]
 
     # ── Scheduler ─────────────────────────────────────────────
     tokenizer_pct_start:
       type: float
-      low: 0.01
-      high: 0.15
+      low: 0.05
+      high: 0.20
       log: false
 
     basemodel_pct_start:
       type: float
-      low: 0.01
-      high: 0.15
+      low: 0.05
+      high: 0.20
       log: false
 
     tokenizer_div_factor:
@@ -139,25 +139,31 @@ hpo:
     # ── Dropout (Crucial for smaller 5-yr datasets) ────────────
     ffn_dropout_p:
       type: float
-      low: 0.0
+      low: 0.1       # Force at least 10% dropout to prevent memorization
       high: 0.4
       log: false
 
     resid_dropout_p:
       type: float
-      low: 0.0
+      low: 0.1       # Force at least 10% dropout to prevent memorization
       high: 0.3
       log: false
 
     # ── BSQ Loss Weights ──────────────────────────────────────
     bsq_beta:
       type: float
-      low: 0.05
+      low: 0.01
       high: 0.2
       log: true
 
+    bsq_gamma:       # ADDED: Crucial for preventing codebook collapse in T4 high-batch mode
+      type: float
+      low: 0.8
+      high: 2.0
+      log: false
+
     bsq_zeta:
       type: float
-      low: 0.05
+      low: 0.01
       high: 0.2
       log: true

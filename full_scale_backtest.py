@@ -13,7 +13,7 @@ from model import Nos, NosTokenizer, NosPredictor
 # Constants & Configuration
 # =============================================================================
 
-CONFIG_PATH = "configs/config_mx110_hpo_winner.yaml"
+CONFIG_PATH = "configs/config.yaml"  # Make sure this points to your active config
 RESULTS_DIR = "backtest_results"
 
 PRICE_COLS = frozenset(['open', 'high', 'low', 'close'])
@@ -85,7 +85,7 @@ def _get_column_verdict(acc: float, corr: float, category: str) -> str:
     if category in ("PRICE", "VOL/AMT"):
         if np.isnan(acc):
             if corr > VerdictThresholds.CORR_MODERATE:
-                return "🟡 CORRELATION SIGNAL (no directional data)"
+                return "🟡 CORRELATION SIGNAL"
             return "⚪ INSUFFICIENT DATA"
             
         if acc > VerdictThresholds.ALPHA_EXCEPTIONAL:
@@ -163,8 +163,7 @@ class MetricsCalculator:
 
 def compute_metrics_all_columns(task: Dict[str, Any], pred_df: pd.DataFrame, feature_cols: List[str]) -> Optional[Dict[str, Any]]:
     """
-    Compute directional accuracy, correlation, RMSE, MAPE for EVERY column
-    in the prediction DataFrame.
+    Compute directional accuracy, correlation, RMSE, MAPE for EVERY column.
     """
     truth_df = task['truth']
     min_len = min(len(pred_df), len(truth_df))
@@ -240,11 +239,18 @@ def compute_metrics_all_columns(task: Dict[str, Any], pred_df: pd.DataFrame, fea
         col_rmses.append(rmse)
         col_mapes.append(mape)
 
-    # Aggregates
+    # Global Aggregates
     result['avg_corr_all'] = np.mean(col_corrs) if col_corrs else 0.0
     result['avg_rmse_all'] = np.mean(col_rmses) if col_rmses else 0.0
     result['avg_mape_all'] = np.mean(col_mapes) if col_mapes else 0.0
     result['avg_acc_all'] = np.mean(col_accs) if col_accs else np.nan
+
+    # Group Aggregates (PRICE vs VOL/AMT)
+    price_accs = [result[f'{c}_acc'] for c in PRICE_COLS if f'{c}_acc' in result]
+    result['avg_acc_price'] = np.mean(price_accs) if price_accs else np.nan
+
+    va_accs = [result[f'{c}_acc'] for c in VOL_AMT_COLS if f'{c}_acc' in result]
+    result['avg_acc_va'] = np.mean(va_accs) if va_accs else np.nan
 
     return result
 
@@ -280,8 +286,6 @@ class DataExporter:
                     col_df = df_res[['start_time', 'end_time'] + col_keys]
                     col_df.to_csv(os.path.join(deepdive_dir, f"deepdive_{col}.csv"), index=False)
             
-            logger.info(f"Saved per-column deep dives to: {deepdive_dir}/")
-
         except OSError as e:
             logger.exception(f"I/O Error while saving results: {e}")
 
@@ -302,27 +306,11 @@ class DataExporter:
                     window=window_size, min_periods=min_periods).mean()
 
         rolling_df.to_csv(target_path, index=False)
-        logger.info(f"Saved rolling metrics: {target_path}")
+
 
 class ReportingEngine:
     """Manages the generation of terminal output and metrics summarization."""
     
-    @staticmethod
-    def print_column_deep_dive(df_res: pd.DataFrame, col: str, col_idx: int, total_cols: int) -> None:
-        if f'{col}_corr' not in df_res.columns:
-            return
-
-        cat = _get_column_category(col)
-        corr_vals = df_res[f'{col}_corr'].dropna()
-        acc_vals = df_res[f'{col}_acc'].dropna() if f'{col}_acc' in df_res.columns else pd.Series(dtype=float)
-
-        mean_acc = acc_vals.mean() * 100 if len(acc_vals) > 0 else np.nan
-        mean_corr = corr_vals.mean() if len(corr_vals) > 0 else 0.0
-
-        verdict = _get_column_verdict(mean_acc, mean_corr, cat)
-
-        logger.info(f"[{col_idx + 1}/{total_cols}] DEEP DIVE: {col.upper()} ({cat}) - Verdict: {verdict}")
-
     @staticmethod
     def print_detailed_report(results: List[Dict[str, Any]], feature_cols: List[str]) -> None:
         if not results:
@@ -334,7 +322,8 @@ class ReportingEngine:
         
         col_summary_rows = []
 
-        for col in feature_cols:
+        # ── 1. Print Detailed Column-by-Column Deep Dives ──
+        for idx, col in enumerate(feature_cols):
             corr_key, acc_key = f'{col}_corr', f'{col}_acc'
             if corr_key not in df_res.columns:
                 continue
@@ -346,6 +335,9 @@ class ReportingEngine:
             mean_corr = corr_vals.mean() if not corr_vals.empty else 0.0
             mean_acc = acc_vals.mean() * 100 if not acc_vals.empty else np.nan
             verdict = _get_column_verdict(mean_acc, mean_corr, cat)
+            
+            # Print the deep dive log
+            logger.info(f"[{idx + 1}/{len(feature_cols)}] DEEP DIVE: {col.upper():<8} ({cat:<8}) - Accuracy: {mean_acc:>6.2f}% | Verdict: {verdict}")
 
             col_summary_rows.append({
                 'column': col,
@@ -357,8 +349,28 @@ class ReportingEngine:
                 'verdict': verdict,
             })
 
-        for idx, col in enumerate(feature_cols):
-            ReportingEngine.print_column_deep_dive(df_res, col, idx, len(feature_cols))
+        # ── 2. Print Summary Table ──
+        logger.info("=" * 85)
+        logger.info(f"{'COLUMN':<15} | {'CATEGORY':<10} | {'DIR. ACCURACY':<15} | {'CORRELATION':<12} | {'VERDICT'}")
+        logger.info("-" * 85)
+        
+        for row in col_summary_rows:
+            acc_str = f"{row['accuracy_%']:.2f}%" if not np.isnan(row['accuracy_%']) else "N/A"
+            corr_str = f"{row['mean_corr']:.4f}"
+            
+            logger.info(f"{row['column'].upper():<15} | {row['category']:<10} | {acc_str:<15} | {corr_str:<12} | {row['verdict']}")
+        logger.info("=" * 85)
+
+        # ── 3. Print Category Aggregates ──
+        overall_acc = df_res['avg_acc_all'].mean() * 100 if 'avg_acc_all' in df_res.columns else np.nan
+        price_acc = df_res['avg_acc_price'].mean() * 100 if 'avg_acc_price' in df_res.columns else np.nan
+        va_acc = df_res['avg_acc_va'].mean() * 100 if 'avg_acc_va' in df_res.columns else np.nan
+
+        logger.info("--- CATEGORY AGGREGATES ---")
+        logger.info(f"Avg Accuracy [ALL COLUMNS]:   {overall_acc:.2f}%" if not np.isnan(overall_acc) else "Avg Accuracy [ALL COLUMNS]:   N/A")
+        logger.info(f"Avg Accuracy [PRICE ONLY]:    {price_acc:.2f}%" if not np.isnan(price_acc) else "Avg Accuracy [PRICE ONLY]:    N/A")
+        logger.info(f"Avg Accuracy [VOL/AMT ONLY]:  {va_acc:.2f}%" if not np.isnan(va_acc) else "Avg Accuracy [VOL/AMT ONLY]:  N/A")
+        logger.info("=====================================================================================")
 
         DataExporter.save_results(df_res, col_summary_rows, feature_cols)
 
@@ -469,7 +481,6 @@ def main() -> None:
 
     logger.info("Generating reports...")
     ReportingEngine.print_detailed_report(results, feature_cols)
-
 
 if __name__ == "__main__":
     main()
