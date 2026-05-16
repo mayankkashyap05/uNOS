@@ -43,11 +43,7 @@ def get_model_size(model: torch.nn.Module) -> str:
 
 class CustomKlineDataset(Dataset):
     """
-    Memory-mapped Kline dataset.
-
-    The first call for a given (data_path, data_type) pair builds numpy cache
-    files alongside the CSV.  Subsequent calls load them via mmap — zero-copy
-    and safe across multiple DataLoader workers and DDP ranks.
+    Memory-mapped Kline dataset with Log Return transformation for price columns.
     """
 
     FEATURE_COLS      = ['open', 'high', 'low', 'close', 'volume', 'amount']
@@ -76,7 +72,7 @@ class CustomKlineDataset(Dataset):
         self.val_ratio       = val_ratio
         self.test_ratio      = test_ratio
 
-        self.py_rng      = random.Random(seed)
+        self.py_rng        = random.Random(seed)
         self.current_epoch = 0
 
         self._load_or_build_cache()
@@ -92,16 +88,20 @@ class CustomKlineDataset(Dataset):
             f"Samples: {self.n_samples:,}"
         )
 
-    # ------------------------------------------------------------------
     def _load_or_build_cache(self):
         cache_x     = f"{self.data_path}.{self.data_type}.x.npy"
         cache_stamp = f"{self.data_path}.{self.data_type}.stamp.npy"
         lock_path   = f"{self.data_path}.{self.data_type}.lock"
 
-        # Cross-process file locking to prevent race conditions in HPO/distributed
+        # Fast path: lock-free check for 99% of workers (cache already exists)
+        if os.path.exists(cache_x) and os.path.exists(cache_stamp):
+            self.x_data     = np.load(cache_x,     mmap_mode='r')
+            self.stamp_data = np.load(cache_stamp, mmap_mode='r')
+            return
+
         from filelock import FileLock
         with FileLock(lock_path, timeout=600):
-            # Double-check inside lock - another worker may have built it while we waited
+            # Double-check inside lock
             if os.path.exists(cache_x) and os.path.exists(cache_stamp):
                 self.x_data     = np.load(cache_x,     mmap_mode='r')
                 self.stamp_data = np.load(cache_stamp, mmap_mode='r')
@@ -122,6 +122,13 @@ class CustomKlineDataset(Dataset):
             if df.isnull().any().any():
                 df = df.ffill()
 
+            # ── PROFESSIONAL UPGRADE: Log Returns ──
+            price_cols = ['open', 'high', 'low', 'close']
+            df[price_cols] = np.log(df[price_cols] / df[price_cols].shift(1))
+
+            # Clean up the NaN created by shift on row 0, and any infinites
+            df[price_cols] = df[price_cols].replace([np.inf, -np.inf], np.nan).fillna(0.0)
+
             # Chronological split
             n = len(df)
             train_end = int(n * self.train_ratio)
@@ -137,7 +144,7 @@ class CustomKlineDataset(Dataset):
 
             del df
 
-            # Atomic writes: write to PID-stamped temp files, then os.replace
+            # Atomic writes
             tmp_x     = f"{cache_x}.tmp.{os.getpid()}.npy"
             tmp_stamp = f"{cache_stamp}.tmp.{os.getpid()}.npy"
 
@@ -147,11 +154,9 @@ class CustomKlineDataset(Dataset):
             os.replace(tmp_x, cache_x)
             os.replace(tmp_stamp, cache_stamp)
 
-        # Outside the lock, memory-map the built files
         self.x_data     = np.load(cache_x,     mmap_mode='r')
         self.stamp_data = np.load(cache_stamp, mmap_mode='r')
 
-    # ------------------------------------------------------------------
     def set_epoch_seed(self, epoch: int):
         self.py_rng.seed(self.seed + epoch)
         self.current_epoch = epoch
@@ -161,24 +166,18 @@ class CustomKlineDataset(Dataset):
 
     def __getitem__(self, idx: int):
         max_start = len(self.x_data) - self.window
-        
-        # PyTorch handles robust index shuffling internally.
         start_idx = idx % (max_start + 1)
-
         end_idx = start_idx + self.window
 
-        # Copy out of mmap so workers get writable arrays
         x       = self.x_data[start_idx:end_idx].copy()
         x_stamp = self.stamp_data[start_idx:end_idx].copy()
 
-        # ---------------------------------------------------------
-        # 🛠️ FIX: Calculate mean and std ONLY on the lookback window
-        # ---------------------------------------------------------
+        # Calculate mean and std ONLY on the lookback window
         lookback_x = x[:self.lookback_window]
         x_mean = lookback_x.mean(axis=0)
         x_std  = lookback_x.std(axis=0)
-    
-        # Apply historical stats to the ENTIRE window (history + future)
+
+        # Apply historical stats to the ENTIRE window
         x = (x - x_mean) / (x_std + 1e-5)
         x = np.clip(x, -self.clip, self.clip)
 
@@ -256,10 +255,11 @@ def create_dataloaders(config):
     train_sampler = (
         DistributedSampler(train_dataset, shuffle=True)  if use_ddp else None
     )
-    # FIX: Use drop_last=True to prevent DDP padding from duplicating edge-case
-    # samples and artificially skewing the validation loss during HPO.
+    # FIX: Use drop_last=False - validation loop correctly masks padding via valid_mask.
+    # drop_last=True discards real data when batch sizes don't divide evenly, causing
+    # inconsistent val_loss across different GPU configurations.
     val_sampler = (
-        DistributedSampler(val_dataset, shuffle=False, drop_last=True) if use_ddp else None
+        DistributedSampler(val_dataset, shuffle=False, drop_last=False) if use_ddp else None
     )
 
     loader_kw = dict(
@@ -270,7 +270,8 @@ def create_dataloaders(config):
 
     train_loader = DataLoader(
         train_dataset,
-        batch_size = config.batch_size,
+        # FIX: Explicit cast from trial config to ensure HPO batch_size is respected
+        batch_size = int(config.batch_size),
         shuffle    = (train_sampler is None),
         drop_last  = True,
         sampler    = train_sampler,
@@ -278,7 +279,8 @@ def create_dataloaders(config):
     )
     val_loader = DataLoader(
         val_dataset,
-        batch_size = config.batch_size,
+        # FIX: Explicit cast from trial config to ensure HPO batch_size is respected
+        batch_size = int(config.batch_size),
         shuffle    = False,
         drop_last  = False,
         sampler    = val_sampler,
@@ -343,7 +345,8 @@ def train_model(model, tokenizer, device, config, save_dir, logger, trial=None):
 
     scheduler = torch.optim.lr_scheduler.OneCycleLR(
         optimizer,
-        max_lr          = config.predictor_learning_rate,
+        # FIX: Guarantee max_lr matches the trial's exact optimizer LR
+        max_lr          = [group['lr'] for group in optimizer.param_groups],
         steps_per_epoch = effective_steps_per_epoch,   # 1 step == accumulation_steps batches
         epochs          = config.basemodel_epochs,
         pct_start       = pct_start,
@@ -381,6 +384,10 @@ def train_model(model, tokenizer, device, config, save_dir, logger, trial=None):
         tf_decay_epochs = max(1, int(config.basemodel_epochs * 0.75))
         tf_prob = max(0.0, 1.0 - (epoch / tf_decay_epochs))
 
+        # Gumbel temperature decay: tau starts at 1.0, decays to 0.3 over training
+        tau_decay_epochs = max(1, int(config.basemodel_epochs * 0.75))
+        current_tau = max(0.3, 1.0 - (epoch / tau_decay_epochs) * 0.7)
+
         # Deterministic-but-varied shuffling per epoch
         train_dataset.set_epoch_seed(epoch * 10_000)
         val_dataset.set_epoch_seed(0)
@@ -406,29 +413,50 @@ def train_model(model, tokenizer, device, config, save_dir, logger, trial=None):
             token_in  = [token_seq_0[:, :-1], token_seq_1[:, :-1]]
             token_out = [token_seq_0[:, 1:],  token_seq_1[:, 1:]]
 
-            # ── Apply Scheduled Sampling ──
-            use_tf = random.random() < tf_prob
+            # ── Apply Scheduled Sampling (DDP Safe) ──
+            if use_ddp:
+                if rank == 0:
+                    use_tf_tensor = torch.tensor([1.0 if random.random() < tf_prob else 0.0], device=device)
+                else:
+                    use_tf_tensor = torch.tensor([0.0], device=device)
+
+                dist.broadcast(use_tf_tensor, src=0)
+                use_tf = bool(use_tf_tensor.item())
+            else:
+                use_tf = random.random() < tf_prob
 
             logits = raw_model()(
                 s1_ids=token_in[0],
                 s2_ids=token_in[1],
                 stamp=batch_x_stamp[:, :-1, :],
                 use_teacher_forcing=use_tf,
-                s1_targets=token_out[0] if use_tf else None
+                s1_targets=token_out[0] if use_tf else None,
+                gumbel_tau=current_tau  # Injected dynamic temperature
             )
 
             loss, s1_loss, s2_loss = raw_model().head.compute_loss(
                 logits[0], logits[1], token_out[0], token_out[1]
             )
 
-            # Scale loss by accumulation steps for accurate mean gradient
-            loss_scaled = loss / accumulation_steps
-            loss_scaled.backward()
+            # ── TASK 1.2: Dynamic Micro-Batch & DDP Sync Storm Fix ──────────
+            is_last_batch = (batch_idx + 1) == len(train_loader)
+            is_step_time = (batch_idx + 1) % accumulation_steps == 0 or is_last_batch
+
+            # Dynamic scalar to prevent inverse gradient accumulation on the tail batch
+            current_micro_batches = (batch_idx % accumulation_steps) + 1 if is_last_batch else accumulation_steps
+            loss_scaled = loss / current_micro_batches
+
+            # DDP Context Manager to prevent all_reduce storms
+            if use_ddp and not is_step_time:
+                with model.no_sync():
+                    loss_scaled.backward()
+            else:
+                loss_scaled.backward()
 
             current_accum_loss += loss.item()
 
             # ── Optimizer step (once per accumulation cycle) ────────────────
-            if (batch_idx + 1) % accumulation_steps == 0 or (batch_idx + 1) == len(train_loader):
+            if is_step_time:
                 torch.nn.utils.clip_grad_norm_(
                     raw_model().parameters(),
                     max_norm=max_grad_norm,
@@ -438,7 +466,7 @@ def train_model(model, tokenizer, device, config, save_dir, logger, trial=None):
                 optimizer.zero_grad()
 
                 # Logging
-                avg_loss = current_accum_loss / accumulation_steps
+                avg_loss = current_accum_loss / current_micro_batches
                 epoch_train_loss += avg_loss
                 train_batches    += 1
 
@@ -511,16 +539,19 @@ def train_model(model, tokenizer, device, config, save_dir, logger, trial=None):
         if rank == 0:
             print(epoch_summary)
 
-        # ── Optuna Pruning Hook ───────────────────────────────────────────────
+        # ── TASK 1.1: Optuna Pruning Hook (Traceback OOM Fix) ─────────────────
         if trial is not None:
-            import optuna 
+            import optuna
             trial.report(avg_val_loss, epoch)
-            
+
             if trial.should_prune():
                 prune_msg = f"Trial {trial.number} pruned at epoch {epoch} (val_loss: {avg_val_loss:.6f})"
                 logger.info(prune_msg)
                 if rank == 0:
                     print(prune_msg)
+
+                # CRITICAL: Sever local variable references to prevent Traceback OOM leak
+                locals().clear()
                 raise optuna.exceptions.TrialPruned()    
         
 

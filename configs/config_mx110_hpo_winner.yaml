@@ -65,7 +65,10 @@ hpo:
   direction: minimize
   sampler: tpe
   pruner: median
-  storage: sqlite:///nos_smoke_test.db?timeout=60
+  # TASK 2.1: Local SQLite path to prevent OneDrive lock corruption
+  # The ?timeout=60 parameter prevents "database is locked" errors when
+  # 8 GPU workers finish trials simultaneously.
+  storage: "sqlite:///C:/Temp/nos_mx110_hpo_winner.db?timeout=60"
   study_name: nos_finetune_hpo_full
   optimize_tokenizer: true
   optimize_basemodel: true

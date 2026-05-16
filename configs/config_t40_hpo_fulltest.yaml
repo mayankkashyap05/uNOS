@@ -69,9 +69,12 @@ hpo:
   n_trials: 40                      
   direction: "minimize"            
   sampler: "tpe"                   
-  pruner: "hyperband"              
-  
-  storage: "sqlite:///nos_1d_t4_hpo.db?timeout=60"
+  pruner: "hyperband"
+
+  # TASK 2.1: Local SQLite path to prevent OneDrive lock corruption
+  # The ?timeout=60 parameter prevents "database is locked" errors when
+  # 8 GPU workers finish trials simultaneously.
+  storage: "sqlite:///C:/Temp/nos_t40_hpo.db?timeout=60"
   study_name: "nos_finetune_1d_hpo"
 
   optimize_tokenizer: true

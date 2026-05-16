@@ -456,32 +456,42 @@ _cleanup() {
     local kill_failed=0
     for pid in "${WORKER_PIDS[@]}"; do
         if kill -0 "${pid}" 2>/dev/null; then
-            kill -TERM "${pid}" 2>/dev/null || kill_failed=$((kill_failed + 1))
-            _warn "  Sent SIGTERM to PID ${pid}"
+            # ── TASK 2.2: Clean Process Termination for Windows/WSL ──────────
+            # Standard 'kill' leaves Python multiprocessing DataLoader workers orphaned
+            # on Windows, trapping VRAM forever. We must kill the entire process tree.
+            if [[ "${OS_TYPE}" == "windows" ]]; then
+                taskkill //F //T //PID "${pid}" 2>/dev/null || kill_failed=$((kill_failed + 1))
+            else
+                kill -TERM "${pid}" 2>/dev/null || kill_failed=$((kill_failed + 1))
+            fi
+            _warn "  Sent termination signal to PID ${pid}"
         fi
     done
 
     # Give workers 10 seconds to shut down gracefully
-    local grace_seconds=10
-    _info "Waiting up to ${grace_seconds}s for graceful shutdown..."
-    local elapsed=0
-    while [[ ${elapsed} -lt ${grace_seconds} ]]; do
-        local still_running=0
-        for pid in "${WORKER_PIDS[@]}"; do
-            kill -0 "${pid}" 2>/dev/null && still_running=$((still_running + 1))
+    # Skip wait on Windows since taskkill //F is immediate
+    if [[ "${OS_TYPE}" != "windows" ]]; then
+        local grace_seconds=10
+        _info "Waiting up to ${grace_seconds}s for graceful shutdown..."
+        local elapsed=0
+        while [[ ${elapsed} -lt ${grace_seconds} ]]; do
+            local still_running=0
+            for pid in "${WORKER_PIDS[@]}"; do
+                kill -0 "${pid}" 2>/dev/null && still_running=$((still_running + 1))
+            done
+            [[ ${still_running} -eq 0 ]] && break
+            sleep 1
+            elapsed=$((elapsed + 1))
         done
-        [[ ${still_running} -eq 0 ]] && break
-        sleep 1
-        elapsed=$((elapsed + 1))
-    done
 
-    # Force kill any remaining workers
-    for pid in "${WORKER_PIDS[@]}"; do
-        if kill -0 "${pid}" 2>/dev/null; then
-            _warn "  Force killing PID ${pid} (SIGKILL)"
-            kill -KILL "${pid}" 2>/dev/null || true
-        fi
-    done
+        # Force kill any remaining workers (POSIX)
+        for pid in "${WORKER_PIDS[@]}"; do
+            if kill -0 "${pid}" 2>/dev/null; then
+                _warn "  Force killing PID ${pid} (SIGKILL)"
+                kill -KILL "${pid}" 2>/dev/null || true
+            fi
+        done
+    fi
 
     _warn "Interrupted. Completed trials have been saved to the Optuna DB."
     _warn "Re-run the same command to resume from where you left off."

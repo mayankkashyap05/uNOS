@@ -4,7 +4,7 @@
 
 | Field | Value |
 | ----- | ----- |
-| **Generated** | `2026-05-15 22:24:34` |
+| **Generated** | `2026-05-16 20:16:25` |
 | **Source mode** | YAML config (`codebase.yaml`) |
 | **Base directory** | `C:\Users\kashy\OneDrive\Documents\uNOS` |
 | **Total files** | 43 |
@@ -246,7 +246,11 @@ hpo:
   #
   # For single-GPU development (in-memory, no persistence):
   #   storage: null
-  storage: null
+
+  # TASK 2.1: Local SQLite path to prevent OneDrive lock corruption
+  # The ?timeout=60 parameter prevents "database is locked" errors when
+  # 8 GPU workers finish trials simultaneously.
+  storage: "sqlite:///C:/Temp/nos_hpo.db?timeout=60"
   study_name: "nos_finetune_hpo"
 
   # What to optimize
@@ -483,8 +487,10 @@ hpo:
   sampler: "tpe"                   
   pruner: "median"                 
   
-  # Actively testing the SQLite WAL & NullPool lock fix locally
-  storage: "sqlite:///nos_smoke_test.db?timeout=60"
+  # TASK 2.1: Local SQLite path to prevent OneDrive lock corruption
+  # The ?timeout=60 parameter prevents "database is locked" errors when
+  # 8 GPU workers finish trials simultaneously.
+  storage: "sqlite:///C:/Temp/nos_mx110_hpo_fulltest.db?timeout=60"
   study_name: "nos_finetune_hpo_full"
 
   optimize_tokenizer: true
@@ -703,7 +709,10 @@ hpo:
   direction: minimize
   sampler: tpe
   pruner: median
-  storage: sqlite:///nos_smoke_test.db?timeout=60
+  # TASK 2.1: Local SQLite path to prevent OneDrive lock corruption
+  # The ?timeout=60 parameter prevents "database is locked" errors when
+  # 8 GPU workers finish trials simultaneously.
+  storage: "sqlite:///C:/Temp/nos_mx110_hpo_winner.db?timeout=60"
   study_name: nos_finetune_hpo_full
   optimize_tokenizer: true
   optimize_basemodel: true
@@ -905,9 +914,12 @@ hpo:
   n_trials: 40                      
   direction: "minimize"            
   sampler: "tpe"                   
-  pruner: "hyperband"              
-  
-  storage: "sqlite:///nos_1d_t4_hpo.db?timeout=60"
+  pruner: "hyperband"
+
+  # TASK 2.1: Local SQLite path to prevent OneDrive lock corruption
+  # The ?timeout=60 parameter prevents "database is locked" errors when
+  # 8 GPU workers finish trials simultaneously.
+  storage: "sqlite:///C:/Temp/nos_t40_hpo.db?timeout=60"
   study_name: "nos_finetune_1d_hpo"
 
   optimize_tokenizer: true
@@ -3523,7 +3535,7 @@ class Nos(nn.Module, PyTorchModelHubMixin):
         elif isinstance(module, RMSNorm):
             nn.init.ones_(module.weight)
 
-    def forward(self, s1_ids, s2_ids, stamp=None, padding_mask=None, use_teacher_forcing=False, s1_targets=None):
+    def forward(self, s1_ids, s2_ids, stamp=None, padding_mask=None, use_teacher_forcing=False, s1_targets=None, gumbel_tau=1.0):
         """
         Args:
             s1_ids (torch.Tensor): Input tensor of s1 token IDs. Shape: [batch_size, seq_len]
@@ -3557,7 +3569,7 @@ class Nos(nn.Module, PyTorchModelHubMixin):
         elif self.training:
             # State 2: Autoregressive Training (Maintains gradient graph)
             # Uses Straight-Through Gumbel-Softmax so S2 can backpropagate into S1
-            s1_probs = F.gumbel_softmax(s1_logits, tau=1.0, hard=True)
+            s1_probs = F.gumbel_softmax(s1_logits, tau=gumbel_tau, hard=True)
             sibling_embed = torch.matmul(s1_probs, self.embedding.emb_s1.weight)
         else:
             # State 3: Standard Inference (Detached, memory-efficient)
@@ -3764,7 +3776,6 @@ class NosPredictor:
         self.model = self.model.to(self.device)
 
     def generate(self, x, x_stamp, y_stamp, pred_len, T, top_k, top_p, sample_count, verbose):
-
         x_tensor = torch.from_numpy(np.array(x).astype(np.float32)).to(self.device)
         x_stamp_tensor = torch.from_numpy(np.array(x_stamp).astype(np.float32)).to(self.device)
         y_stamp_tensor = torch.from_numpy(np.array(y_stamp).astype(np.float32)).to(self.device)
@@ -3784,8 +3795,8 @@ class NosPredictor:
 
         df = df.copy()
         if self.vol_col not in df.columns:
-            df[self.vol_col] = 0.0  # Fill missing volume with zeros
-            df[self.amt_vol] = 0.0  # Fill missing amount with zeros
+            df[self.vol_col] = 0.0
+            df[self.amt_vol] = 0.0
         if self.amt_vol not in df.columns and self.vol_col in df.columns:
             df[self.amt_vol] = df[self.vol_col] * df[self.price_cols].mean(axis=1)
 
@@ -3795,12 +3806,16 @@ class NosPredictor:
         x_time_df = calc_time_stamps(x_timestamp)
         y_time_df = calc_time_stamps(y_timestamp)
 
+        # ── PROFESSIONAL UPGRADE: Store last absolute price & convert to Log Returns ──
+        last_abs_prices = df[self.price_cols].iloc[-1].values
+
+        df[self.price_cols] = np.log(df[self.price_cols] / df[self.price_cols].shift(1))
+        df[self.price_cols] = df[self.price_cols].replace([np.inf, -np.inf], np.nan).fillna(0.0)
+
         x = df[self.price_cols + [self.vol_col, self.amt_vol]].values.astype(np.float32)
         x_stamp = x_time_df.values.astype(np.float32)
         y_stamp = y_time_df.values.astype(np.float32)
 
-        # FIX: Compute scaling statistics strictly over the trailing context window
-        # to prevent normalization shift and match CustomKlineDataset training logic.
         recent_x = x[-self.max_context:] if x.shape[0] > self.max_context else x
         x_mean, x_std = np.mean(recent_x, axis=0), np.std(recent_x, axis=0)
 
@@ -3814,32 +3829,25 @@ class NosPredictor:
         preds = self.generate(x, x_stamp, y_stamp, pred_len, T, top_k, top_p, sample_count, verbose)
 
         preds = preds.squeeze(0)
+
+        # Un-normalize Z-score (these are now predicted Log Returns)
         preds = preds * (x_std + 1e-5) + x_mean
+
+        # ── PROFESSIONAL UPGRADE: Reconstruct absolute prices ──
+        num_price_cols = len(self.price_cols)
+        pred_log_returns = preds[:, :num_price_cols]
+
+        # Formula: P_t = P_0 * exp(cumsum(R_log))
+        cum_log_returns = np.cumsum(pred_log_returns, axis=0)
+        pred_abs_prices = last_abs_prices * np.exp(cum_log_returns)
+
+        # Overwrite the log return columns with the newly reconstructed absolute prices
+        preds[:, :num_price_cols] = pred_abs_prices
 
         pred_df = pd.DataFrame(preds, columns=self.price_cols + [self.vol_col, self.amt_vol], index=y_timestamp)
         return pred_df
 
-
     def predict_batch(self, df_list, x_timestamp_list, y_timestamp_list, pred_len, T=1.0, top_k=0, top_p=0.9, sample_count=1, verbose=True):
-        """
-        Perform parallel (batch) prediction on multiple time series. All series must have the same historical length and prediction length (pred_len).
-
-        Args:
-            df_list (List[pd.DataFrame]): List of input DataFrames, each containing price columns and optional volume/amount columns.
-            x_timestamp_list (List[pd.DatetimeIndex or Series]): List of timestamps corresponding to historical data, length should match the number of rows in each DataFrame.
-            y_timestamp_list (List[pd.DatetimeIndex or Series]): List of future prediction timestamps, length should equal pred_len.
-            pred_len (int): Number of prediction steps.
-            T (float): Sampling temperature.
-            top_k (int): Top-k filtering threshold.
-            top_p (float): Top-p (nucleus sampling) threshold.
-            sample_count (int): Number of parallel samples per series, automatically averaged internally.
-            verbose (bool): Whether to display autoregressive progress.
-
-        Returns:
-            List[pd.DataFrame]: List of prediction results in the same order as input, each DataFrame contains
-                                `open, high, low, close, volume, amount` columns, indexed by corresponding `y_timestamp`.
-        """
-        # Basic validation
         if not isinstance(df_list, (list, tuple)) or not isinstance(x_timestamp_list, (list, tuple)) or not isinstance(y_timestamp_list, (list, tuple)):
             raise ValueError("df_list, x_timestamp_list, y_timestamp_list must be list or tuple types.")
         if not (len(df_list) == len(x_timestamp_list) == len(y_timestamp_list)):
@@ -3854,6 +3862,9 @@ class NosPredictor:
         stds = []
         seq_lens = []
         y_lens = []
+
+        # ── Store last absolute prices for the entire batch ──
+        last_abs_prices_list = []
 
         for i in range(num_series):
             df = df_list[i]
@@ -3878,6 +3889,12 @@ class NosPredictor:
             x_time_df = calc_time_stamps(x_timestamp)
             y_time_df = calc_time_stamps(y_timestamp)
 
+            # ── Capture absolute price, then convert dataframe to Log Returns ──
+            last_abs_prices_list.append(df[self.price_cols].iloc[-1].values)
+
+            df[self.price_cols] = np.log(df[self.price_cols] / df[self.price_cols].shift(1))
+            df[self.price_cols] = df[self.price_cols].replace([np.inf, -np.inf], np.nan).fillna(0.0)
+
             x = df[self.price_cols + [self.vol_col, self.amt_vol]].values.astype(np.float32)
             x_stamp = x_time_df.values.astype(np.float32)
             y_stamp = y_time_df.values.astype(np.float32)
@@ -3887,7 +3904,6 @@ class NosPredictor:
             if y_stamp.shape[0] != pred_len:
                 raise ValueError(f"y_timestamp length at index {i} should equal pred_len={pred_len}, got {y_stamp.shape[0]}.")
 
-            # FIX: Bound the scaling calculation to the active context window per series
             recent_x = x[-self.max_context:] if x.shape[0] > self.max_context else x
             x_mean, x_std = np.mean(recent_x, axis=0), np.std(recent_x, axis=0)
 
@@ -3903,22 +3919,31 @@ class NosPredictor:
             seq_lens.append(x_norm.shape[0])
             y_lens.append(y_stamp.shape[0])
 
-        # Require all series to have consistent historical and prediction lengths for batch processing
         if len(set(seq_lens)) != 1:
             raise ValueError(f"Parallel prediction requires all series to have consistent historical lengths, got: {seq_lens}")
         if len(set(y_lens)) != 1:
             raise ValueError(f"Parallel prediction requires all series to have consistent prediction lengths, got: {y_lens}")
 
-        x_batch = np.stack(x_list, axis=0).astype(np.float32)           # (B, seq_len, feat)
-        x_stamp_batch = np.stack(x_stamp_list, axis=0).astype(np.float32) # (B, seq_len, time_feat)
-        y_stamp_batch = np.stack(y_stamp_list, axis=0).astype(np.float32) # (B, pred_len, time_feat)
+        x_batch = np.stack(x_list, axis=0).astype(np.float32)
+        x_stamp_batch = np.stack(x_stamp_list, axis=0).astype(np.float32)
+        y_stamp_batch = np.stack(y_stamp_list, axis=0).astype(np.float32)
 
         preds = self.generate(x_batch, x_stamp_batch, y_stamp_batch, pred_len, T, top_k, top_p, sample_count, verbose)
-        # preds: (B, pred_len, feat)
 
         pred_dfs = []
+        num_price_cols = len(self.price_cols)
+
         for i in range(num_series):
+            # Un-normalize Z-score (Log Returns)
             preds_i = preds[i] * (stds[i] + 1e-5) + means[i]
+
+            # ── Reconstruct absolute prices for this specific batch item ──
+            pred_log_returns = preds_i[:, :num_price_cols]
+            cum_log_returns = np.cumsum(pred_log_returns, axis=0)
+            pred_abs_prices = last_abs_prices_list[i] * np.exp(cum_log_returns)
+
+            preds_i[:, :num_price_cols] = pred_abs_prices
+
             pred_df = pd.DataFrame(preds_i, columns=self.price_cols + [self.vol_col, self.amt_vol], index=y_timestamp_list[i])
             pred_dfs.append(pred_df)
 
@@ -5247,7 +5272,14 @@ class TokenizerObjective:
             # This executes regardless of success, pruning, or exception.
             # Skipping this causes PyTorch allocator cache accumulation,
             # which leads to OOM on trial N+K even though trial N "freed" its memory.
-            release_gpu_memory(tokenizer)
+            # Explicitly delete local references so GC can collect them.
+            if 'tokenizer' in locals():
+                del tokenizer
+
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
 
             # ── Step 6: Delete trial artifacts ────────────────────────────
             if trial_dir and os.path.exists(trial_dir):
@@ -5425,7 +5457,17 @@ class BasemodelObjective:
             return val_loss
 
         finally:
-            release_gpu_memory(model, tokenizer)
+            # Explicitly delete local references so GC can collect them.
+            if 'model' in locals():
+                del model
+            if 'tokenizer' in locals():
+                del tokenizer
+
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
+
             if trial_dir and os.path.exists(trial_dir):
                 shutil.rmtree(trial_dir, ignore_errors=True)
 
@@ -5752,11 +5794,11 @@ class NosHPOTuner:
                  cursor = dbapi_connection.cursor()
                  cursor.execute("PRAGMA journal_mode=WAL")
                  cursor.execute("PRAGMA synchronous=NORMAL")
-                 cursor.execute("PRAGMA busy_timeout=60000")
+                 cursor.execute("PRAGMA busy_timeout=300000")
                  cursor.close()
 
              self._logger.info(
-                 "SQLite WAL mode, NullPool, and busy_timeout=60s applied via connection hook."
+                 "SQLite WAL mode, NullPool, and busy_timeout=300s applied via connection hook."
              )
         except Exception as exc:
              self._logger.warning(
@@ -6090,16 +6132,31 @@ class NosHPOTuner:
         try:
             with open(tmp_path, "w", encoding="utf-8") as f:
                 json.dump(payload, f, indent=2, default=str)
-            os.replace(tmp_path, final_path)  # Atomic on POSIX
-            self._logger.info(f"Results atomically written to: {final_path}")
-            print(f"📊 Results saved to: {final_path}")
+
+            # ── TASK 2.1: Windows race-condition backoff for atomic writes ──
+            # OneDrive or other indexing services often hold transient read-locks
+            # on newly created files. This ensures os.replace doesn't crash the worker.
+            for attempt in range(5):
+                try:
+                    os.replace(tmp_path, final_path)  # Atomic on POSIX, near-atomic on Windows
+                    self._logger.info(f"Results atomically written to: {final_path}")
+                    print(f"📊 Results saved to: {final_path}")
+                    break
+                except PermissionError:
+                    if attempt == 4:
+                        raise  # Re-raise after exhausting retries
+                    time.sleep(0.1 * (2 ** attempt))  # Exponential backoff: 0.1s, 0.2s, 0.4s, 0.8s
+
         except Exception as exc:
             self._logger.error(
                 f"Failed to save results to {final_path}: {exc}", exc_info=True
             )
         finally:
             if os.path.exists(tmp_path):
-                os.remove(tmp_path)
+                try:
+                    os.remove(tmp_path)
+                except OSError:
+                    pass
 
         # ── Optional: Save visualisation HTML plots ────────────────────────
         self._save_visualisations(study, phase)
@@ -6927,32 +6984,42 @@ _cleanup() {
     local kill_failed=0
     for pid in "${WORKER_PIDS[@]}"; do
         if kill -0 "${pid}" 2>/dev/null; then
-            kill -TERM "${pid}" 2>/dev/null || kill_failed=$((kill_failed + 1))
-            _warn "  Sent SIGTERM to PID ${pid}"
+            # ── TASK 2.2: Clean Process Termination for Windows/WSL ──────────
+            # Standard 'kill' leaves Python multiprocessing DataLoader workers orphaned
+            # on Windows, trapping VRAM forever. We must kill the entire process tree.
+            if [[ "${OS_TYPE}" == "windows" ]]; then
+                taskkill //F //T //PID "${pid}" 2>/dev/null || kill_failed=$((kill_failed + 1))
+            else
+                kill -TERM "${pid}" 2>/dev/null || kill_failed=$((kill_failed + 1))
+            fi
+            _warn "  Sent termination signal to PID ${pid}"
         fi
     done
 
     # Give workers 10 seconds to shut down gracefully
-    local grace_seconds=10
-    _info "Waiting up to ${grace_seconds}s for graceful shutdown..."
-    local elapsed=0
-    while [[ ${elapsed} -lt ${grace_seconds} ]]; do
-        local still_running=0
-        for pid in "${WORKER_PIDS[@]}"; do
-            kill -0 "${pid}" 2>/dev/null && still_running=$((still_running + 1))
+    # Skip wait on Windows since taskkill //F is immediate
+    if [[ "${OS_TYPE}" != "windows" ]]; then
+        local grace_seconds=10
+        _info "Waiting up to ${grace_seconds}s for graceful shutdown..."
+        local elapsed=0
+        while [[ ${elapsed} -lt ${grace_seconds} ]]; do
+            local still_running=0
+            for pid in "${WORKER_PIDS[@]}"; do
+                kill -0 "${pid}" 2>/dev/null && still_running=$((still_running + 1))
+            done
+            [[ ${still_running} -eq 0 ]] && break
+            sleep 1
+            elapsed=$((elapsed + 1))
         done
-        [[ ${still_running} -eq 0 ]] && break
-        sleep 1
-        elapsed=$((elapsed + 1))
-    done
 
-    # Force kill any remaining workers
-    for pid in "${WORKER_PIDS[@]}"; do
-        if kill -0 "${pid}" 2>/dev/null; then
-            _warn "  Force killing PID ${pid} (SIGKILL)"
-            kill -KILL "${pid}" 2>/dev/null || true
-        fi
-    done
+        # Force kill any remaining workers (POSIX)
+        for pid in "${WORKER_PIDS[@]}"; do
+            if kill -0 "${pid}" 2>/dev/null; then
+                _warn "  Force killing PID ${pid} (SIGKILL)"
+                kill -KILL "${pid}" 2>/dev/null || true
+            fi
+        done
+    fi
 
     _warn "Interrupted. Completed trials have been saved to the Optuna DB."
     _warn "Re-run the same command to resume from where you left off."
@@ -7288,11 +7355,7 @@ def get_model_size(model: torch.nn.Module) -> str:
 
 class CustomKlineDataset(Dataset):
     """
-    Memory-mapped Kline dataset.
-
-    The first call for a given (data_path, data_type) pair builds numpy cache
-    files alongside the CSV.  Subsequent calls load them via mmap — zero-copy
-    and safe across multiple DataLoader workers and DDP ranks.
+    Memory-mapped Kline dataset with Log Return transformation for price columns.
     """
 
     FEATURE_COLS      = ['open', 'high', 'low', 'close', 'volume', 'amount']
@@ -7321,7 +7384,7 @@ class CustomKlineDataset(Dataset):
         self.val_ratio       = val_ratio
         self.test_ratio      = test_ratio
 
-        self.py_rng      = random.Random(seed)
+        self.py_rng        = random.Random(seed)
         self.current_epoch = 0
 
         self._load_or_build_cache()
@@ -7337,16 +7400,20 @@ class CustomKlineDataset(Dataset):
             f"Samples: {self.n_samples:,}"
         )
 
-    # ------------------------------------------------------------------
     def _load_or_build_cache(self):
         cache_x     = f"{self.data_path}.{self.data_type}.x.npy"
         cache_stamp = f"{self.data_path}.{self.data_type}.stamp.npy"
         lock_path   = f"{self.data_path}.{self.data_type}.lock"
 
-        # Cross-process file locking to prevent race conditions in HPO/distributed
+        # Fast path: lock-free check for 99% of workers (cache already exists)
+        if os.path.exists(cache_x) and os.path.exists(cache_stamp):
+            self.x_data     = np.load(cache_x,     mmap_mode='r')
+            self.stamp_data = np.load(cache_stamp, mmap_mode='r')
+            return
+
         from filelock import FileLock
         with FileLock(lock_path, timeout=600):
-            # Double-check inside lock - another worker may have built it while we waited
+            # Double-check inside lock
             if os.path.exists(cache_x) and os.path.exists(cache_stamp):
                 self.x_data     = np.load(cache_x,     mmap_mode='r')
                 self.stamp_data = np.load(cache_stamp, mmap_mode='r')
@@ -7367,6 +7434,13 @@ class CustomKlineDataset(Dataset):
             if df.isnull().any().any():
                 df = df.ffill()
 
+            # ── PROFESSIONAL UPGRADE: Log Returns ──
+            price_cols = ['open', 'high', 'low', 'close']
+            df[price_cols] = np.log(df[price_cols] / df[price_cols].shift(1))
+
+            # Clean up the NaN created by shift on row 0, and any infinites
+            df[price_cols] = df[price_cols].replace([np.inf, -np.inf], np.nan).fillna(0.0)
+
             # Chronological split
             n = len(df)
             train_end = int(n * self.train_ratio)
@@ -7382,7 +7456,7 @@ class CustomKlineDataset(Dataset):
 
             del df
 
-            # Atomic writes: write to PID-stamped temp files, then os.replace
+            # Atomic writes
             tmp_x     = f"{cache_x}.tmp.{os.getpid()}.npy"
             tmp_stamp = f"{cache_stamp}.tmp.{os.getpid()}.npy"
 
@@ -7392,11 +7466,9 @@ class CustomKlineDataset(Dataset):
             os.replace(tmp_x, cache_x)
             os.replace(tmp_stamp, cache_stamp)
 
-        # Outside the lock, memory-map the built files
         self.x_data     = np.load(cache_x,     mmap_mode='r')
         self.stamp_data = np.load(cache_stamp, mmap_mode='r')
 
-    # ------------------------------------------------------------------
     def set_epoch_seed(self, epoch: int):
         self.py_rng.seed(self.seed + epoch)
         self.current_epoch = epoch
@@ -7406,24 +7478,18 @@ class CustomKlineDataset(Dataset):
 
     def __getitem__(self, idx: int):
         max_start = len(self.x_data) - self.window
-        
-        # PyTorch handles robust index shuffling internally.
         start_idx = idx % (max_start + 1)
-
         end_idx = start_idx + self.window
 
-        # Copy out of mmap so workers get writable arrays
         x       = self.x_data[start_idx:end_idx].copy()
         x_stamp = self.stamp_data[start_idx:end_idx].copy()
 
-        # ---------------------------------------------------------
-        # 🛠️ FIX: Calculate mean and std ONLY on the lookback window
-        # ---------------------------------------------------------
+        # Calculate mean and std ONLY on the lookback window
         lookback_x = x[:self.lookback_window]
         x_mean = lookback_x.mean(axis=0)
         x_std  = lookback_x.std(axis=0)
-    
-        # Apply historical stats to the ENTIRE window (history + future)
+
+        # Apply historical stats to the ENTIRE window
         x = (x - x_mean) / (x_std + 1e-5)
         x = np.clip(x, -self.clip, self.clip)
 
@@ -7501,10 +7567,11 @@ def create_dataloaders(config):
     train_sampler = (
         DistributedSampler(train_dataset, shuffle=True)  if use_ddp else None
     )
-    # FIX: Use drop_last=True to prevent DDP padding from duplicating edge-case
-    # samples and artificially skewing the validation loss during HPO.
+    # FIX: Use drop_last=False - validation loop correctly masks padding via valid_mask.
+    # drop_last=True discards real data when batch sizes don't divide evenly, causing
+    # inconsistent val_loss across different GPU configurations.
     val_sampler = (
-        DistributedSampler(val_dataset, shuffle=False, drop_last=True) if use_ddp else None
+        DistributedSampler(val_dataset, shuffle=False, drop_last=False) if use_ddp else None
     )
 
     loader_kw = dict(
@@ -7515,7 +7582,8 @@ def create_dataloaders(config):
 
     train_loader = DataLoader(
         train_dataset,
-        batch_size = config.batch_size,
+        # FIX: Explicit cast from trial config to ensure HPO batch_size is respected
+        batch_size = int(config.batch_size),
         shuffle    = (train_sampler is None),
         drop_last  = True,
         sampler    = train_sampler,
@@ -7523,7 +7591,8 @@ def create_dataloaders(config):
     )
     val_loader = DataLoader(
         val_dataset,
-        batch_size = config.batch_size,
+        # FIX: Explicit cast from trial config to ensure HPO batch_size is respected
+        batch_size = int(config.batch_size),
         shuffle    = False,
         drop_last  = False,
         sampler    = val_sampler,
@@ -7588,7 +7657,8 @@ def train_model(model, tokenizer, device, config, save_dir, logger, trial=None):
 
     scheduler = torch.optim.lr_scheduler.OneCycleLR(
         optimizer,
-        max_lr          = config.predictor_learning_rate,
+        # FIX: Guarantee max_lr matches the trial's exact optimizer LR
+        max_lr          = [group['lr'] for group in optimizer.param_groups],
         steps_per_epoch = effective_steps_per_epoch,   # 1 step == accumulation_steps batches
         epochs          = config.basemodel_epochs,
         pct_start       = pct_start,
@@ -7626,6 +7696,10 @@ def train_model(model, tokenizer, device, config, save_dir, logger, trial=None):
         tf_decay_epochs = max(1, int(config.basemodel_epochs * 0.75))
         tf_prob = max(0.0, 1.0 - (epoch / tf_decay_epochs))
 
+        # Gumbel temperature decay: tau starts at 1.0, decays to 0.3 over training
+        tau_decay_epochs = max(1, int(config.basemodel_epochs * 0.75))
+        current_tau = max(0.3, 1.0 - (epoch / tau_decay_epochs) * 0.7)
+
         # Deterministic-but-varied shuffling per epoch
         train_dataset.set_epoch_seed(epoch * 10_000)
         val_dataset.set_epoch_seed(0)
@@ -7651,29 +7725,50 @@ def train_model(model, tokenizer, device, config, save_dir, logger, trial=None):
             token_in  = [token_seq_0[:, :-1], token_seq_1[:, :-1]]
             token_out = [token_seq_0[:, 1:],  token_seq_1[:, 1:]]
 
-            # ── Apply Scheduled Sampling ──
-            use_tf = random.random() < tf_prob
+            # ── Apply Scheduled Sampling (DDP Safe) ──
+            if use_ddp:
+                if rank == 0:
+                    use_tf_tensor = torch.tensor([1.0 if random.random() < tf_prob else 0.0], device=device)
+                else:
+                    use_tf_tensor = torch.tensor([0.0], device=device)
+
+                dist.broadcast(use_tf_tensor, src=0)
+                use_tf = bool(use_tf_tensor.item())
+            else:
+                use_tf = random.random() < tf_prob
 
             logits = raw_model()(
                 s1_ids=token_in[0],
                 s2_ids=token_in[1],
                 stamp=batch_x_stamp[:, :-1, :],
                 use_teacher_forcing=use_tf,
-                s1_targets=token_out[0] if use_tf else None
+                s1_targets=token_out[0] if use_tf else None,
+                gumbel_tau=current_tau  # Injected dynamic temperature
             )
 
             loss, s1_loss, s2_loss = raw_model().head.compute_loss(
                 logits[0], logits[1], token_out[0], token_out[1]
             )
 
-            # Scale loss by accumulation steps for accurate mean gradient
-            loss_scaled = loss / accumulation_steps
-            loss_scaled.backward()
+            # ── TASK 1.2: Dynamic Micro-Batch & DDP Sync Storm Fix ──────────
+            is_last_batch = (batch_idx + 1) == len(train_loader)
+            is_step_time = (batch_idx + 1) % accumulation_steps == 0 or is_last_batch
+
+            # Dynamic scalar to prevent inverse gradient accumulation on the tail batch
+            current_micro_batches = (batch_idx % accumulation_steps) + 1 if is_last_batch else accumulation_steps
+            loss_scaled = loss / current_micro_batches
+
+            # DDP Context Manager to prevent all_reduce storms
+            if use_ddp and not is_step_time:
+                with model.no_sync():
+                    loss_scaled.backward()
+            else:
+                loss_scaled.backward()
 
             current_accum_loss += loss.item()
 
             # ── Optimizer step (once per accumulation cycle) ────────────────
-            if (batch_idx + 1) % accumulation_steps == 0 or (batch_idx + 1) == len(train_loader):
+            if is_step_time:
                 torch.nn.utils.clip_grad_norm_(
                     raw_model().parameters(),
                     max_norm=max_grad_norm,
@@ -7683,7 +7778,7 @@ def train_model(model, tokenizer, device, config, save_dir, logger, trial=None):
                 optimizer.zero_grad()
 
                 # Logging
-                avg_loss = current_accum_loss / accumulation_steps
+                avg_loss = current_accum_loss / current_micro_batches
                 epoch_train_loss += avg_loss
                 train_batches    += 1
 
@@ -7756,16 +7851,19 @@ def train_model(model, tokenizer, device, config, save_dir, logger, trial=None):
         if rank == 0:
             print(epoch_summary)
 
-        # ── Optuna Pruning Hook ───────────────────────────────────────────────
+        # ── TASK 1.1: Optuna Pruning Hook (Traceback OOM Fix) ─────────────────
         if trial is not None:
-            import optuna 
+            import optuna
             trial.report(avg_val_loss, epoch)
-            
+
             if trial.should_prune():
                 prune_msg = f"Trial {trial.number} pruned at epoch {epoch} (val_loss: {avg_val_loss:.6f})"
                 logger.info(prune_msg)
                 if rank == 0:
                     print(prune_msg)
+
+                # CRITICAL: Sever local variable references to prevent Traceback OOM leak
+                locals().clear()
                 raise optuna.exceptions.TrialPruned()    
         
 
@@ -8033,13 +8131,15 @@ def create_dataloaders(config):
     
     use_ddp = dist.is_available() and dist.is_initialized()
     train_sampler = DistributedSampler(train_dataset, num_replicas=dist.get_world_size(), rank=dist.get_rank(), shuffle=True) if use_ddp else None
-    # FIX: Use drop_last=True to prevent DDP padding from duplicating edge-case
-    # samples and artificially skewing the validation loss during HPO.
-    val_sampler = DistributedSampler(val_dataset, num_replicas=dist.get_world_size(), rank=dist.get_rank(), shuffle=False, drop_last=True) if use_ddp else None
+    # FIX: Use drop_last=False - validation loop correctly masks padding via valid_mask.
+    # drop_last=True discards real data when batch sizes don't divide evenly, causing
+    # inconsistent val_loss across different GPU configurations.
+    val_sampler = DistributedSampler(val_dataset, num_replicas=dist.get_world_size(), rank=dist.get_rank(), shuffle=False, drop_last=False) if use_ddp else None
 
     train_loader = DataLoader(
         train_dataset,
-        batch_size=config.batch_size,
+        # FIX: Explicit cast from trial config to ensure HPO batch_size is respected
+        batch_size=int(config.batch_size),
         shuffle=(train_sampler is None),
         num_workers=config.num_workers,
         pin_memory=True,
@@ -8047,10 +8147,11 @@ def create_dataloaders(config):
         drop_last=True,
         sampler=train_sampler
     )
-    
+
     val_loader = DataLoader(
         val_dataset,
-        batch_size=config.batch_size,
+        # FIX: Explicit cast from trial config to ensure HPO batch_size is respected
+        batch_size=int(config.batch_size),
         shuffle=False,
         num_workers=config.num_workers,
         pin_memory=True,
@@ -8101,7 +8202,8 @@ def train_tokenizer(model, device, config, save_dir, logger, trial=None):
 
     scheduler = torch.optim.lr_scheduler.OneCycleLR(
         optimizer,
-        max_lr=config.tokenizer_learning_rate,
+        # FIX: Guarantee max_lr matches the trial's exact optimizer LR
+        max_lr=[group['lr'] for group in optimizer.param_groups],
         steps_per_epoch=effective_steps_per_epoch,
         epochs=config.tokenizer_epochs,
         pct_start=pct_start,
@@ -8143,7 +8245,6 @@ def train_tokenizer(model, device, config, save_dir, logger, trial=None):
             recon_loss_pre = F.mse_loss(z_pre, batch_x)
             recon_loss_all = F.mse_loss(z, batch_x)
 
-            # FIXED: Apply dynamic loss weights from configuration
             weighted_recon = (
                 (config.tokenizer_recon_pre_weight * recon_loss_pre) +
                 (config.tokenizer_recon_all_weight * recon_loss_all)
@@ -8151,14 +8252,25 @@ def train_tokenizer(model, device, config, save_dir, logger, trial=None):
 
             loss = (config.tokenizer_recon_weight * weighted_recon) + (config.tokenizer_bsq_weight * bsq_loss)
 
-            # Scale loss by accumulation steps for accurate mean gradient
-            loss_scaled = loss / accumulation_steps
-            loss_scaled.backward()
+            # ── TASK 1.2: Dynamic Micro-Batch & DDP Sync Storm Fix ──────────
+            is_last_batch = (batch_idx + 1) == len(train_loader)
+            is_step_time = (batch_idx + 1) % accumulation_steps == 0 or is_last_batch
+
+            # Dynamic scalar to prevent inverse gradient accumulation on the tail batch
+            current_micro_batches = (batch_idx % accumulation_steps) + 1 if is_last_batch else accumulation_steps
+            loss_scaled = loss / current_micro_batches
+
+            # DDP Context Manager to prevent all_reduce storms
+            if use_ddp and not is_step_time:
+                with model.no_sync():
+                    loss_scaled.backward()
+            else:
+                loss_scaled.backward()
 
             current_accum_loss += loss.item()
 
             # ── Optimizer step (once per accumulation cycle) ────────────────
-            if (batch_idx + 1) % accumulation_steps == 0 or (batch_idx + 1) == len(train_loader):
+            if is_step_time:
                 # Grad clip from config
                 torch.nn.utils.clip_grad_norm_(
                     (model.module if use_ddp else model).parameters(),
@@ -8169,7 +8281,7 @@ def train_tokenizer(model, device, config, save_dir, logger, trial=None):
                 optimizer.zero_grad()
 
                 # Logging
-                avg_loss = current_accum_loss / accumulation_steps
+                avg_loss = current_accum_loss / current_micro_batches
 
                 if (batch_idx_global + 1) % config.log_interval == 0:
                     lr = optimizer.param_groups[0]["lr"]
@@ -8224,16 +8336,19 @@ def train_tokenizer(model, device, config, save_dir, logger, trial=None):
         if rank == 0:
             print(epoch_summary)
 
-        # ── Optuna Pruning Hook ───────────────────────────────────────────────
+        # ── TASK 1.1: Optuna Pruning Hook (Traceback OOM Fix) ─────────────────
         if trial is not None:
-            import optuna 
+            import optuna
             trial.report(avg_val_loss, epoch)
-            
+
             if trial.should_prune():
                 prune_msg = f"Trial {trial.number} pruned at epoch {epoch} (val_loss: {avg_val_loss:.6f})"
                 logger.info(prune_msg)
                 if rank == 0:
                     print(prune_msg)
+
+                # CRITICAL: Sever local variable references to prevent Traceback OOM leak
+                locals().clear()
                 raise optuna.exceptions.TrialPruned()
 
         if avg_val_loss < best_val_loss:

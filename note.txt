@@ -106,3 +106,13 @@ timestamps, open, high, low, close, volume, amount
 ```
 
 Same format as your input — clean and consistent across all timeframes.
+
+
+
+
+3. Account for the "N+1" Inference Rule
+When you convert absolute prices to returns, you lose one row of data (because row 0 has no previous day to calculate a return from).
+
+Why: If your lookback_window is 60, passing exactly 60 rows of absolute prices into predictor.predict() will result in 1 NaN row and 59 valid return rows.
+
+Action: Ensure your live trading bot passes lookback_window + 1 rows to the predictor. The pct_change() or np.log() will consume the extra row, leaving exactly 60 clean return values for the model's context window.

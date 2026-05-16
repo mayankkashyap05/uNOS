@@ -236,7 +236,7 @@ class Nos(nn.Module, PyTorchModelHubMixin):
         elif isinstance(module, RMSNorm):
             nn.init.ones_(module.weight)
 
-    def forward(self, s1_ids, s2_ids, stamp=None, padding_mask=None, use_teacher_forcing=False, s1_targets=None):
+    def forward(self, s1_ids, s2_ids, stamp=None, padding_mask=None, use_teacher_forcing=False, s1_targets=None, gumbel_tau=1.0):
         """
         Args:
             s1_ids (torch.Tensor): Input tensor of s1 token IDs. Shape: [batch_size, seq_len]
@@ -270,7 +270,7 @@ class Nos(nn.Module, PyTorchModelHubMixin):
         elif self.training:
             # State 2: Autoregressive Training (Maintains gradient graph)
             # Uses Straight-Through Gumbel-Softmax so S2 can backpropagate into S1
-            s1_probs = F.gumbel_softmax(s1_logits, tau=1.0, hard=True)
+            s1_probs = F.gumbel_softmax(s1_logits, tau=gumbel_tau, hard=True)
             sibling_embed = torch.matmul(s1_probs, self.embedding.emb_s1.weight)
         else:
             # State 3: Standard Inference (Detached, memory-efficient)
@@ -477,7 +477,6 @@ class NosPredictor:
         self.model = self.model.to(self.device)
 
     def generate(self, x, x_stamp, y_stamp, pred_len, T, top_k, top_p, sample_count, verbose):
-
         x_tensor = torch.from_numpy(np.array(x).astype(np.float32)).to(self.device)
         x_stamp_tensor = torch.from_numpy(np.array(x_stamp).astype(np.float32)).to(self.device)
         y_stamp_tensor = torch.from_numpy(np.array(y_stamp).astype(np.float32)).to(self.device)
@@ -497,8 +496,8 @@ class NosPredictor:
 
         df = df.copy()
         if self.vol_col not in df.columns:
-            df[self.vol_col] = 0.0  # Fill missing volume with zeros
-            df[self.amt_vol] = 0.0  # Fill missing amount with zeros
+            df[self.vol_col] = 0.0
+            df[self.amt_vol] = 0.0
         if self.amt_vol not in df.columns and self.vol_col in df.columns:
             df[self.amt_vol] = df[self.vol_col] * df[self.price_cols].mean(axis=1)
 
@@ -508,12 +507,16 @@ class NosPredictor:
         x_time_df = calc_time_stamps(x_timestamp)
         y_time_df = calc_time_stamps(y_timestamp)
 
+        # ── PROFESSIONAL UPGRADE: Store last absolute price & convert to Log Returns ──
+        last_abs_prices = df[self.price_cols].iloc[-1].values
+
+        df[self.price_cols] = np.log(df[self.price_cols] / df[self.price_cols].shift(1))
+        df[self.price_cols] = df[self.price_cols].replace([np.inf, -np.inf], np.nan).fillna(0.0)
+
         x = df[self.price_cols + [self.vol_col, self.amt_vol]].values.astype(np.float32)
         x_stamp = x_time_df.values.astype(np.float32)
         y_stamp = y_time_df.values.astype(np.float32)
 
-        # FIX: Compute scaling statistics strictly over the trailing context window
-        # to prevent normalization shift and match CustomKlineDataset training logic.
         recent_x = x[-self.max_context:] if x.shape[0] > self.max_context else x
         x_mean, x_std = np.mean(recent_x, axis=0), np.std(recent_x, axis=0)
 
@@ -527,32 +530,25 @@ class NosPredictor:
         preds = self.generate(x, x_stamp, y_stamp, pred_len, T, top_k, top_p, sample_count, verbose)
 
         preds = preds.squeeze(0)
+
+        # Un-normalize Z-score (these are now predicted Log Returns)
         preds = preds * (x_std + 1e-5) + x_mean
+
+        # ── PROFESSIONAL UPGRADE: Reconstruct absolute prices ──
+        num_price_cols = len(self.price_cols)
+        pred_log_returns = preds[:, :num_price_cols]
+
+        # Formula: P_t = P_0 * exp(cumsum(R_log))
+        cum_log_returns = np.cumsum(pred_log_returns, axis=0)
+        pred_abs_prices = last_abs_prices * np.exp(cum_log_returns)
+
+        # Overwrite the log return columns with the newly reconstructed absolute prices
+        preds[:, :num_price_cols] = pred_abs_prices
 
         pred_df = pd.DataFrame(preds, columns=self.price_cols + [self.vol_col, self.amt_vol], index=y_timestamp)
         return pred_df
 
-
     def predict_batch(self, df_list, x_timestamp_list, y_timestamp_list, pred_len, T=1.0, top_k=0, top_p=0.9, sample_count=1, verbose=True):
-        """
-        Perform parallel (batch) prediction on multiple time series. All series must have the same historical length and prediction length (pred_len).
-
-        Args:
-            df_list (List[pd.DataFrame]): List of input DataFrames, each containing price columns and optional volume/amount columns.
-            x_timestamp_list (List[pd.DatetimeIndex or Series]): List of timestamps corresponding to historical data, length should match the number of rows in each DataFrame.
-            y_timestamp_list (List[pd.DatetimeIndex or Series]): List of future prediction timestamps, length should equal pred_len.
-            pred_len (int): Number of prediction steps.
-            T (float): Sampling temperature.
-            top_k (int): Top-k filtering threshold.
-            top_p (float): Top-p (nucleus sampling) threshold.
-            sample_count (int): Number of parallel samples per series, automatically averaged internally.
-            verbose (bool): Whether to display autoregressive progress.
-
-        Returns:
-            List[pd.DataFrame]: List of prediction results in the same order as input, each DataFrame contains
-                                `open, high, low, close, volume, amount` columns, indexed by corresponding `y_timestamp`.
-        """
-        # Basic validation
         if not isinstance(df_list, (list, tuple)) or not isinstance(x_timestamp_list, (list, tuple)) or not isinstance(y_timestamp_list, (list, tuple)):
             raise ValueError("df_list, x_timestamp_list, y_timestamp_list must be list or tuple types.")
         if not (len(df_list) == len(x_timestamp_list) == len(y_timestamp_list)):
@@ -567,6 +563,9 @@ class NosPredictor:
         stds = []
         seq_lens = []
         y_lens = []
+
+        # ── Store last absolute prices for the entire batch ──
+        last_abs_prices_list = []
 
         for i in range(num_series):
             df = df_list[i]
@@ -591,6 +590,12 @@ class NosPredictor:
             x_time_df = calc_time_stamps(x_timestamp)
             y_time_df = calc_time_stamps(y_timestamp)
 
+            # ── Capture absolute price, then convert dataframe to Log Returns ──
+            last_abs_prices_list.append(df[self.price_cols].iloc[-1].values)
+
+            df[self.price_cols] = np.log(df[self.price_cols] / df[self.price_cols].shift(1))
+            df[self.price_cols] = df[self.price_cols].replace([np.inf, -np.inf], np.nan).fillna(0.0)
+
             x = df[self.price_cols + [self.vol_col, self.amt_vol]].values.astype(np.float32)
             x_stamp = x_time_df.values.astype(np.float32)
             y_stamp = y_time_df.values.astype(np.float32)
@@ -600,7 +605,6 @@ class NosPredictor:
             if y_stamp.shape[0] != pred_len:
                 raise ValueError(f"y_timestamp length at index {i} should equal pred_len={pred_len}, got {y_stamp.shape[0]}.")
 
-            # FIX: Bound the scaling calculation to the active context window per series
             recent_x = x[-self.max_context:] if x.shape[0] > self.max_context else x
             x_mean, x_std = np.mean(recent_x, axis=0), np.std(recent_x, axis=0)
 
@@ -616,22 +620,31 @@ class NosPredictor:
             seq_lens.append(x_norm.shape[0])
             y_lens.append(y_stamp.shape[0])
 
-        # Require all series to have consistent historical and prediction lengths for batch processing
         if len(set(seq_lens)) != 1:
             raise ValueError(f"Parallel prediction requires all series to have consistent historical lengths, got: {seq_lens}")
         if len(set(y_lens)) != 1:
             raise ValueError(f"Parallel prediction requires all series to have consistent prediction lengths, got: {y_lens}")
 
-        x_batch = np.stack(x_list, axis=0).astype(np.float32)           # (B, seq_len, feat)
-        x_stamp_batch = np.stack(x_stamp_list, axis=0).astype(np.float32) # (B, seq_len, time_feat)
-        y_stamp_batch = np.stack(y_stamp_list, axis=0).astype(np.float32) # (B, pred_len, time_feat)
+        x_batch = np.stack(x_list, axis=0).astype(np.float32)
+        x_stamp_batch = np.stack(x_stamp_list, axis=0).astype(np.float32)
+        y_stamp_batch = np.stack(y_stamp_list, axis=0).astype(np.float32)
 
         preds = self.generate(x_batch, x_stamp_batch, y_stamp_batch, pred_len, T, top_k, top_p, sample_count, verbose)
-        # preds: (B, pred_len, feat)
 
         pred_dfs = []
+        num_price_cols = len(self.price_cols)
+
         for i in range(num_series):
+            # Un-normalize Z-score (Log Returns)
             preds_i = preds[i] * (stds[i] + 1e-5) + means[i]
+
+            # ── Reconstruct absolute prices for this specific batch item ──
+            pred_log_returns = preds_i[:, :num_price_cols]
+            cum_log_returns = np.cumsum(pred_log_returns, axis=0)
+            pred_abs_prices = last_abs_prices_list[i] * np.exp(cum_log_returns)
+
+            preds_i[:, :num_price_cols] = pred_abs_prices
+
             pred_df = pd.DataFrame(preds_i, columns=self.price_cols + [self.vol_col, self.amt_vol], index=y_timestamp_list[i])
             pred_dfs.append(pred_df)
 

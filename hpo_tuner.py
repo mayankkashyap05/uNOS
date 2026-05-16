@@ -644,7 +644,14 @@ class TokenizerObjective:
             # This executes regardless of success, pruning, or exception.
             # Skipping this causes PyTorch allocator cache accumulation,
             # which leads to OOM on trial N+K even though trial N "freed" its memory.
-            release_gpu_memory(tokenizer)
+            # Explicitly delete local references so GC can collect them.
+            if 'tokenizer' in locals():
+                del tokenizer
+
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
 
             # ── Step 6: Delete trial artifacts ────────────────────────────
             if trial_dir and os.path.exists(trial_dir):
@@ -822,7 +829,17 @@ class BasemodelObjective:
             return val_loss
 
         finally:
-            release_gpu_memory(model, tokenizer)
+            # Explicitly delete local references so GC can collect them.
+            if 'model' in locals():
+                del model
+            if 'tokenizer' in locals():
+                del tokenizer
+
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
+
             if trial_dir and os.path.exists(trial_dir):
                 shutil.rmtree(trial_dir, ignore_errors=True)
 
@@ -1149,11 +1166,11 @@ class NosHPOTuner:
                  cursor = dbapi_connection.cursor()
                  cursor.execute("PRAGMA journal_mode=WAL")
                  cursor.execute("PRAGMA synchronous=NORMAL")
-                 cursor.execute("PRAGMA busy_timeout=60000")
+                 cursor.execute("PRAGMA busy_timeout=300000")
                  cursor.close()
 
              self._logger.info(
-                 "SQLite WAL mode, NullPool, and busy_timeout=60s applied via connection hook."
+                 "SQLite WAL mode, NullPool, and busy_timeout=300s applied via connection hook."
              )
         except Exception as exc:
              self._logger.warning(
@@ -1487,16 +1504,31 @@ class NosHPOTuner:
         try:
             with open(tmp_path, "w", encoding="utf-8") as f:
                 json.dump(payload, f, indent=2, default=str)
-            os.replace(tmp_path, final_path)  # Atomic on POSIX
-            self._logger.info(f"Results atomically written to: {final_path}")
-            print(f"📊 Results saved to: {final_path}")
+
+            # ── TASK 2.1: Windows race-condition backoff for atomic writes ──
+            # OneDrive or other indexing services often hold transient read-locks
+            # on newly created files. This ensures os.replace doesn't crash the worker.
+            for attempt in range(5):
+                try:
+                    os.replace(tmp_path, final_path)  # Atomic on POSIX, near-atomic on Windows
+                    self._logger.info(f"Results atomically written to: {final_path}")
+                    print(f"📊 Results saved to: {final_path}")
+                    break
+                except PermissionError:
+                    if attempt == 4:
+                        raise  # Re-raise after exhausting retries
+                    time.sleep(0.1 * (2 ** attempt))  # Exponential backoff: 0.1s, 0.2s, 0.4s, 0.8s
+
         except Exception as exc:
             self._logger.error(
                 f"Failed to save results to {final_path}: {exc}", exc_info=True
             )
         finally:
             if os.path.exists(tmp_path):
-                os.remove(tmp_path)
+                try:
+                    os.remove(tmp_path)
+                except OSError:
+                    pass
 
         # ── Optional: Save visualisation HTML plots ────────────────────────
         self._save_visualisations(study, phase)

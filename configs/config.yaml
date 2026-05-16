@@ -110,7 +110,11 @@ hpo:
   #
   # For single-GPU development (in-memory, no persistence):
   #   storage: null
-  storage: null
+
+  # TASK 2.1: Local SQLite path to prevent OneDrive lock corruption
+  # The ?timeout=60 parameter prevents "database is locked" errors when
+  # 8 GPU workers finish trials simultaneously.
+  storage: "sqlite:///C:/Temp/nos_hpo.db?timeout=60"
   study_name: "nos_finetune_hpo"
 
   # What to optimize

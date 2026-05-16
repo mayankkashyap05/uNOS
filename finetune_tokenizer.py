@@ -120,13 +120,15 @@ def create_dataloaders(config):
     
     use_ddp = dist.is_available() and dist.is_initialized()
     train_sampler = DistributedSampler(train_dataset, num_replicas=dist.get_world_size(), rank=dist.get_rank(), shuffle=True) if use_ddp else None
-    # FIX: Use drop_last=True to prevent DDP padding from duplicating edge-case
-    # samples and artificially skewing the validation loss during HPO.
-    val_sampler = DistributedSampler(val_dataset, num_replicas=dist.get_world_size(), rank=dist.get_rank(), shuffle=False, drop_last=True) if use_ddp else None
+    # FIX: Use drop_last=False - validation loop correctly masks padding via valid_mask.
+    # drop_last=True discards real data when batch sizes don't divide evenly, causing
+    # inconsistent val_loss across different GPU configurations.
+    val_sampler = DistributedSampler(val_dataset, num_replicas=dist.get_world_size(), rank=dist.get_rank(), shuffle=False, drop_last=False) if use_ddp else None
 
     train_loader = DataLoader(
         train_dataset,
-        batch_size=config.batch_size,
+        # FIX: Explicit cast from trial config to ensure HPO batch_size is respected
+        batch_size=int(config.batch_size),
         shuffle=(train_sampler is None),
         num_workers=config.num_workers,
         pin_memory=True,
@@ -134,10 +136,11 @@ def create_dataloaders(config):
         drop_last=True,
         sampler=train_sampler
     )
-    
+
     val_loader = DataLoader(
         val_dataset,
-        batch_size=config.batch_size,
+        # FIX: Explicit cast from trial config to ensure HPO batch_size is respected
+        batch_size=int(config.batch_size),
         shuffle=False,
         num_workers=config.num_workers,
         pin_memory=True,
@@ -188,7 +191,8 @@ def train_tokenizer(model, device, config, save_dir, logger, trial=None):
 
     scheduler = torch.optim.lr_scheduler.OneCycleLR(
         optimizer,
-        max_lr=config.tokenizer_learning_rate,
+        # FIX: Guarantee max_lr matches the trial's exact optimizer LR
+        max_lr=[group['lr'] for group in optimizer.param_groups],
         steps_per_epoch=effective_steps_per_epoch,
         epochs=config.tokenizer_epochs,
         pct_start=pct_start,
@@ -230,7 +234,6 @@ def train_tokenizer(model, device, config, save_dir, logger, trial=None):
             recon_loss_pre = F.mse_loss(z_pre, batch_x)
             recon_loss_all = F.mse_loss(z, batch_x)
 
-            # FIXED: Apply dynamic loss weights from configuration
             weighted_recon = (
                 (config.tokenizer_recon_pre_weight * recon_loss_pre) +
                 (config.tokenizer_recon_all_weight * recon_loss_all)
@@ -238,14 +241,25 @@ def train_tokenizer(model, device, config, save_dir, logger, trial=None):
 
             loss = (config.tokenizer_recon_weight * weighted_recon) + (config.tokenizer_bsq_weight * bsq_loss)
 
-            # Scale loss by accumulation steps for accurate mean gradient
-            loss_scaled = loss / accumulation_steps
-            loss_scaled.backward()
+            # ── TASK 1.2: Dynamic Micro-Batch & DDP Sync Storm Fix ──────────
+            is_last_batch = (batch_idx + 1) == len(train_loader)
+            is_step_time = (batch_idx + 1) % accumulation_steps == 0 or is_last_batch
+
+            # Dynamic scalar to prevent inverse gradient accumulation on the tail batch
+            current_micro_batches = (batch_idx % accumulation_steps) + 1 if is_last_batch else accumulation_steps
+            loss_scaled = loss / current_micro_batches
+
+            # DDP Context Manager to prevent all_reduce storms
+            if use_ddp and not is_step_time:
+                with model.no_sync():
+                    loss_scaled.backward()
+            else:
+                loss_scaled.backward()
 
             current_accum_loss += loss.item()
 
             # ── Optimizer step (once per accumulation cycle) ────────────────
-            if (batch_idx + 1) % accumulation_steps == 0 or (batch_idx + 1) == len(train_loader):
+            if is_step_time:
                 # Grad clip from config
                 torch.nn.utils.clip_grad_norm_(
                     (model.module if use_ddp else model).parameters(),
@@ -256,7 +270,7 @@ def train_tokenizer(model, device, config, save_dir, logger, trial=None):
                 optimizer.zero_grad()
 
                 # Logging
-                avg_loss = current_accum_loss / accumulation_steps
+                avg_loss = current_accum_loss / current_micro_batches
 
                 if (batch_idx_global + 1) % config.log_interval == 0:
                     lr = optimizer.param_groups[0]["lr"]
@@ -311,16 +325,19 @@ def train_tokenizer(model, device, config, save_dir, logger, trial=None):
         if rank == 0:
             print(epoch_summary)
 
-        # ── Optuna Pruning Hook ───────────────────────────────────────────────
+        # ── TASK 1.1: Optuna Pruning Hook (Traceback OOM Fix) ─────────────────
         if trial is not None:
-            import optuna 
+            import optuna
             trial.report(avg_val_loss, epoch)
-            
+
             if trial.should_prune():
                 prune_msg = f"Trial {trial.number} pruned at epoch {epoch} (val_loss: {avg_val_loss:.6f})"
                 logger.info(prune_msg)
                 if rank == 0:
                     print(prune_msg)
+
+                # CRITICAL: Sever local variable references to prevent Traceback OOM leak
+                locals().clear()
                 raise optuna.exceptions.TrialPruned()
 
         if avg_val_loss < best_val_loss:
