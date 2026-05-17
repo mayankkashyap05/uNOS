@@ -13,7 +13,7 @@ from model import Nos, NosTokenizer, NosPredictor
 # Constants & Configuration
 # =============================================================================
 
-CONFIG_PATH = "configs/config.yaml"  # Make sure this points to your active config
+CONFIG_PATH = "configs/config_t40_hpo_winner.yaml"  # Make sure this points to your active config
 RESULTS_DIR = "backtest_results"
 
 PRICE_COLS = frozenset(['open', 'high', 'low', 'close'])
