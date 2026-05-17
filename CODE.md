@@ -4,37 +4,40 @@
 
 | Field | Value |
 | ----- | ----- |
-| **Generated** | `2026-05-16 20:16:25` |
+| **Generated** | `2026-05-17 13:01:38` |
 | **Source mode** | YAML config (`codebase.yaml`) |
 | **Base directory** | `C:\Users\kashy\OneDrive\Documents\uNOS` |
-| **Total files** | 43 |
+| **Total files** | 47 |
 
 ## 📑 Table of Contents
 
 1. [Project Structure](#-project-structure)
 2. [File Contents](#-file-contents)
+   - [backtest_results/backtest_column_summary.csv](#backtest-resultsbacktest-column-summarycsv)
+   - [backtest_results/backtest_results_full.csv](#backtest-resultsbacktest-results-fullcsv)
+   - [backtest_results/backtest_rolling_accuracy.csv](#backtest-resultsbacktest-rolling-accuracycsv)
+   - [backtest_results/column_deep_dives/deepdive_amount.csv](#backtest-resultscolumn-deep-divesdeepdive-amountcsv)
+   - [backtest_results/column_deep_dives/deepdive_close.csv](#backtest-resultscolumn-deep-divesdeepdive-closecsv)
+   - [backtest_results/column_deep_dives/deepdive_high.csv](#backtest-resultscolumn-deep-divesdeepdive-highcsv)
+   - [backtest_results/column_deep_dives/deepdive_low.csv](#backtest-resultscolumn-deep-divesdeepdive-lowcsv)
+   - [backtest_results/column_deep_dives/deepdive_open.csv](#backtest-resultscolumn-deep-divesdeepdive-opencsv)
+   - [backtest_results/column_deep_dives/deepdive_volume.csv](#backtest-resultscolumn-deep-divesdeepdive-volumecsv)
    - [configs/config.yaml](#configsconfigyaml)
    - [configs/config_mx110_hpo_fulltest.yaml](#configsconfig-mx110-hpo-fulltestyaml)
-   - [configs/config_mx110_hpo_winner.yaml](#configsconfig-mx110-hpo-winneryaml)
    - [configs/config_t40_hpo_fulltest.yaml](#configsconfig-t40-hpo-fulltestyaml)
+   - [configs/config_t40_hpo_winner.yaml](#configsconfig-t40-hpo-winneryaml)
    - [data/1d.csv](#data1dcsv)
-   - [finetuned/model1.zip](#finetunedmodel1zip)
-   - [finetuned/smoke_test_full_hpo/basemodel/best_model/config.json](#finetunedsmoke-test-full-hpobasemodelbest-modelconfigjson)
-   - [finetuned/smoke_test_full_hpo/basemodel/best_model/model.safetensors](#finetunedsmoke-test-full-hpobasemodelbest-modelmodelsafetensors)
-   - [finetuned/smoke_test_full_hpo/basemodel/best_model/README.md](#finetunedsmoke-test-full-hpobasemodelbest-modelreadmemd)
-   - [finetuned/smoke_test_full_hpo/hpo_logs/worker_pid20088_cuda0.log](#finetunedsmoke-test-full-hpohpo-logsworker-pid20088-cuda0log)
-   - [finetuned/smoke_test_full_hpo/hpo_results/basemodel_trials.json](#finetunedsmoke-test-full-hpohpo-resultsbasemodel-trialsjson)
-   - [finetuned/smoke_test_full_hpo/hpo_results/tokenizer_trials.json](#finetunedsmoke-test-full-hpohpo-resultstokenizer-trialsjson)
-   - [finetuned/smoke_test_full_hpo/hpo_trials/basemodel_pid20088_trial0/trial.log](#finetunedsmoke-test-full-hpohpo-trialsbasemodel-pid20088-trial0triallog)
-   - [finetuned/smoke_test_full_hpo/hpo_trials/basemodel_pid20088_trial1/trial.log](#finetunedsmoke-test-full-hpohpo-trialsbasemodel-pid20088-trial1triallog)
-   - [finetuned/smoke_test_full_hpo/hpo_trials/tokenizer_pid20088_trial0/trial.log](#finetunedsmoke-test-full-hpohpo-trialstokenizer-pid20088-trial0triallog)
-   - [finetuned/smoke_test_full_hpo/hpo_trials/tokenizer_pid20088_trial1/trial.log](#finetunedsmoke-test-full-hpohpo-trialstokenizer-pid20088-trial1triallog)
-   - [finetuned/smoke_test_full_hpo/logs/basemodel_training_rank_0.log](#finetunedsmoke-test-full-hpologsbasemodel-training-rank-0log)
-   - [finetuned/smoke_test_full_hpo/logs/tokenizer_training_rank_0.log](#finetunedsmoke-test-full-hpologstokenizer-training-rank-0log)
-   - [finetuned/smoke_test_full_hpo/tokenizer/trial.log](#finetunedsmoke-test-full-hpotokenizertriallog)
-   - [finetuned/smoke_test_full_hpo/tokenizer/best_model/config.json](#finetunedsmoke-test-full-hpotokenizerbest-modelconfigjson)
-   - [finetuned/smoke_test_full_hpo/tokenizer/best_model/model.safetensors](#finetunedsmoke-test-full-hpotokenizerbest-modelmodelsafetensors)
-   - [finetuned/smoke_test_full_hpo/tokenizer/best_model/README.md](#finetunedsmoke-test-full-hpotokenizerbest-modelreadmemd)
+   - [finetuned/1d_t4_hpo/basemodel/best_model/config.json](#finetuned1d-t4-hpobasemodelbest-modelconfigjson)
+   - [finetuned/1d_t4_hpo/basemodel/best_model/model.safetensors](#finetuned1d-t4-hpobasemodelbest-modelmodelsafetensors)
+   - [finetuned/1d_t4_hpo/basemodel/best_model/README.md](#finetuned1d-t4-hpobasemodelbest-modelreadmemd)
+   - [finetuned/1d_t4_hpo/hpo_logs/worker_pid18131_cuda0.log](#finetuned1d-t4-hpohpo-logsworker-pid18131-cuda0log)
+   - [finetuned/1d_t4_hpo/logs/basemodel_training_rank_0.log](#finetuned1d-t4-hpologsbasemodel-training-rank-0log)
+   - [finetuned/1d_t4_hpo/logs/tokenizer_training_rank_0.log](#finetuned1d-t4-hpologstokenizer-training-rank-0log)
+   - [finetuned/1d_t4_hpo/tokenizer/trial.log](#finetuned1d-t4-hpotokenizertriallog)
+   - [finetuned/1d_t4_hpo/tokenizer/best_model/config.json](#finetuned1d-t4-hpotokenizerbest-modelconfigjson)
+   - [finetuned/1d_t4_hpo/tokenizer/best_model/model.safetensors](#finetuned1d-t4-hpotokenizerbest-modelmodelsafetensors)
+   - [finetuned/1d_t4_hpo/tokenizer/best_model/README.md](#finetuned1d-t4-hpotokenizerbest-modelreadmemd)
+   - [finetuned/tests/model.zip](#finetunedtestsmodelzip)
    - [model/__init__.py](#model--init--py)
    - [model/module.py](#modelmodulepy)
    - [model/nos.py](#modelnospy)
@@ -54,6 +57,7 @@
    - [finetune_base_model.py](#finetune-base-modelpy)
    - [finetune_tokenizer.py](#finetune-tokenizerpy)
    - [train_sequential.py](#train-sequentialpy)
+   - [full_scale_backtest.py](#full-scale-backtestpy)
    - [requirements.txt](#requirementstxt)
    - [CLAUDE.md](#claudemd)
 
@@ -61,44 +65,44 @@
 
 ```
 .
+├── backtest_results
+│   ├── backtest_column_summary.csv
+│   ├── backtest_results_full.csv
+│   ├── backtest_rolling_accuracy.csv
+│   └── column_deep_dives
+│       ├── deepdive_amount.csv
+│       ├── deepdive_close.csv
+│       ├── deepdive_high.csv
+│       ├── deepdive_low.csv
+│       ├── deepdive_open.csv
+│       └── deepdive_volume.csv
 ├── configs
 │   ├── config.yaml
 │   ├── config_mx110_hpo_fulltest.yaml
-│   ├── config_mx110_hpo_winner.yaml
-│   └── config_t40_hpo_fulltest.yaml
+│   ├── config_t40_hpo_fulltest.yaml
+│   └── config_t40_hpo_winner.yaml
 ├── data
 │   └── 1d.csv
 ├── finetuned
-│   ├── model1.zip
-│   └── smoke_test_full_hpo
-│       ├── basemodel
-│       │   └── best_model
-│       │       ├── config.json
-│       │       ├── model.safetensors
-│       │       └── README.md
-│       ├── hpo_logs
-│       │   └── worker_pid20088_cuda0.log
-│       ├── hpo_results
-│       │   ├── basemodel_trials.json
-│       │   └── tokenizer_trials.json
-│       ├── hpo_trials
-│       │   ├── basemodel_pid20088_trial0
-│       │   │   └── trial.log
-│       │   ├── basemodel_pid20088_trial1
-│       │   │   └── trial.log
-│       │   ├── tokenizer_pid20088_trial0
-│       │   │   └── trial.log
-│       │   └── tokenizer_pid20088_trial1
-│       │       └── trial.log
-│       ├── logs
-│       │   ├── basemodel_training_rank_0.log
-│       │   └── tokenizer_training_rank_0.log
-│       └── tokenizer
-│           ├── trial.log
-│           └── best_model
-│               ├── config.json
-│               ├── model.safetensors
-│               └── README.md
+│   ├── 1d_t4_hpo
+│   │   ├── basemodel
+│   │   │   └── best_model
+│   │   │       ├── config.json
+│   │   │       ├── model.safetensors
+│   │   │       └── README.md
+│   │   ├── hpo_logs
+│   │   │   └── worker_pid18131_cuda0.log
+│   │   ├── logs
+│   │   │   ├── basemodel_training_rank_0.log
+│   │   │   └── tokenizer_training_rank_0.log
+│   │   └── tokenizer
+│   │       ├── trial.log
+│   │       └── best_model
+│   │           ├── config.json
+│   │           ├── model.safetensors
+│   │           └── README.md
+│   └── tests
+│       └── model.zip
 ├── model
 │   ├── __init__.py
 │   ├── module.py
@@ -125,11 +129,147 @@
 ├── finetune_base_model.py
 ├── finetune_tokenizer.py
 ├── train_sequential.py
+├── full_scale_backtest.py
 ├── requirements.txt
 └── CLAUDE.md
 ```
 
 ## 📄 File Contents
+
+### `backtest_results/backtest_column_summary.csv`
+
+```text
+column,category,accuracy_%,mean_corr,n_samples,n_directional,verdict
+open,PRICE,90.9090909090909,0.0758205353052911,22,22,🟢🟢 EXCEPTIONAL ALPHA
+high,PRICE,59.09090909090909,0.09427040047852676,22,22,🟢🟢 EXCEPTIONAL ALPHA
+low,PRICE,81.81818181818183,0.08574615560609201,22,22,🟢🟢 EXCEPTIONAL ALPHA
+close,PRICE,59.09090909090909,0.08906325958953364,22,22,🟢🟢 EXCEPTIONAL ALPHA
+volume,VOL/AMT,72.72727272727273,0.3157535283756822,22,22,🟢🟢 EXCEPTIONAL ALPHA
+
+# ⚠️  Preview — showing 5 of 6 data rows (1 rows hidden).
+```
+
+---
+
+### `backtest_results/backtest_results_full.csv`
+
+```text
+start_time,end_time,open_corr,open_rmse,open_nrmse,open_mape,open_mae,open_r2,open_path_acc,open_last_price,open_pred_t1,open_true_t1,open_acc,high_corr,high_rmse,high_nrmse,high_mape,high_mae,high_r2,high_path_acc,high_last_price,high_pred_t1,high_true_t1,high_acc,low_corr,low_rmse,low_nrmse,low_mape,low_mae,low_r2,low_path_acc,low_last_price,low_pred_t1,low_true_t1,low_acc,close_corr,close_rmse,close_nrmse,close_mape,close_mae,close_r2,close_path_acc,close_last_price,close_pred_t1,close_true_t1,close_acc,volume_corr,volume_rmse,volume_nrmse,volume_mape,volume_mae,volume_r2,volume_path_acc,volume_last_price,volume_pred_t1,volume_true_t1,volume_acc,amount_corr,amount_rmse,amount_nrmse,amount_mape,amount_mae,amount_r2,amount_path_acc,amount_last_price,amount_pred_t1,amount_true_t1,amount_acc,avg_corr_all,avg_rmse_all,avg_mape_all,avg_acc_all,avg_acc_price,avg_acc_va
+2025-03-27,2025-04-09,-0.8967293661633968,34.8267409357726,28.64865786677411,25.90455457953263,29.796034066336492,-11.038129673240759,0.42857142857142855,143.64,136.8845672607422,137.35,1,-0.7622433800185778,29.09612872783387,23.053481809964655,21.121854314143903,25.689393659319197,-11.355999665439183,0.42857142857142855,145.49,140.8697052001953,140.22,1,-0.9081089005480469,30.378581059415367,26.27872460989405,24.59288201599969,26.763679765973773,-6.560263974959503,0.42857142857142855,135.89,134.9918670654297,135.63,1,-0.7839413327922037,32.84708483131239,27.314365081433078,25.5784218354595,29.53328281947545,-12.220789126828073,0.42857142857142855,137.34,138.6562042236328,138.43,1,0.105448103778457,5032187.8251189105,100.09315970684953,77.17171785462102,4108985.8240714283,-1.9884695829817591,0.5714285714285714,3099523.287,1637197.25,2466162.683,1,0.12048919132797165,690041243.4442807,117.56126944552416,110.42344789966647,618510230.3896464,-4.441416573922088,0.5714285714285714,437250101.7183266,145930816.0,341285953.23849666,1,-0.5208476140692994,115845593.06965588,47.46547974990387,1.0,1.0,1.0
+2025-04-10,2025-04-23,-0.7995724801768351,27.54166051833304,21.039311132132617,17.162625777277523,23.302375662667412,-8.674450289710705,0.5714285714285714,105.4,118.36685180664062,119.05,1,-0.8547849828830725,30.536363673634213,22.30233981420677,18.87877405029423,26.66772633143834,-10.843508066293406,0.2857142857142857,121.0,122.83771514892578,119.3,0,-0.8421207262124717,31.17563464660396,24.39394397818668,20.435590193520824,27.12007298060826,-9.432760340462025,0.35714285714285715,101.26,109.35100555419922,108.21,1,-0.8062702429936123,30.968293856483033,23.250093255955864,19.466685726648254,26.840177459716795,-9.397832131226462,0.5,119.05,117.07911682128906,112.81,1,0.45101061940248277,2533501.521494249,60.41120039489437,53.661431423644665,2310597.906642857,-7.5317316092252735,0.5,9334586.139,8852828.0,5566324.629,1,0.12644150152124045,570987633.0688473,103.04435338292366,92.3658537335425,520438150.2041604,-23.890993266163118,0.42857142857142855,1032981778.1336168,1626446336.0,632016470.7068334,0,-0.4542160518903781,95586875.80204904,36.995160150821334,0.6666666666666666,0.75,0.5
+2025-04-24,2025-05-07,0.7005763278646833,13.556750775014303,9.140160118761576,8.053627787624151,11.892865796770367,-35.45313496512371,0.6428571428571429,148.78,152.987548828125,151.1,1,0.6859921768398229,18.00555260108042,11.928721200783595,10.836305694990997,16.28469597952706,-41.431972147827715,0.7142857142857143,154.21,150.76182556152344,152.9,1,0.5018593944307574,15.517947434026443,10.69834362910427,9.106360567074304,13.169000026157923,-37.544400469090014,0.7142857142857143,147.13,142.9000244140625,144.87,1,0.5938274012483761,19.07724020242418,12.88548739265404,11.553625674672173,17.050731419154577,-80.23499174310538,0.5714285714285714,151.1,142.60980224609375,152.55,0,0.3714003685612464,1413515.2816453823,56.517146657720815,46.352092923145136,1188624.1182857142,-2.07613806128515,0.35714285714285715,4801378.47,3405181.25,3535860.484,1,0.3718461414109476,223720538.38440648,60.24075128679907,50.3801869263722,190821968.87835482,-2.2612002651841965,0.35714285714285715,724646698.52195,509257280.0,527299470.42120665,1,0.5375836350593056,37522353.30392381,22.713699928979825,0.8333333333333334,0.75,1.0
+2025-05-08,2025-05-21,-0.053894004646711145,36.62817004014634,21.53241152894173,20.016953860609803,34.39219443184989,-19.360003414211313,0.5,146.89,148.98529052734375,147.32,1,0.17325427479453104,45.23375803467233,25.602288760260933,24.781522207360794,43.855536869594026,-71.49391152317688,0.35714285714285715,149.54,147.2510986328125,164.6,0,-0.10221628362585118,35.77259420518926,21.727294843508073,20.408031758178765,33.8261090523856,-35.94068716381998,0.42857142857142855,144.68,143.29917907714844,147.08,0,0.294118790886185,43.43007775201329,25.25308648167065,24.413376514118575,42.002245832170765,-71.12686788504459,0.42857142857142855,147.32,144.12091064453125,164.46,0,0.4145461111235948,3531534.9421083247,87.13216058759727,80.45384968723394,3315323.978642857,-6.793799897429645,0.5714285714285714,2440566.284,1117226.25,6040622.618,0,0.5372341323405374,578827663.4091122,83.94936040577194,77.29440961639834,543096179.4942209,-6.5596799737833855,0.5714285714285714,358940331.73577,203925568.0,947464043.6030768,0,0.21050717014538098,97059893.2359701,41.22802394065004,0.16666666666666666,0.25,0.0
+2025-05-22,2025-06-04,0.8674510113694004,9.889304673377609,5.887091600639695,5.290705115871487,8.939708687918527,-0.20471359116256416,0.6428571428571429,168.59,174.8369903564453,173.54,1,0.901479074691037,16.870378525431274,9.84519732703763,9.495084810988716,16.251100420270646,-1.886728823280579,0.5714285714285714,175.99,171.52316284179688,180.87,0,0.9138788147553261,10.341088843163515,6.339337049611188,5.87152647809608,9.64141230991908,-0.26187738662995175,0.6428571428571429,165.51,163.36959838867188,172.59,0,0.9270874609997738,12.812464003150653,7.693688307448217,7.367936160392426,12.24709668840681,-0.7781264981765112,0.6428571428571429,173.53,164.9285430908203,179.68,0,0.6771361878989548,1968785.7196521454,68.84536794547702,64.58288680272138,1817156.6137142857,-2.657240216910144,0.5,4400610.4,3003037.5,3608222.862,1,0.691679460917216,290423285.98866796,60.139240636988056,52.32604961864884,253638309.4583512,-1.2335180774236307,0.5,748953716.71487,553836096.0,640408590.1322967,1,0.8297853351052847,48732020.27025936,24.155698164453156,0.5,0.25,1.0
+
+# ⚠️  Preview — showing 5 of 22 data rows (17 rows hidden).
+```
+
+---
+
+### `backtest_results/backtest_rolling_accuracy.csv`
+
+```text
+start_time,open_rolling_acc,open_rolling_corr,high_rolling_acc,high_rolling_corr,low_rolling_acc,low_rolling_corr,close_rolling_acc,close_rolling_corr,volume_rolling_acc,volume_rolling_corr,amount_rolling_acc,amount_rolling_corr
+2025-03-27,,,,,,,,,,,,
+2025-04-10,100.0,-0.848150923170116,50.0,-0.8085141814508252,100.0,-0.8751148133802593,100.0,-0.795105787892908,100.0,0.2782293615904699,50.0,0.12346534642460605
+2025-04-24,100.0,-0.33190850615851625,66.66666666666666,-0.31034539535394245,100.0,-0.41612341077658704,66.66666666666666,-0.33212805817914665,100.0,0.30928636391406206,66.66666666666666,0.20625894475338655
+2025-05-08,100.0,-0.26240488078056495,50.0,-0.18944547781682408,75.0,-0.3376466289889031,50.0,-0.17556634591281373,75.0,0.33560130071644523,50.0,0.28900274165017426
+2025-05-22,100.0,-0.03643370235057188,40.0,0.028739432684748146,60.0,-0.08734154024005727,40.0,0.044964415469703777,80.0,0.4039082781529471,60.0,0.36953808550358264
+
+# ⚠️  Preview — showing 5 of 22 data rows (17 rows hidden).
+```
+
+---
+
+### `backtest_results/column_deep_dives/deepdive_amount.csv`
+
+```text
+start_time,end_time,amount_corr,amount_rmse,amount_nrmse,amount_mape,amount_mae,amount_r2,amount_path_acc,amount_last_price,amount_pred_t1,amount_true_t1,amount_acc
+2025-03-27,2025-04-09,0.12048919132797165,690041243.4442807,117.56126944552416,110.42344789966647,618510230.3896464,-4.441416573922088,0.5714285714285714,437250101.7183266,145930816.0,341285953.23849666,1
+2025-04-10,2025-04-23,0.12644150152124045,570987633.0688473,103.04435338292366,92.3658537335425,520438150.2041604,-23.890993266163118,0.42857142857142855,1032981778.1336168,1626446336.0,632016470.7068334,0
+2025-04-24,2025-05-07,0.3718461414109476,223720538.38440648,60.24075128679907,50.3801869263722,190821968.87835482,-2.2612002651841965,0.35714285714285715,724646698.52195,509257280.0,527299470.42120665,1
+2025-05-08,2025-05-21,0.5372341323405374,578827663.4091122,83.94936040577194,77.29440961639834,543096179.4942209,-6.5596799737833855,0.5714285714285714,358940331.73577,203925568.0,947464043.6030768,0
+2025-05-22,2025-06-04,0.691679460917216,290423285.98866796,60.139240636988056,52.32604961864884,253638309.4583512,-1.2335180774236307,0.5,748953716.71487,553836096.0,640408590.1322967,1
+
+# ⚠️  Preview — showing 5 of 22 data rows (17 rows hidden).
+```
+
+---
+
+### `backtest_results/column_deep_dives/deepdive_close.csv`
+
+```text
+start_time,end_time,close_corr,close_rmse,close_nrmse,close_mape,close_mae,close_r2,close_path_acc,close_last_price,close_pred_t1,close_true_t1,close_acc
+2025-03-27,2025-04-09,-0.7839413327922037,32.84708483131239,27.314365081433078,25.5784218354595,29.53328281947545,-12.220789126828073,0.42857142857142855,137.34,138.6562042236328,138.43,1
+2025-04-10,2025-04-23,-0.8062702429936123,30.968293856483033,23.250093255955864,19.466685726648254,26.840177459716795,-9.397832131226462,0.5,119.05,117.07911682128906,112.81,1
+2025-04-24,2025-05-07,0.5938274012483761,19.07724020242418,12.88548739265404,11.553625674672173,17.050731419154577,-80.23499174310538,0.5714285714285714,151.1,142.60980224609375,152.55,0
+2025-05-08,2025-05-21,0.294118790886185,43.43007775201329,25.25308648167065,24.413376514118575,42.002245832170765,-71.12686788504459,0.42857142857142855,147.32,144.12091064453125,164.46,0
+2025-05-22,2025-06-04,0.9270874609997738,12.812464003150653,7.693688307448217,7.367936160392426,12.24709668840681,-0.7781264981765112,0.6428571428571429,173.53,164.9285430908203,179.68,0
+
+# ⚠️  Preview — showing 5 of 22 data rows (17 rows hidden).
+```
+
+---
+
+### `backtest_results/column_deep_dives/deepdive_high.csv`
+
+```text
+start_time,end_time,high_corr,high_rmse,high_nrmse,high_mape,high_mae,high_r2,high_path_acc,high_last_price,high_pred_t1,high_true_t1,high_acc
+2025-03-27,2025-04-09,-0.7622433800185778,29.09612872783387,23.053481809964655,21.121854314143903,25.689393659319197,-11.355999665439183,0.42857142857142855,145.49,140.8697052001953,140.22,1
+2025-04-10,2025-04-23,-0.8547849828830725,30.536363673634213,22.30233981420677,18.87877405029423,26.66772633143834,-10.843508066293406,0.2857142857142857,121.0,122.83771514892578,119.3,0
+2025-04-24,2025-05-07,0.6859921768398229,18.00555260108042,11.928721200783595,10.836305694990997,16.28469597952706,-41.431972147827715,0.7142857142857143,154.21,150.76182556152344,152.9,1
+2025-05-08,2025-05-21,0.17325427479453104,45.23375803467233,25.602288760260933,24.781522207360794,43.855536869594026,-71.49391152317688,0.35714285714285715,149.54,147.2510986328125,164.6,0
+2025-05-22,2025-06-04,0.901479074691037,16.870378525431274,9.84519732703763,9.495084810988716,16.251100420270646,-1.886728823280579,0.5714285714285714,175.99,171.52316284179688,180.87,0
+
+# ⚠️  Preview — showing 5 of 22 data rows (17 rows hidden).
+```
+
+---
+
+### `backtest_results/column_deep_dives/deepdive_low.csv`
+
+```text
+start_time,end_time,low_corr,low_rmse,low_nrmse,low_mape,low_mae,low_r2,low_path_acc,low_last_price,low_pred_t1,low_true_t1,low_acc
+2025-03-27,2025-04-09,-0.9081089005480469,30.378581059415367,26.27872460989405,24.59288201599969,26.763679765973773,-6.560263974959503,0.42857142857142855,135.89,134.9918670654297,135.63,1
+2025-04-10,2025-04-23,-0.8421207262124717,31.17563464660396,24.39394397818668,20.435590193520824,27.12007298060826,-9.432760340462025,0.35714285714285715,101.26,109.35100555419922,108.21,1
+2025-04-24,2025-05-07,0.5018593944307574,15.517947434026443,10.69834362910427,9.106360567074304,13.169000026157923,-37.544400469090014,0.7142857142857143,147.13,142.9000244140625,144.87,1
+2025-05-08,2025-05-21,-0.10221628362585118,35.77259420518926,21.727294843508073,20.408031758178765,33.8261090523856,-35.94068716381998,0.42857142857142855,144.68,143.29917907714844,147.08,0
+2025-05-22,2025-06-04,0.9138788147553261,10.341088843163515,6.339337049611188,5.87152647809608,9.64141230991908,-0.26187738662995175,0.6428571428571429,165.51,163.36959838867188,172.59,0
+
+# ⚠️  Preview — showing 5 of 22 data rows (17 rows hidden).
+```
+
+---
+
+### `backtest_results/column_deep_dives/deepdive_open.csv`
+
+```text
+start_time,end_time,open_corr,open_rmse,open_nrmse,open_mape,open_mae,open_r2,open_path_acc,open_last_price,open_pred_t1,open_true_t1,open_acc
+2025-03-27,2025-04-09,-0.8967293661633968,34.8267409357726,28.64865786677411,25.90455457953263,29.796034066336492,-11.038129673240759,0.42857142857142855,143.64,136.8845672607422,137.35,1
+2025-04-10,2025-04-23,-0.7995724801768351,27.54166051833304,21.039311132132617,17.162625777277523,23.302375662667412,-8.674450289710705,0.5714285714285714,105.4,118.36685180664062,119.05,1
+2025-04-24,2025-05-07,0.7005763278646833,13.556750775014303,9.140160118761576,8.053627787624151,11.892865796770367,-35.45313496512371,0.6428571428571429,148.78,152.987548828125,151.1,1
+2025-05-08,2025-05-21,-0.053894004646711145,36.62817004014634,21.53241152894173,20.016953860609803,34.39219443184989,-19.360003414211313,0.5,146.89,148.98529052734375,147.32,1
+2025-05-22,2025-06-04,0.8674510113694004,9.889304673377609,5.887091600639695,5.290705115871487,8.939708687918527,-0.20471359116256416,0.6428571428571429,168.59,174.8369903564453,173.54,1
+
+# ⚠️  Preview — showing 5 of 22 data rows (17 rows hidden).
+```
+
+---
+
+### `backtest_results/column_deep_dives/deepdive_volume.csv`
+
+```text
+start_time,end_time,volume_corr,volume_rmse,volume_nrmse,volume_mape,volume_mae,volume_r2,volume_path_acc,volume_last_price,volume_pred_t1,volume_true_t1,volume_acc
+2025-03-27,2025-04-09,0.105448103778457,5032187.8251189105,100.09315970684953,77.17171785462102,4108985.8240714283,-1.9884695829817591,0.5714285714285714,3099523.287,1637197.25,2466162.683,1
+2025-04-10,2025-04-23,0.45101061940248277,2533501.521494249,60.41120039489437,53.661431423644665,2310597.906642857,-7.5317316092252735,0.5,9334586.139,8852828.0,5566324.629,1
+2025-04-24,2025-05-07,0.3714003685612464,1413515.2816453823,56.517146657720815,46.352092923145136,1188624.1182857142,-2.07613806128515,0.35714285714285715,4801378.47,3405181.25,3535860.484,1
+2025-05-08,2025-05-21,0.4145461111235948,3531534.9421083247,87.13216058759727,80.45384968723394,3315323.978642857,-6.793799897429645,0.5714285714285714,2440566.284,1117226.25,6040622.618,0
+2025-05-22,2025-06-04,0.6771361878989548,1968785.7196521454,68.84536794547702,64.58288680272138,1817156.6137142857,-2.657240216910144,0.5,4400610.4,3003037.5,3608222.862,1
+
+# ⚠️  Preview — showing 5 of 22 data rows (17 rows hidden).
+```
+
+---
 
 ### `configs/config.yaml`
 
@@ -639,214 +779,11 @@ hpo:
 
 ---
 
-### `configs/config_mx110_hpo_winner.yaml`
-
-```yaml
-data:
-  data_path: data/1d.csv
-  lookback_window: 3
-  predict_window: 2
-  max_context: 5
-  clip: 7.282970263056656
-  train_ratio: 0.9
-  val_ratio: 0.1
-  test_ratio: 0.0
-training:
-  tokenizer_epochs: 2
-  basemodel_epochs: 2
-  batch_size: 1
-  log_interval: 10
-  num_workers: 2
-  pin_memory: true
-  persistent_workers: true
-  seed: 42
-  tokenizer_learning_rate: 0.0001025350969016849
-  predictor_learning_rate: 1.3292918943162153e-06
-  adam_beta1: 0.9231993941811405
-  adam_beta2: 0.9592671899355066
-  adam_weight_decay: 0.22648248189516848
-  accumulation_steps: 1
-  tokenizer_pct_start: 0.012881829201412343
-  tokenizer_div_factor: 5.0
-  basemodel_pct_start: 0.012881829201412343
-  basemodel_div_factor: 5.0
-  tokenizer_max_grad_norm: 1.325320294340452
-  basemodel_max_grad_norm: 1.325320294340452
-  tokenizer_grad_clip: 2.0
-  basemodel_grad_clip: 3.0
-  ffn_dropout_p: 0.1216968971838151
-  attn_dropout_p: 0.10495128632644757
-  resid_dropout_p: 0.12958350559263473
-  token_dropout_p: 0.058245828039608386
-  bsq_beta: 0.024878734419814436
-  bsq_gamma0: 1.2871346474483567
-  bsq_gamma: 1.3183340223705389
-  bsq_zeta: 0.023927528765580644
-model_paths:
-  pretrained_tokenizer: models/nos_tokenizer_2k
-  pretrained_predictor: models/nos_mini
-  exp_name: smoke_test_full_hpo
-  base_path: finetuned
-  base_save_path: ''
-  finetuned_tokenizer: ''
-  tokenizer_save_name: tokenizer
-  basemodel_save_name: basemodel
-experiment:
-  name: Nos_smoke_test_full
-  description: 2GB VRAM Full HPO Structure Test
-  use_comet: false
-  train_tokenizer: true
-  train_basemodel: true
-  skip_existing: false
-  hpo_applied: true
-  hpo_applied_timestamp: '2026-05-15T21:48:23.384812'
-device:
-  use_cuda: true
-  device_id: 0
-hpo:
-  enabled: true
-  n_trials: 2
-  direction: minimize
-  sampler: tpe
-  pruner: median
-  # TASK 2.1: Local SQLite path to prevent OneDrive lock corruption
-  # The ?timeout=60 parameter prevents "database is locked" errors when
-  # 8 GPU workers finish trials simultaneously.
-  storage: "sqlite:///C:/Temp/nos_mx110_hpo_winner.db?timeout=60"
-  study_name: nos_finetune_hpo_full
-  optimize_tokenizer: true
-  optimize_basemodel: true
-  hpo_tokenizer_epochs: 1
-  hpo_basemodel_epochs: 1
-  search_space:
-    tokenizer_learning_rate:
-      type: float
-      low: 1.0e-05
-      high: 0.005
-      log: true
-    predictor_learning_rate:
-      type: float
-      low: 1.0e-07
-      high: 0.0001
-      log: true
-    adam_weight_decay:
-      type: float
-      low: 0.001
-      high: 0.3
-      log: true
-    adam_beta1:
-      type: float
-      low: 0.85
-      high: 0.95
-      log: false
-    adam_beta2:
-      type: float
-      low: 0.9
-      high: 0.999
-      log: false
-    batch_size:
-      type: categorical
-      choices:
-      - 1
-      - 2
-      - 4
-    accumulation_steps:
-      type: categorical
-      choices:
-      - 1
-      - 2
-      - 4
-    tokenizer_pct_start:
-      type: float
-      low: 0.01
-      high: 0.15
-      log: false
-    basemodel_pct_start:
-      type: float
-      low: 0.01
-      high: 0.15
-      log: false
-    tokenizer_div_factor:
-      type: categorical
-      choices:
-      - 5.0
-      - 10.0
-      - 25.0
-      - 50.0
-    basemodel_div_factor:
-      type: categorical
-      choices:
-      - 5.0
-      - 10.0
-      - 25.0
-      - 50.0
-    tokenizer_max_grad_norm:
-      type: float
-      low: 0.5
-      high: 5.0
-      log: false
-    basemodel_max_grad_norm:
-      type: float
-      low: 0.5
-      high: 5.0
-      log: false
-    ffn_dropout_p:
-      type: float
-      low: 0.0
-      high: 0.4
-      log: false
-    attn_dropout_p:
-      type: float
-      low: 0.0
-      high: 0.2
-      log: false
-    resid_dropout_p:
-      type: float
-      low: 0.0
-      high: 0.3
-      log: false
-    token_dropout_p:
-      type: float
-      low: 0.0
-      high: 0.2
-      log: false
-    bsq_beta:
-      type: float
-      low: 0.01
-      high: 0.2
-      log: true
-    bsq_gamma0:
-      type: float
-      low: 0.5
-      high: 2.0
-      log: false
-    bsq_gamma:
-      type: float
-      low: 0.8
-      high: 2.0
-      log: false
-    bsq_zeta:
-      type: float
-      low: 0.01
-      high: 0.2
-      log: true
-    clip:
-      type: float
-      low: 3.0
-      high: 10.0
-      log: false
-
-```
-
----
-
 ### `configs/config_t40_hpo_fulltest.yaml`
 
 ```yaml
 data:
   data_path: "data/1d.csv"
-  # 5 years of daily data is roughly 1250-1825 rows.
-  # 90 days lookback, 14 days predict is optimal for capturing macro trends.
   lookback_window: 90
   predict_window: 14
   max_context: 90
@@ -856,21 +793,22 @@ data:
   test_ratio: 0.0
 
 training:
-  # Base epochs used for the final "apply best" retraining phase
-  tokenizer_epochs: 30
-  basemodel_epochs: 20
+  # Increased epochs because larger batch sizes mean fewer steps per epoch
+  tokenizer_epochs: 50
+  basemodel_epochs: 30
   
-  # Scaled up for T4 16GB VRAM
-  batch_size: 64
+  # Base default pushed higher for T4 16GB VRAM
+  batch_size: 128
   log_interval: 10
 
+  # T4 has strong DMA, keeping 4 workers is optimal for data feeding
   num_workers: 4
   pin_memory: true
   persistent_workers: true
   seed: 42
 
-  tokenizer_learning_rate: 0.0002
-  predictor_learning_rate: 0.00004
+  tokenizer_learning_rate: 0.0005
+  predictor_learning_rate: 0.0001
 
   adam_beta1: 0.9
   adam_beta2: 0.95
@@ -878,9 +816,9 @@ training:
 
   accumulation_steps: 1
 
-  tokenizer_pct_start: 0.03
+  tokenizer_pct_start: 0.05
   tokenizer_div_factor: 10.0
-  basemodel_pct_start: 0.03
+  basemodel_pct_start: 0.05
   basemodel_div_factor: 10.0
 
   tokenizer_max_grad_norm: 2.0   
@@ -898,7 +836,7 @@ model_paths:
 
 experiment:
   name: "Nos_1d_T4_HPO"
-  description: "T4 GPU Full HPO for 5-Year Daily Data"
+  description: "T4 16GB Optimized HPO for 5-Year Daily Data"
   use_comet: false
   train_tokenizer: true
   train_basemodel: true
@@ -911,14 +849,12 @@ device:
 # ── Hyperparameter Search Space ──────────────────────────────────
 hpo:
   enabled: true                    
-  n_trials: 40                      
+  n_trials: 10                      
   direction: "minimize"            
   sampler: "tpe"                   
   pruner: "hyperband"
 
-  # TASK 2.1: Local SQLite path to prevent OneDrive lock corruption
-  # The ?timeout=60 parameter prevents "database is locked" errors when
-  # 8 GPU workers finish trials simultaneously.
+  # Local SQLite path to prevent OneDrive lock corruption
   storage: "sqlite:///C:/Temp/nos_t40_hpo.db?timeout=60"
   study_name: "nos_finetune_1d_hpo"
 
@@ -933,44 +869,47 @@ hpo:
     # ── Tokenizer ──────────────────────────────────────────────
     tokenizer_learning_rate:
       type: float
-      low: 1.0e-5
+      low: 5.0e-5    # Shifted up to accommodate larger batch sizes
       high: 5.0e-3
       log: true
 
     # ── Predictor ──────────────────────────────────────────────
     predictor_learning_rate:
       type: float
-      low: 1.0e-6
-      high: 1.0e-4
+      low: 5.0e-6    # Shifted up to accommodate larger batch sizes
+      high: 5.0e-4
       log: true
 
     # ── Shared Optimizer ───────────────────────────────────────
     adam_weight_decay:
       type: float
-      low: 0.001
+      low: 0.01      # Raised floor to force stronger regularization on small dataset
       high: 0.3
       log: true
 
     # ── Batch & Accumulation ───────────────────────────────────
     batch_size:
       type: categorical
-      choices: [32, 64, 128]
+      # T4 can easily handle 256 on nos_mini. 
+      # 256 is the absolute ceiling for a 1,800 row dataset (~7 steps/epoch)
+      choices: [64, 128, 256]
 
     accumulation_steps:
       type: categorical
+      # Keep at 1 or 2 to avoid reducing steps-per-epoch too severely
       choices: [1, 2]
 
     # ── Scheduler ─────────────────────────────────────────────
     tokenizer_pct_start:
       type: float
-      low: 0.01
-      high: 0.15
+      low: 0.05
+      high: 0.20
       log: false
 
     basemodel_pct_start:
       type: float
-      low: 0.01
-      high: 0.15
+      low: 0.05
+      high: 0.20
       log: false
 
     tokenizer_div_factor:
@@ -984,28 +923,184 @@ hpo:
     # ── Dropout (Crucial for smaller 5-yr datasets) ────────────
     ffn_dropout_p:
       type: float
-      low: 0.0
+      low: 0.1       # Force at least 10% dropout to prevent memorization
       high: 0.4
       log: false
 
     resid_dropout_p:
       type: float
-      low: 0.0
+      low: 0.1       # Force at least 10% dropout to prevent memorization
       high: 0.3
       log: false
 
     # ── BSQ Loss Weights ──────────────────────────────────────
     bsq_beta:
       type: float
-      low: 0.05
+      low: 0.01
       high: 0.2
       log: true
 
+    bsq_gamma:       # ADDED: Crucial for preventing codebook collapse in T4 high-batch mode
+      type: float
+      low: 0.8
+      high: 2.0
+      log: false
+
     bsq_zeta:
+      type: float
+      low: 0.01
+      high: 0.2
+      log: true
+```
+
+---
+
+### `configs/config_t40_hpo_winner.yaml`
+
+```yaml
+data:
+  data_path: data/1d.csv
+  lookback_window: 90
+  predict_window: 14
+  max_context: 90
+  clip: 5.0
+  train_ratio: 0.8
+  val_ratio: 0.2
+  test_ratio: 0.0
+training:
+  tokenizer_epochs: 50
+  basemodel_epochs: 30
+  batch_size: 128
+  log_interval: 10
+  num_workers: 4
+  pin_memory: true
+  persistent_workers: true
+  seed: 42
+  tokenizer_learning_rate: 0.0021627162139822797
+  predictor_learning_rate: 0.0003784146030083808
+  adam_beta1: 0.9
+  adam_beta2: 0.95
+  adam_weight_decay: 0.20978213384576816
+  accumulation_steps: 1
+  tokenizer_pct_start: 0.10064227571054421
+  tokenizer_div_factor: 10.0
+  basemodel_pct_start: 0.09879954961448967
+  basemodel_div_factor: 50.0
+  tokenizer_max_grad_norm: 2.0
+  basemodel_max_grad_norm: 3.0
+  bsq_beta: 0.08215779086695435
+  bsq_gamma: 1.2363555228551528
+  bsq_zeta: 0.1837882061421475
+  ffn_dropout_p: 0.2070259980080768
+  resid_dropout_p: 0.15618690193747614
+model_paths:
+  pretrained_tokenizer: models/nos_tokenizer_2k
+  pretrained_predictor: models/nos_mini
+  exp_name: 1d_t4_hpo
+  base_path: finetuned
+  base_save_path: ''
+  finetuned_tokenizer: ''
+  tokenizer_save_name: tokenizer
+  basemodel_save_name: basemodel
+experiment:
+  name: Nos_1d_T4_HPO
+  description: T4 16GB Optimized HPO for 5-Year Daily Data
+  use_comet: false
+  train_tokenizer: true
+  train_basemodel: true
+  skip_existing: false
+  hpo_applied: true
+  hpo_applied_timestamp: '2026-05-17T07:11:32.136801'
+device:
+  use_cuda: true
+  device_id: 0
+hpo:
+  enabled: true
+  n_trials: 10
+  direction: minimize
+  sampler: tpe
+  pruner: hyperband
+  storage: sqlite:///C:/Temp/nos_t40_hpo.db?timeout=60
+  study_name: nos_finetune_1d_hpo
+  optimize_tokenizer: true
+  optimize_basemodel: true
+  hpo_tokenizer_epochs: 5
+  hpo_basemodel_epochs: 5
+  search_space:
+    tokenizer_learning_rate:
+      type: float
+      low: 5.0e-05
+      high: 0.005
+      log: true
+    predictor_learning_rate:
+      type: float
+      low: 5.0e-06
+      high: 0.0005
+      log: true
+    adam_weight_decay:
+      type: float
+      low: 0.01
+      high: 0.3
+      log: true
+    batch_size:
+      type: categorical
+      choices:
+      - 64
+      - 128
+      - 256
+    accumulation_steps:
+      type: categorical
+      choices:
+      - 1
+      - 2
+    tokenizer_pct_start:
       type: float
       low: 0.05
       high: 0.2
+      log: false
+    basemodel_pct_start:
+      type: float
+      low: 0.05
+      high: 0.2
+      log: false
+    tokenizer_div_factor:
+      type: categorical
+      choices:
+      - 10.0
+      - 25.0
+      - 50.0
+    basemodel_div_factor:
+      type: categorical
+      choices:
+      - 10.0
+      - 25.0
+      - 50.0
+    ffn_dropout_p:
+      type: float
+      low: 0.1
+      high: 0.4
+      log: false
+    resid_dropout_p:
+      type: float
+      low: 0.1
+      high: 0.3
+      log: false
+    bsq_beta:
+      type: float
+      low: 0.01
+      high: 0.2
       log: true
+    bsq_gamma:
+      type: float
+      low: 0.8
+      high: 2.0
+      log: false
+    bsq_zeta:
+      type: float
+      low: 0.01
+      high: 0.2
+      log: true
+
 ```
 
 ---
@@ -1025,15 +1120,7 @@ timestamps,open,high,low,close,volume,amount
 
 ---
 
-### `finetuned/model1.zip`
-
-```text
-[Binary file — content not displayed]
-```
-
----
-
-### `finetuned/smoke_test_full_hpo/basemodel/best_model/config.json`
+### `finetuned/1d_t4_hpo/basemodel/best_model/config.json`
 
 ```json
 {
@@ -1053,7 +1140,7 @@ timestamps,open,high,low,close,volume,amount
 
 ---
 
-### `finetuned/smoke_test_full_hpo/basemodel/best_model/model.safetensors`
+### `finetuned/1d_t4_hpo/basemodel/best_model/model.safetensors`
 
 ```text
 [File too large to display: 15.7 MB]
@@ -1061,7 +1148,7 @@ timestamps,open,high,low,close,volume,amount
 
 ---
 
-### `finetuned/smoke_test_full_hpo/basemodel/best_model/README.md`
+### `finetuned/1d_t4_hpo/basemodel/best_model/README.md`
 
 ```markdown
 ---
@@ -1078,1491 +1165,993 @@ This model has been pushed to the Hub using the [PytorchModelHubMixin](https://h
 
 ---
 
-### `finetuned/smoke_test_full_hpo/hpo_logs/worker_pid20088_cuda0.log`
+### `finetuned/1d_t4_hpo/hpo_logs/worker_pid18131_cuda0.log`
 
 ```text
-2026-05-15 21:36:27 [INFO    ] [__main__] NosHPOTuner initialised | config=configs/config_mx110_hpo_fulltest.yaml | device=cuda:0 | worker_tag=pid20088_cuda0
-2026-05-15 21:36:27 [INFO    ] [__main__] DataLoader num_workers: 4 (CPU cores=8, GPU workers=1)
-2026-05-15 21:36:27 [INFO    ] [__main__] Starting tokenizer HPO: 2 trials | device=cuda:0
-2026-05-15 21:36:27 [INFO    ] [__main__] Creating/loading study 'nos_finetune_hpo_full_tokenizer' | storage=sqlite:///nos_smoke_test.db?timeout=60
-2026-05-15 21:36:27 [INFO    ] [__main__] SQLite WAL mode, NullPool, and busy_timeout=60s applied via connection hook.
-2026-05-15 21:36:27 [INFO    ] [__main__] Study ready: 0 existing trials loaded.
-2026-05-15 21:36:27 [INFO    ] [__main__.TokenizerObjective.pid20088] Trial 0 | Sampled overrides: {'tokenizer_learning_rate': 0.0001025350969016849, 'adam_weight_decay': 0.22648248189516848, 'adam_beta1': 0.9231993941811405, 'adam_beta2': 0.9592671899355066, 'batch_size': 1, 'accumulation_steps': 1, 'tokenizer_pct_start': 0.012881829201412343, 'tokenizer_div_factor': 5.0, 'tokenizer_max_grad_norm': 1.325320294340452, 'bsq_beta': 0.024878734419814436, 'bsq_gamma0': 1.2871346474483567, 'bsq_gamma': 1.3183340223705389, 'bsq_zeta': 0.023927528765580644, 'clip': 7.282970263056656, 'tokenizer_epochs': 1, 'log_interval': 999999, 'num_workers': 4}
-2026-05-15 21:36:28 [DEBUG   ] [filelock] Attempting to acquire lock 2509863254352 on data/1d.csv.train.lock
-2026-05-15 21:36:28 [DEBUG   ] [filelock] Lock 2509863254352 acquired on data/1d.csv.train.lock
-2026-05-15 21:36:28 [DEBUG   ] [filelock] Attempting to release lock 2509863254352 on data/1d.csv.train.lock
-2026-05-15 21:36:28 [DEBUG   ] [filelock] Lock 2509863254352 released on data/1d.csv.train.lock
-2026-05-15 21:36:28 [DEBUG   ] [filelock] Attempting to acquire lock 2509864379280 on data/1d.csv.val.lock
-2026-05-15 21:36:28 [DEBUG   ] [filelock] Lock 2509864379280 acquired on data/1d.csv.val.lock
-2026-05-15 21:36:28 [DEBUG   ] [filelock] Attempting to release lock 2509864379280 on data/1d.csv.val.lock
-2026-05-15 21:36:28 [DEBUG   ] [filelock] Lock 2509864379280 released on data/1d.csv.val.lock
-2026-05-15 21:38:40 [INFO    ] [__main__.TokenizerObjective.pid20088] Trial 0 COMPLETE | val_loss=0.457058 | overrides={'tokenizer_learning_rate': 0.0001025350969016849, 'adam_weight_decay': 0.22648248189516848, 'adam_beta1': 0.9231993941811405, 'adam_beta2': 0.9592671899355066, 'batch_size': 1, 'accumulation_steps': 1, 'tokenizer_pct_start': 0.012881829201412343, 'tokenizer_div_factor': 5.0, 'tokenizer_max_grad_norm': 1.325320294340452, 'bsq_beta': 0.024878734419814436, 'bsq_gamma0': 1.2871346474483567, 'bsq_gamma': 1.3183340223705389, 'bsq_zeta': 0.023927528765580644, 'clip': 7.282970263056656, 'tokenizer_epochs': 1, 'log_interval': 999999, 'num_workers': 4}
-2026-05-15 21:38:41 [INFO    ] [__main__.TokenizerObjective.pid20088] Trial 1 | Sampled overrides: {'tokenizer_learning_rate': 2.3795221163877236e-05, 'adam_weight_decay': 0.005292705365436975, 'adam_beta1': 0.8866361843293691, 'adam_beta2': 0.9451509284374866, 'batch_size': 1, 'accumulation_steps': 4, 'tokenizer_pct_start': 0.03387337731622081, 'tokenizer_div_factor': 25.0, 'tokenizer_max_grad_norm': 1.870761961280168, 'bsq_beta': 0.013399060561509796, 'bsq_gamma0': 1.5263495397682354, 'bsq_gamma': 1.3281829924875215, 'bsq_zeta': 0.014413697528610409, 'clip': 6.466238370778891, 'tokenizer_epochs': 1, 'log_interval': 999999, 'num_workers': 4}
-2026-05-15 21:38:41 [DEBUG   ] [filelock] Attempting to acquire lock 2510045362896 on data/1d.csv.train.lock
-2026-05-15 21:38:41 [DEBUG   ] [filelock] Lock 2510045362896 acquired on data/1d.csv.train.lock
-2026-05-15 21:38:41 [DEBUG   ] [filelock] Attempting to release lock 2510045362896 on data/1d.csv.train.lock
-2026-05-15 21:38:41 [DEBUG   ] [filelock] Lock 2510045362896 released on data/1d.csv.train.lock
-2026-05-15 21:38:41 [DEBUG   ] [filelock] Attempting to acquire lock 2508479293904 on data/1d.csv.val.lock
-2026-05-15 21:38:41 [DEBUG   ] [filelock] Lock 2508479293904 acquired on data/1d.csv.val.lock
-2026-05-15 21:38:41 [DEBUG   ] [filelock] Attempting to release lock 2508479293904 on data/1d.csv.val.lock
-2026-05-15 21:38:41 [DEBUG   ] [filelock] Lock 2508479293904 released on data/1d.csv.val.lock
-2026-05-15 21:40:41 [INFO    ] [__main__.TokenizerObjective.pid20088] Trial 1 COMPLETE | val_loss=0.589649 | overrides={'tokenizer_learning_rate': 2.3795221163877236e-05, 'adam_weight_decay': 0.005292705365436975, 'adam_beta1': 0.8866361843293691, 'adam_beta2': 0.9451509284374866, 'batch_size': 1, 'accumulation_steps': 4, 'tokenizer_pct_start': 0.03387337731622081, 'tokenizer_div_factor': 25.0, 'tokenizer_max_grad_norm': 1.870761961280168, 'bsq_beta': 0.013399060561509796, 'bsq_gamma0': 1.5263495397682354, 'bsq_gamma': 1.3281829924875215, 'bsq_zeta': 0.014413697528610409, 'clip': 6.466238370778891, 'tokenizer_epochs': 1, 'log_interval': 999999, 'num_workers': 4}
-2026-05-15 21:40:41 [INFO    ] [__main__] Tokenizer HPO complete | best_val_loss=0.457058 | best_params={'tokenizer_learning_rate': 0.0001025350969016849, 'adam_weight_decay': 0.22648248189516848, 'adam_beta1': 0.9231993941811405, 'adam_beta2': 0.9592671899355066, 'batch_size': 1, 'accumulation_steps': 1, 'tokenizer_pct_start': 0.012881829201412343, 'tokenizer_div_factor': 5.0, 'tokenizer_max_grad_norm': 1.325320294340452, 'bsq_beta': 0.024878734419814436, 'bsq_gamma0': 1.2871346474483567, 'bsq_gamma': 1.3183340223705389, 'bsq_zeta': 0.023927528765580644, 'clip': 7.282970263056656}
-2026-05-15 21:40:41 [INFO    ] [__main__] Results atomically written to: finetuned/smoke_test_full_hpo\hpo_results\tokenizer_trials.json
-2026-05-15 21:40:41 [DEBUG   ] [matplotlib] matplotlib data path: C:\Users\kashy\.conda\envs\.conda\Lib\site-packages\matplotlib\mpl-data
-2026-05-15 21:40:41 [DEBUG   ] [matplotlib] CONFIGDIR=C:\Users\kashy\.matplotlib
-2026-05-15 21:40:41 [DEBUG   ] [matplotlib] interactive is False
-2026-05-15 21:40:41 [DEBUG   ] [matplotlib] platform is win32
-2026-05-15 21:40:41 [DEBUG   ] [matplotlib] CACHEDIR=C:\Users\kashy\.matplotlib
-2026-05-15 21:40:41 [DEBUG   ] [matplotlib.font_manager] Using fontManager instance from C:\Users\kashy\.matplotlib\fontlist-v390.json
-2026-05-15 21:40:44 [INFO    ] [__main__] Visualisation plots saved to: finetuned/smoke_test_full_hpo\hpo_results
-2026-05-15 21:40:44 [INFO    ] [__main__] Training full tokenizer with best HPO params before basemodel phase.
-2026-05-15 21:40:45 [DEBUG   ] [filelock] Attempting to acquire lock 2508796623312 on data/1d.csv.train.lock
-2026-05-15 21:40:45 [DEBUG   ] [filelock] Lock 2508796623312 acquired on data/1d.csv.train.lock
-2026-05-15 21:40:45 [DEBUG   ] [filelock] Attempting to release lock 2508796623312 on data/1d.csv.train.lock
-2026-05-15 21:40:45 [DEBUG   ] [filelock] Lock 2508796623312 released on data/1d.csv.train.lock
-2026-05-15 21:40:45 [DEBUG   ] [filelock] Attempting to acquire lock 2508792556048 on data/1d.csv.val.lock
-2026-05-15 21:40:45 [DEBUG   ] [filelock] Lock 2508792556048 acquired on data/1d.csv.val.lock
-2026-05-15 21:40:45 [DEBUG   ] [filelock] Attempting to release lock 2508792556048 on data/1d.csv.val.lock
-2026-05-15 21:40:45 [DEBUG   ] [filelock] Lock 2508792556048 released on data/1d.csv.val.lock
-2026-05-15 21:44:18 [INFO    ] [__main__] Best tokenizer training complete. Saved to: finetuned/smoke_test_full_hpo\tokenizer
-2026-05-15 21:44:19 [INFO    ] [__main__] Starting basemodel HPO: 2 trials | device=cuda:0 | tokenizer=finetuned/smoke_test_full_hpo\tokenizer\best_model
-2026-05-15 21:44:19 [INFO    ] [__main__] Creating/loading study 'nos_finetune_hpo_full_basemodel' | storage=sqlite:///nos_smoke_test.db?timeout=60
-2026-05-15 21:44:19 [INFO    ] [__main__] SQLite WAL mode, NullPool, and busy_timeout=60s applied via connection hook.
-2026-05-15 21:44:19 [INFO    ] [__main__] Study ready: 0 existing trials loaded.
-2026-05-15 21:44:19 [INFO    ] [__main__.BasemodelObjective.pid20088] Trial 0 | Sampled overrides: {'predictor_learning_rate': 1.3292918943162153e-06, 'adam_weight_decay': 0.22648248189516848, 'adam_beta1': 0.9231993941811405, 'adam_beta2': 0.9592671899355066, 'batch_size': 1, 'accumulation_steps': 1, 'basemodel_pct_start': 0.012881829201412343, 'basemodel_div_factor': 5.0, 'basemodel_max_grad_norm': 1.325320294340452, 'ffn_dropout_p': 0.1216968971838151, 'attn_dropout_p': 0.10495128632644757, 'resid_dropout_p': 0.12958350559263473, 'token_dropout_p': 0.058245828039608386, 'clip': 7.282970263056656, 'basemodel_epochs': 1, 'log_interval': 999999, 'num_workers': 4}
-2026-05-15 21:44:19 [DEBUG   ] [filelock] Attempting to acquire lock 2508803439888 on data/1d.csv.train.lock
-2026-05-15 21:44:19 [DEBUG   ] [filelock] Lock 2508803439888 acquired on data/1d.csv.train.lock
-2026-05-15 21:44:19 [DEBUG   ] [filelock] Attempting to release lock 2508803439888 on data/1d.csv.train.lock
-2026-05-15 21:44:19 [DEBUG   ] [filelock] Lock 2508803439888 released on data/1d.csv.train.lock
-2026-05-15 21:44:19 [DEBUG   ] [filelock] Attempting to acquire lock 2509864538448 on data/1d.csv.val.lock
-2026-05-15 21:44:19 [DEBUG   ] [filelock] Lock 2509864538448 acquired on data/1d.csv.val.lock
-2026-05-15 21:44:19 [DEBUG   ] [filelock] Attempting to release lock 2509864538448 on data/1d.csv.val.lock
-2026-05-15 21:44:19 [DEBUG   ] [filelock] Lock 2509864538448 released on data/1d.csv.val.lock
-2026-05-15 21:46:31 [INFO    ] [__main__.BasemodelObjective.pid20088] Trial 0 COMPLETE | val_loss=6.592907 | overrides={'predictor_learning_rate': 1.3292918943162153e-06, 'adam_weight_decay': 0.22648248189516848, 'adam_beta1': 0.9231993941811405, 'adam_beta2': 0.9592671899355066, 'batch_size': 1, 'accumulation_steps': 1, 'basemodel_pct_start': 0.012881829201412343, 'basemodel_div_factor': 5.0, 'basemodel_max_grad_norm': 1.325320294340452, 'ffn_dropout_p': 0.1216968971838151, 'attn_dropout_p': 0.10495128632644757, 'resid_dropout_p': 0.12958350559263473, 'token_dropout_p': 0.058245828039608386, 'clip': 7.282970263056656, 'basemodel_epochs': 1, 'log_interval': 999999, 'num_workers': 4}
-2026-05-15 21:46:32 [INFO    ] [__main__.BasemodelObjective.pid20088] Trial 1 | Sampled overrides: {'predictor_learning_rate': 2.621087878265437e-07, 'adam_weight_decay': 0.005292705365436975, 'adam_beta1': 0.8866361843293691, 'adam_beta2': 0.9451509284374866, 'batch_size': 1, 'accumulation_steps': 4, 'basemodel_pct_start': 0.03387337731622081, 'basemodel_div_factor': 25.0, 'basemodel_max_grad_norm': 1.870761961280168, 'ffn_dropout_p': 0.039068845602553554, 'attn_dropout_p': 0.1368466053024314, 'resid_dropout_p': 0.13204574812188039, 'token_dropout_p': 0.024407646968955768, 'clip': 6.466238370778891, 'basemodel_epochs': 1, 'log_interval': 999999, 'num_workers': 4}
-2026-05-15 21:46:32 [DEBUG   ] [filelock] Attempting to acquire lock 2508478293520 on data/1d.csv.train.lock
-2026-05-15 21:46:32 [DEBUG   ] [filelock] Lock 2508478293520 acquired on data/1d.csv.train.lock
-2026-05-15 21:46:32 [DEBUG   ] [filelock] Attempting to release lock 2508478293520 on data/1d.csv.train.lock
-2026-05-15 21:46:32 [DEBUG   ] [filelock] Lock 2508478293520 released on data/1d.csv.train.lock
-2026-05-15 21:46:32 [DEBUG   ] [filelock] Attempting to acquire lock 2508382663120 on data/1d.csv.val.lock
-2026-05-15 21:46:32 [DEBUG   ] [filelock] Lock 2508382663120 acquired on data/1d.csv.val.lock
-2026-05-15 21:46:32 [DEBUG   ] [filelock] Attempting to release lock 2508382663120 on data/1d.csv.val.lock
-2026-05-15 21:46:32 [DEBUG   ] [filelock] Lock 2508382663120 released on data/1d.csv.val.lock
-2026-05-15 21:48:21 [INFO    ] [__main__.BasemodelObjective.pid20088] Trial 1 COMPLETE | val_loss=6.711541 | overrides={'predictor_learning_rate': 2.621087878265437e-07, 'adam_weight_decay': 0.005292705365436975, 'adam_beta1': 0.8866361843293691, 'adam_beta2': 0.9451509284374866, 'batch_size': 1, 'accumulation_steps': 4, 'basemodel_pct_start': 0.03387337731622081, 'basemodel_div_factor': 25.0, 'basemodel_max_grad_norm': 1.870761961280168, 'ffn_dropout_p': 0.039068845602553554, 'attn_dropout_p': 0.1368466053024314, 'resid_dropout_p': 0.13204574812188039, 'token_dropout_p': 0.024407646968955768, 'clip': 6.466238370778891, 'basemodel_epochs': 1, 'log_interval': 999999, 'num_workers': 4}
-2026-05-15 21:48:22 [INFO    ] [__main__] Basemodel HPO complete | best_val_loss=6.592907 | best_params={'predictor_learning_rate': 1.3292918943162153e-06, 'adam_weight_decay': 0.22648248189516848, 'adam_beta1': 0.9231993941811405, 'adam_beta2': 0.9592671899355066, 'batch_size': 1, 'accumulation_steps': 1, 'basemodel_pct_start': 0.012881829201412343, 'basemodel_div_factor': 5.0, 'basemodel_max_grad_norm': 1.325320294340452, 'ffn_dropout_p': 0.1216968971838151, 'attn_dropout_p': 0.10495128632644757, 'resid_dropout_p': 0.12958350559263473, 'token_dropout_p': 0.058245828039608386, 'clip': 7.282970263056656}
-2026-05-15 21:48:22 [INFO    ] [__main__] Results atomically written to: finetuned/smoke_test_full_hpo\hpo_results\basemodel_trials.json
-2026-05-15 21:48:23 [INFO    ] [__main__] Visualisation plots saved to: finetuned/smoke_test_full_hpo\hpo_results
-2026-05-15 21:48:23 [INFO    ] [__main__] Routed optimised clip=7.282970263056656 → data.clip (removed from training block to prevent shadowing).
-2026-05-15 21:48:23 [INFO    ] [__main__] Best config written to: configs/config_mx110_hpo_winner.yaml
+2026-05-17 07:03:15 [INFO    ] [__main__] NosHPOTuner initialised | config=configs/config_t40_hpo_fulltest.yaml | device=cuda:0 | worker_tag=pid18131_cuda0
+2026-05-17 07:03:15 [INFO    ] [__main__] DataLoader num_workers: 1 (CPU cores=2, GPU workers=1)
+2026-05-17 07:03:15 [INFO    ] [__main__] Starting tokenizer HPO: 10 trials | device=cuda:0
+2026-05-17 07:03:15 [INFO    ] [__main__] Creating/loading study 'nos_finetune_1d_hpo_tokenizer' | storage=sqlite:///C:/Temp/nos_t40_hpo.db?timeout=60
+2026-05-17 07:03:16 [INFO    ] [__main__] SQLite WAL mode, NullPool, and busy_timeout=300s applied via connection hook.
+2026-05-17 07:03:16 [INFO    ] [__main__] Study ready: 0 existing trials loaded.
+2026-05-17 07:03:16 [INFO    ] [__main__.TokenizerObjective.pid18131] Trial 0 | Sampled overrides: {'tokenizer_learning_rate': 0.0002805758207667253, 'adam_weight_decay': 0.2536999076681772, 'batch_size': 64, 'accumulation_steps': 1, 'tokenizer_pct_start': 0.1799264218662403, 'tokenizer_div_factor': 25.0, 'bsq_beta': 0.18276027831785724, 'bsq_gamma': 1.798931168960506, 'bsq_zeta': 0.018891200276189388, 'tokenizer_epochs': 5, 'log_interval': 999999, 'num_workers': 1}
+2026-05-17 07:03:16 [DEBUG   ] [filelock] Attempting to acquire lock 139497524456208 on data/1d.csv.train.lock
+2026-05-17 07:03:16 [DEBUG   ] [filelock] Lock 139497524456208 acquired on data/1d.csv.train.lock
+2026-05-17 07:03:16 [DEBUG   ] [filelock] Attempting to release lock 139497524456208 on data/1d.csv.train.lock
+2026-05-17 07:03:16 [DEBUG   ] [filelock] Lock 139497524456208 released on data/1d.csv.train.lock
+2026-05-17 07:03:16 [DEBUG   ] [filelock] Attempting to acquire lock 139497524493008 on data/1d.csv.val.lock
+2026-05-17 07:03:16 [DEBUG   ] [filelock] Lock 139497524493008 acquired on data/1d.csv.val.lock
+2026-05-17 07:03:16 [DEBUG   ] [filelock] Attempting to release lock 139497524493008 on data/1d.csv.val.lock
+2026-05-17 07:03:16 [DEBUG   ] [filelock] Lock 139497524493008 released on data/1d.csv.val.lock
+2026-05-17 07:03:38 [INFO    ] [__main__.TokenizerObjective.pid18131] Trial 0 COMPLETE | val_loss=0.055199 | overrides={'tokenizer_learning_rate': 0.0002805758207667253, 'adam_weight_decay': 0.2536999076681772, 'batch_size': 64, 'accumulation_steps': 1, 'tokenizer_pct_start': 0.1799264218662403, 'tokenizer_div_factor': 25.0, 'bsq_beta': 0.18276027831785724, 'bsq_gamma': 1.798931168960506, 'bsq_zeta': 0.018891200276189388, 'tokenizer_epochs': 5, 'log_interval': 999999, 'num_workers': 1}
+2026-05-17 07:03:39 [INFO    ] [__main__.TokenizerObjective.pid18131] Trial 1 | Sampled overrides: {'tokenizer_learning_rate': 0.00011551009439226474, 'adam_weight_decay': 0.018659959624904916, 'batch_size': 128, 'accumulation_steps': 2, 'tokenizer_pct_start': 0.07092407909780628, 'tokenizer_div_factor': 50.0, 'bsq_beta': 0.10508421338691762, 'bsq_gamma': 1.0396085385900318, 'bsq_zeta': 0.04666963767236924, 'tokenizer_epochs': 5, 'log_interval': 999999, 'num_workers': 1}
+2026-05-17 07:03:53 [INFO    ] [__main__.TokenizerObjective.pid18131] Trial 1 COMPLETE | val_loss=0.100841 | overrides={'tokenizer_learning_rate': 0.00011551009439226474, 'adam_weight_decay': 0.018659959624904916, 'batch_size': 128, 'accumulation_steps': 2, 'tokenizer_pct_start': 0.07092407909780628, 'tokenizer_div_factor': 50.0, 'bsq_beta': 0.10508421338691762, 'bsq_gamma': 1.0396085385900318, 'bsq_zeta': 0.04666963767236924, 'tokenizer_epochs': 5, 'log_interval': 999999, 'num_workers': 1}
+2026-05-17 07:03:54 [INFO    ] [__main__.TokenizerObjective.pid18131] Trial 2 | Sampled overrides: {'tokenizer_learning_rate': 0.000765242606091573, 'adam_weight_decay': 0.011711509955524094, 'batch_size': 64, 'accumulation_steps': 2, 'tokenizer_pct_start': 0.1712596022174692, 'tokenizer_div_factor': 50.0, 'bsq_beta': 0.03738105868191797, 'bsq_gamma': 0.9464458818137347, 'bsq_zeta': 0.04407984038169244, 'tokenizer_epochs': 5, 'log_interval': 999999, 'num_workers': 1}
+2026-05-17 07:04:10 [INFO    ] [__main__.TokenizerObjective.pid18131] Trial 2 COMPLETE | val_loss=0.049402 | overrides={'tokenizer_learning_rate': 0.000765242606091573, 'adam_weight_decay': 0.011711509955524094, 'batch_size': 64, 'accumulation_steps': 2, 'tokenizer_pct_start': 0.1712596022174692, 'tokenizer_div_factor': 50.0, 'bsq_beta': 0.03738105868191797, 'bsq_gamma': 0.9464458818137347, 'bsq_zeta': 0.04407984038169244, 'tokenizer_epochs': 5, 'log_interval': 999999, 'num_workers': 1}
+2026-05-17 07:04:10 [INFO    ] [__main__.TokenizerObjective.pid18131] Trial 3 | Sampled overrides: {'tokenizer_learning_rate': 5.8579686961535335e-05, 'adam_weight_decay': 0.22038218939289875, 'batch_size': 128, 'accumulation_steps': 2, 'tokenizer_pct_start': 0.07772816832882906, 'tokenizer_div_factor': 10.0, 'bsq_beta': 0.1459476894296684, 'bsq_gamma': 1.5174799745733023, 'bsq_zeta': 0.15826541904647565, 'tokenizer_epochs': 5, 'log_interval': 999999, 'num_workers': 1}
+2026-05-17 07:04:23 [INFO    ] [__main__.TokenizerObjective.pid18131] Trial 4 | Sampled overrides: {'tokenizer_learning_rate': 7.515450322528411e-05, 'adam_weight_decay': 0.01947558230629543, 'batch_size': 256, 'accumulation_steps': 2, 'tokenizer_pct_start': 0.1035129990040384, 'tokenizer_div_factor': 25.0, 'bsq_beta': 0.11058146376563001, 'bsq_gamma': 0.8894607724157251, 'bsq_zeta': 0.19229567074543377, 'tokenizer_epochs': 5, 'log_interval': 999999, 'num_workers': 1}
+2026-05-17 07:04:44 [INFO    ] [__main__.TokenizerObjective.pid18131] Trial 5 | Sampled overrides: {'tokenizer_learning_rate': 0.0017516992455793442, 'adam_weight_decay': 0.019657448966046126, 'batch_size': 128, 'accumulation_steps': 2, 'tokenizer_pct_start': 0.06110669776011356, 'tokenizer_div_factor': 50.0, 'bsq_beta': 0.06470376604234768, 'bsq_gamma': 1.1970776298231791, 'bsq_zeta': 0.012097379927033842, 'tokenizer_epochs': 5, 'log_interval': 999999, 'num_workers': 1}
+2026-05-17 07:05:00 [INFO    ] [__main__.TokenizerObjective.pid18131] Trial 5 COMPLETE | val_loss=0.053635 | overrides={'tokenizer_learning_rate': 0.0017516992455793442, 'adam_weight_decay': 0.019657448966046126, 'batch_size': 128, 'accumulation_steps': 2, 'tokenizer_pct_start': 0.06110669776011356, 'tokenizer_div_factor': 50.0, 'bsq_beta': 0.06470376604234768, 'bsq_gamma': 1.1970776298231791, 'bsq_zeta': 0.012097379927033842, 'tokenizer_epochs': 5, 'log_interval': 999999, 'num_workers': 1}
+2026-05-17 07:05:11 [INFO    ] [__main__.TokenizerObjective.pid18131] Trial 6 | Sampled overrides: {'tokenizer_learning_rate': 0.00020937973594503152, 'adam_weight_decay': 0.030222834756467344, 'batch_size': 256, 'accumulation_steps': 1, 'tokenizer_pct_start': 0.15698671808344927, 'tokenizer_div_factor': 50.0, 'bsq_beta': 0.043897812845882046, 'bsq_gamma': 1.4272793952583929, 'bsq_zeta': 0.035995125264172326, 'tokenizer_epochs': 5, 'log_interval': 999999, 'num_workers': 1}
+2026-05-17 07:05:17 [INFO    ] [__main__.TokenizerObjective.pid18131] Trial 7 | Sampled overrides: {'tokenizer_learning_rate': 5.6209310478965295e-05, 'adam_weight_decay': 0.01443340240633889, 'batch_size': 128, 'accumulation_steps': 2, 'tokenizer_pct_start': 0.08739383437233125, 'tokenizer_div_factor': 25.0, 'bsq_beta': 0.012593695017526326, 'bsq_gamma': 1.1477017434965218, 'bsq_zeta': 0.01620890700720353, 'tokenizer_epochs': 5, 'log_interval': 999999, 'num_workers': 1}
+2026-05-17 07:05:41 [INFO    ] [__main__.TokenizerObjective.pid18131] Trial 8 | Sampled overrides: {'tokenizer_learning_rate': 0.003617139922832709, 'adam_weight_decay': 0.156203869845265, 'batch_size': 128, 'accumulation_steps': 2, 'tokenizer_pct_start': 0.13090133628734762, 'tokenizer_div_factor': 25.0, 'bsq_beta': 0.013905315749737282, 'bsq_gamma': 1.07352219505033, 'bsq_zeta': 0.03594843964212239, 'tokenizer_epochs': 5, 'log_interval': 999999, 'num_workers': 1}
+2026-05-17 07:05:58 [INFO    ] [__main__.TokenizerObjective.pid18131] Trial 9 | Sampled overrides: {'tokenizer_learning_rate': 0.0021627162139822797, 'adam_weight_decay': 0.18681142751959703, 'batch_size': 128, 'accumulation_steps': 1, 'tokenizer_pct_start': 0.10064227571054421, 'tokenizer_div_factor': 10.0, 'bsq_beta': 0.08215779086695435, 'bsq_gamma': 1.2363555228551528, 'bsq_zeta': 0.1837882061421475, 'tokenizer_epochs': 5, 'log_interval': 999999, 'num_workers': 1}
+2026-05-17 07:06:15 [INFO    ] [__main__.TokenizerObjective.pid18131] Trial 9 COMPLETE | val_loss=0.045195 | overrides={'tokenizer_learning_rate': 0.0021627162139822797, 'adam_weight_decay': 0.18681142751959703, 'batch_size': 128, 'accumulation_steps': 1, 'tokenizer_pct_start': 0.10064227571054421, 'tokenizer_div_factor': 10.0, 'bsq_beta': 0.08215779086695435, 'bsq_gamma': 1.2363555228551528, 'bsq_zeta': 0.1837882061421475, 'tokenizer_epochs': 5, 'log_interval': 999999, 'num_workers': 1}
+2026-05-17 07:06:26 [INFO    ] [__main__] Tokenizer HPO complete | best_val_loss=0.045195 | best_params={'tokenizer_learning_rate': 0.0021627162139822797, 'adam_weight_decay': 0.18681142751959703, 'batch_size': 128, 'accumulation_steps': 1, 'tokenizer_pct_start': 0.10064227571054421, 'tokenizer_div_factor': 10.0, 'bsq_beta': 0.08215779086695435, 'bsq_gamma': 1.2363555228551528, 'bsq_zeta': 0.1837882061421475}
+2026-05-17 07:06:26 [INFO    ] [__main__] Results atomically written to: finetuned/1d_t4_hpo/hpo_results/tokenizer_trials.json
+2026-05-17 07:06:26 [DEBUG   ] [matplotlib] matplotlib data path: /usr/local/lib/python3.12/dist-packages/matplotlib/mpl-data
+2026-05-17 07:06:26 [DEBUG   ] [matplotlib] CONFIGDIR=/root/.config/matplotlib
+2026-05-17 07:06:26 [DEBUG   ] [matplotlib] interactive is False
+2026-05-17 07:06:26 [DEBUG   ] [matplotlib] platform is linux
+2026-05-17 07:06:26 [DEBUG   ] [matplotlib] CACHEDIR=/root/.cache/matplotlib
+2026-05-17 07:06:26 [DEBUG   ] [matplotlib.font_manager] Using fontManager instance from /root/.cache/matplotlib/fontlist-v390.json
+2026-05-17 07:06:28 [INFO    ] [__main__] Visualisation plots saved to: finetuned/1d_t4_hpo/hpo_results
+2026-05-17 07:06:28 [INFO    ] [__main__] Training full tokenizer with best HPO params before basemodel phase.
+2026-05-17 07:09:16 [INFO    ] [__main__] Best tokenizer training complete. Saved to: finetuned/1d_t4_hpo/tokenizer
+2026-05-17 07:09:16 [INFO    ] [__main__] Starting basemodel HPO: 10 trials | device=cuda:0 | tokenizer=finetuned/1d_t4_hpo/tokenizer/best_model
+2026-05-17 07:09:16 [INFO    ] [__main__] Creating/loading study 'nos_finetune_1d_hpo_basemodel' | storage=sqlite:///C:/Temp/nos_t40_hpo.db?timeout=60
+2026-05-17 07:09:16 [INFO    ] [__main__] SQLite WAL mode, NullPool, and busy_timeout=300s applied via connection hook.
+2026-05-17 07:09:16 [INFO    ] [__main__] Study ready: 0 existing trials loaded.
+2026-05-17 07:09:17 [INFO    ] [__main__.BasemodelObjective.pid18131] Trial 0 | Sampled overrides: {'predictor_learning_rate': 2.8057582076672495e-05, 'adam_weight_decay': 0.2536999076681772, 'batch_size': 64, 'accumulation_steps': 1, 'basemodel_pct_start': 0.1799264218662403, 'basemodel_div_factor': 25.0, 'ffn_dropout_p': 0.39097295564859835, 'resid_dropout_p': 0.26648852816008434, 'basemodel_epochs': 5, 'log_interval': 999999, 'num_workers': 1}
+2026-05-17 07:09:30 [INFO    ] [__main__.BasemodelObjective.pid18131] Trial 0 COMPLETE | val_loss=4.679457 | overrides={'predictor_learning_rate': 2.8057582076672495e-05, 'adam_weight_decay': 0.2536999076681772, 'batch_size': 64, 'accumulation_steps': 1, 'basemodel_pct_start': 0.1799264218662403, 'basemodel_div_factor': 25.0, 'ffn_dropout_p': 0.39097295564859835, 'resid_dropout_p': 0.26648852816008434, 'basemodel_epochs': 5, 'log_interval': 999999, 'num_workers': 1}
+2026-05-17 07:09:31 [INFO    ] [__main__.BasemodelObjective.pid18131] Trial 1 | Sampled overrides: {'predictor_learning_rate': 1.3293771991636346e-05, 'adam_weight_decay': 0.01855998084649059, 'batch_size': 256, 'accumulation_steps': 1, 'basemodel_pct_start': 0.14177793420835694, 'basemodel_div_factor': 50.0, 'ffn_dropout_p': 0.2368209952651108, 'resid_dropout_p': 0.2570351922786027, 'basemodel_epochs': 5, 'log_interval': 999999, 'num_workers': 1}
+2026-05-17 07:09:43 [INFO    ] [__main__.BasemodelObjective.pid18131] Trial 1 COMPLETE | val_loss=4.761098 | overrides={'predictor_learning_rate': 1.3293771991636346e-05, 'adam_weight_decay': 0.01855998084649059, 'batch_size': 256, 'accumulation_steps': 1, 'basemodel_pct_start': 0.14177793420835694, 'basemodel_div_factor': 50.0, 'ffn_dropout_p': 0.2368209952651108, 'resid_dropout_p': 0.2570351922786027, 'basemodel_epochs': 5, 'log_interval': 999999, 'num_workers': 1}
+2026-05-17 07:09:43 [INFO    ] [__main__.BasemodelObjective.pid18131] Trial 2 | Sampled overrides: {'predictor_learning_rate': 1.2540578430226153e-05, 'adam_weight_decay': 0.05748924681991978, 'batch_size': 256, 'accumulation_steps': 1, 'basemodel_pct_start': 0.192332830588, 'basemodel_div_factor': 10.0, 'ffn_dropout_p': 0.12930163420191518, 'resid_dropout_p': 0.23684660530243137, 'basemodel_epochs': 5, 'log_interval': 999999, 'num_workers': 1}
+2026-05-17 07:09:55 [INFO    ] [__main__.BasemodelObjective.pid18131] Trial 2 COMPLETE | val_loss=4.760827 | overrides={'predictor_learning_rate': 1.2540578430226153e-05, 'adam_weight_decay': 0.05748924681991978, 'batch_size': 256, 'accumulation_steps': 1, 'basemodel_pct_start': 0.192332830588, 'basemodel_div_factor': 10.0, 'ffn_dropout_p': 0.12930163420191518, 'resid_dropout_p': 0.23684660530243137, 'basemodel_epochs': 5, 'log_interval': 999999, 'num_workers': 1}
+2026-05-17 07:09:56 [INFO    ] [__main__.BasemodelObjective.pid18131] Trial 3 | Sampled overrides: {'predictor_learning_rate': 3.7955524026413494e-05, 'adam_weight_decay': 0.015144860262751412, 'batch_size': 256, 'accumulation_steps': 2, 'basemodel_pct_start': 0.09675666141341166, 'basemodel_div_factor': 25.0, 'ffn_dropout_p': 0.39087538832936763, 'resid_dropout_p': 0.2550265646722229, 'basemodel_epochs': 5, 'log_interval': 999999, 'num_workers': 1}
+2026-05-17 07:10:08 [INFO    ] [__main__.BasemodelObjective.pid18131] Trial 3 COMPLETE | val_loss=4.752116 | overrides={'predictor_learning_rate': 3.7955524026413494e-05, 'adam_weight_decay': 0.015144860262751412, 'batch_size': 256, 'accumulation_steps': 2, 'basemodel_pct_start': 0.09675666141341166, 'basemodel_div_factor': 25.0, 'ffn_dropout_p': 0.39087538832936763, 'resid_dropout_p': 0.2550265646722229, 'basemodel_epochs': 5, 'log_interval': 999999, 'num_workers': 1}
+2026-05-17 07:10:08 [INFO    ] [__main__.BasemodelObjective.pid18131] Trial 4 | Sampled overrides: {'predictor_learning_rate': 0.0003784146030083808, 'adam_weight_decay': 0.20978213384576816, 'batch_size': 128, 'accumulation_steps': 1, 'basemodel_pct_start': 0.09879954961448967, 'basemodel_div_factor': 50.0, 'ffn_dropout_p': 0.2070259980080768, 'resid_dropout_p': 0.15618690193747614, 'basemodel_epochs': 5, 'log_interval': 999999, 'num_workers': 1}
+2026-05-17 07:10:21 [INFO    ] [__main__.BasemodelObjective.pid18131] Trial 4 COMPLETE | val_loss=4.388323 | overrides={'predictor_learning_rate': 0.0003784146030083808, 'adam_weight_decay': 0.20978213384576816, 'batch_size': 128, 'accumulation_steps': 1, 'basemodel_pct_start': 0.09879954961448967, 'basemodel_div_factor': 50.0, 'ffn_dropout_p': 0.2070259980080768, 'resid_dropout_p': 0.15618690193747614, 'basemodel_epochs': 5, 'log_interval': 999999, 'num_workers': 1}
+2026-05-17 07:10:21 [INFO    ] [__main__.BasemodelObjective.pid18131] Trial 5 | Sampled overrides: {'predictor_learning_rate': 6.086423540561219e-05, 'adam_weight_decay': 0.016149614799999188, 'batch_size': 256, 'accumulation_steps': 1, 'basemodel_pct_start': 0.050828317568540365, 'basemodel_div_factor': 10.0, 'ffn_dropout_p': 0.3313811040057838, 'resid_dropout_p': 0.11480893034681808, 'basemodel_epochs': 5, 'log_interval': 999999, 'num_workers': 1}
+2026-05-17 07:10:33 [INFO    ] [__main__.BasemodelObjective.pid18131] Trial 5 COMPLETE | val_loss=4.666116 | overrides={'predictor_learning_rate': 6.086423540561219e-05, 'adam_weight_decay': 0.016149614799999188, 'batch_size': 256, 'accumulation_steps': 1, 'basemodel_pct_start': 0.050828317568540365, 'basemodel_div_factor': 10.0, 'ffn_dropout_p': 0.3313811040057838, 'resid_dropout_p': 0.11480893034681808, 'basemodel_epochs': 5, 'log_interval': 999999, 'num_workers': 1}
+2026-05-17 07:10:34 [INFO    ] [__main__.BasemodelObjective.pid18131] Trial 6 | Sampled overrides: {'predictor_learning_rate': 2.6055622978941292e-05, 'adam_weight_decay': 0.014830392684568025, 'batch_size': 64, 'accumulation_steps': 2, 'basemodel_pct_start': 0.09877749830401206, 'basemodel_div_factor': 50.0, 'ffn_dropout_p': 0.2416644775485848, 'resid_dropout_p': 0.12391884918766034, 'basemodel_epochs': 5, 'log_interval': 999999, 'num_workers': 1}
+2026-05-17 07:10:40 [INFO    ] [__main__.BasemodelObjective.pid18131] Trial 7 | Sampled overrides: {'predictor_learning_rate': 0.0001334933337137229, 'adam_weight_decay': 0.13297554090738672, 'batch_size': 128, 'accumulation_steps': 1, 'basemodel_pct_start': 0.05381286901161428, 'basemodel_div_factor': 50.0, 'ffn_dropout_p': 0.19430679432289802, 'resid_dropout_p': 0.20171413823294054, 'basemodel_epochs': 5, 'log_interval': 999999, 'num_workers': 1}
+2026-05-17 07:10:56 [INFO    ] [__main__.BasemodelObjective.pid18131] Trial 8 | Sampled overrides: {'predictor_learning_rate': 0.00032666526101138684, 'adam_weight_decay': 0.02334720250903525, 'batch_size': 128, 'accumulation_steps': 2, 'basemodel_pct_start': 0.07418319308810067, 'basemodel_div_factor': 10.0, 'ffn_dropout_p': 0.3614381770563153, 'resid_dropout_p': 0.2607344153798229, 'basemodel_epochs': 5, 'log_interval': 999999, 'num_workers': 1}
+2026-05-17 07:11:11 [INFO    ] [__main__.BasemodelObjective.pid18131] Trial 9 | Sampled overrides: {'predictor_learning_rate': 1.1806199622206298e-05, 'adam_weight_decay': 0.20816986844858934, 'batch_size': 256, 'accumulation_steps': 1, 'basemodel_pct_start': 0.08419027438129126, 'basemodel_div_factor': 50.0, 'ffn_dropout_p': 0.10208563915935721, 'resid_dropout_p': 0.20214946051551314, 'basemodel_epochs': 5, 'log_interval': 999999, 'num_workers': 1}
+2026-05-17 07:11:31 [INFO    ] [__main__] Basemodel HPO complete | best_val_loss=4.388323 | best_params={'predictor_learning_rate': 0.0003784146030083808, 'adam_weight_decay': 0.20978213384576816, 'batch_size': 128, 'accumulation_steps': 1, 'basemodel_pct_start': 0.09879954961448967, 'basemodel_div_factor': 50.0, 'ffn_dropout_p': 0.2070259980080768, 'resid_dropout_p': 0.15618690193747614}
+2026-05-17 07:11:31 [INFO    ] [__main__] Results atomically written to: finetuned/1d_t4_hpo/hpo_results/basemodel_trials.json
+2026-05-17 07:11:32 [INFO    ] [__main__] Visualisation plots saved to: finetuned/1d_t4_hpo/hpo_results
+2026-05-17 07:11:32 [INFO    ] [__main__] Best config written to: configs/config_t40_hpo_winner.yaml
 
 ```
 
 ---
 
-### `finetuned/smoke_test_full_hpo/hpo_results/basemodel_trials.json`
-
-```json
-{
-  "best_value": 6.592906690255189,
-  "best_params": {
-    "predictor_learning_rate": 1.3292918943162153e-06,
-    "adam_weight_decay": 0.22648248189516848,
-    "adam_beta1": 0.9231993941811405,
-    "adam_beta2": 0.9592671899355066,
-    "batch_size": 1,
-    "accumulation_steps": 1,
-    "basemodel_pct_start": 0.012881829201412343,
-    "basemodel_div_factor": 5.0,
-    "basemodel_max_grad_norm": 1.325320294340452,
-    "ffn_dropout_p": 0.1216968971838151,
-    "attn_dropout_p": 0.10495128632644757,
-    "resid_dropout_p": 0.12958350559263473,
-    "token_dropout_p": 0.058245828039608386,
-    "clip": 7.282970263056656
-  },
-  "n_trials": 2,
-  "n_completed": 2,
-  "n_pruned": 0,
-  "n_failed": 0,
-  "trials": [
-    {
-      "number": 0,
-      "value": 6.592906690255189,
-      "params": {
-        "predictor_learning_rate": 1.3292918943162153e-06,
-        "adam_weight_decay": 0.22648248189516848,
-        "adam_beta1": 0.9231993941811405,
-        "adam_beta2": 0.9592671899355066,
-        "batch_size": 1,
-        "accumulation_steps": 1,
-        "basemodel_pct_start": 0.012881829201412343,
-        "basemodel_div_factor": 5.0,
-        "basemodel_max_grad_norm": 1.325320294340452,
-        "ffn_dropout_p": 0.1216968971838151,
-        "attn_dropout_p": 0.10495128632644757,
-        "resid_dropout_p": 0.12958350559263473,
-        "token_dropout_p": 0.058245828039608386,
-        "clip": 7.282970263056656
-      },
-      "state": "TrialState.COMPLETE",
-      "datetime_start": "2026-05-15T21:44:19.180226",
-      "datetime_complete": "2026-05-15T21:46:32.171509"
-    },
-    {
-      "number": 1,
-      "value": 6.711540647653433,
-      "params": {
-        "predictor_learning_rate": 2.621087878265437e-07,
-        "adam_weight_decay": 0.005292705365436975,
-        "adam_beta1": 0.8866361843293691,
-        "adam_beta2": 0.9451509284374866,
-        "batch_size": 1,
-        "accumulation_steps": 4,
-        "basemodel_pct_start": 0.03387337731622081,
-        "basemodel_div_factor": 25.0,
-        "basemodel_max_grad_norm": 1.870761961280168,
-        "ffn_dropout_p": 0.039068845602553554,
-        "attn_dropout_p": 0.1368466053024314,
-        "resid_dropout_p": 0.13204574812188039,
-        "token_dropout_p": 0.024407646968955768,
-        "clip": 6.466238370778891
-      },
-      "state": "TrialState.COMPLETE",
-      "datetime_start": "2026-05-15T21:46:32.243462",
-      "datetime_complete": "2026-05-15T21:48:22.116180"
-    }
-  ],
-  "timestamp": "2026-05-15T21:48:22.216430",
-  "worker_tag": "pid20088_cuda0"
-}
-```
-
----
-
-### `finetuned/smoke_test_full_hpo/hpo_results/tokenizer_trials.json`
-
-```json
-{
-  "best_value": 0.4570583648311022,
-  "best_params": {
-    "tokenizer_learning_rate": 0.0001025350969016849,
-    "adam_weight_decay": 0.22648248189516848,
-    "adam_beta1": 0.9231993941811405,
-    "adam_beta2": 0.9592671899355066,
-    "batch_size": 1,
-    "accumulation_steps": 1,
-    "tokenizer_pct_start": 0.012881829201412343,
-    "tokenizer_div_factor": 5.0,
-    "tokenizer_max_grad_norm": 1.325320294340452,
-    "bsq_beta": 0.024878734419814436,
-    "bsq_gamma0": 1.2871346474483567,
-    "bsq_gamma": 1.3183340223705389,
-    "bsq_zeta": 0.023927528765580644,
-    "clip": 7.282970263056656
-  },
-  "n_trials": 2,
-  "n_completed": 2,
-  "n_pruned": 0,
-  "n_failed": 0,
-  "trials": [
-    {
-      "number": 0,
-      "value": 0.4570583648311022,
-      "params": {
-        "tokenizer_learning_rate": 0.0001025350969016849,
-        "adam_weight_decay": 0.22648248189516848,
-        "adam_beta1": 0.9231993941811405,
-        "adam_beta2": 0.9592671899355066,
-        "batch_size": 1,
-        "accumulation_steps": 1,
-        "tokenizer_pct_start": 0.012881829201412343,
-        "tokenizer_div_factor": 5.0,
-        "tokenizer_max_grad_norm": 1.325320294340452,
-        "bsq_beta": 0.024878734419814436,
-        "bsq_gamma0": 1.2871346474483567,
-        "bsq_gamma": 1.3183340223705389,
-        "bsq_zeta": 0.023927528765580644,
-        "clip": 7.282970263056656
-      },
-      "state": "TrialState.COMPLETE",
-      "datetime_start": "2026-05-15T21:36:27.620410",
-      "datetime_complete": "2026-05-15T21:38:40.823190"
-    },
-    {
-      "number": 1,
-      "value": 0.5896485339563626,
-      "params": {
-        "tokenizer_learning_rate": 2.3795221163877236e-05,
-        "adam_weight_decay": 0.005292705365436975,
-        "adam_beta1": 0.8866361843293691,
-        "adam_beta2": 0.9451509284374866,
-        "batch_size": 1,
-        "accumulation_steps": 4,
-        "tokenizer_pct_start": 0.03387337731622081,
-        "tokenizer_div_factor": 25.0,
-        "tokenizer_max_grad_norm": 1.870761961280168,
-        "bsq_beta": 0.013399060561509796,
-        "bsq_gamma0": 1.5263495397682354,
-        "bsq_gamma": 1.3281829924875215,
-        "bsq_zeta": 0.014413697528610409,
-        "clip": 6.466238370778891
-      },
-      "state": "TrialState.COMPLETE",
-      "datetime_start": "2026-05-15T21:38:40.924198",
-      "datetime_complete": "2026-05-15T21:40:41.307166"
-    }
-  ],
-  "timestamp": "2026-05-15T21:40:41.430166",
-  "worker_tag": "pid20088_cuda0"
-}
-```
-
----
-
-### `finetuned/smoke_test_full_hpo/hpo_trials/basemodel_pid20088_trial0/trial.log`
+### `finetuned/1d_t4_hpo/logs/basemodel_training_rank_0.log`
 
 ```text
-2026-05-15 21:44:19 [INFO] Starting base-model training …
-2026-05-15 21:46:29 [INFO] 
---- Epoch 1/1 Summary ---
-  Train Loss : 6.765360
-  Val   Loss : 6.592907
-  Epoch Time : 0:02:10
+2026-05-17 07:14:42 - basemodel_training_rank_0 - INFO - === Basemodel Training Started ===
+2026-05-17 07:14:42 - basemodel_training_rank_0 - INFO - Experiment: 1d_t4_hpo
+2026-05-17 07:14:42 - basemodel_training_rank_0 - INFO - Log dir:    finetuned/1d_t4_hpo/logs
+2026-05-17 07:14:42 - basemodel_training_rank_0 - INFO - Rank:       0
+2026-05-17 07:14:42 - basemodel_training_rank_0 - INFO - Timestamp:  2026-05-17 07:14:42
+2026-05-17 07:14:42 - basemodel_training_rank_0 - INFO - Loading fine-tuned tokenizer...
+2026-05-17 07:14:42 - basemodel_training_rank_0 - INFO - Loading pretrained predictor...
+2026-05-17 07:14:42 - basemodel_training_rank_0 - INFO - Model parameters: 4,108,032
+2026-05-17 07:14:42 - basemodel_training_rank_0 - INFO - === Training Configuration ===
+2026-05-17 07:14:42 - basemodel_training_rank_0 - INFO - Data path: data/1d.csv
+2026-05-17 07:14:42 - basemodel_training_rank_0 - INFO - Lookback window: 90
+2026-05-17 07:14:42 - basemodel_training_rank_0 - INFO - Predict window: 14
+2026-05-17 07:14:42 - basemodel_training_rank_0 - INFO - Batch size: 128
+2026-05-17 07:14:42 - basemodel_training_rank_0 - INFO - Learning rate: 0.0003784146030083808
+2026-05-17 07:14:42 - basemodel_training_rank_0 - INFO - Training epochs: 30
+2026-05-17 07:14:42 - basemodel_training_rank_0 - INFO - Device: cuda:0
+2026-05-17 07:14:42 - basemodel_training_rank_0 - INFO - Tokenizer path: finetuned/1d_t4_hpo/tokenizer/best_model
+2026-05-17 07:14:42 - basemodel_training_rank_0 - INFO - Pretrained model path: models/nos_mini
+2026-05-17 07:14:42 - basemodel_training_rank_0 - INFO - Starting fine-tuning training...
+2026-05-17 07:14:42 - basemodel_training_rank_0 - INFO - Starting base-model training …
+2026-05-17 07:14:44 - basemodel_training_rank_0 - INFO - [Epoch 1/30, Step 10/11] LR: 0.000092  Loss: 4.8909
+2026-05-17 07:14:44 - basemodel_training_rank_0 - INFO - 
+--- Epoch 1/30 Summary ---
+  Train Loss : 4.963334
+  Val   Loss : 4.645067
+  Epoch Time : 0:00:02
 
-2026-05-15 21:46:29 [INFO] ✓ Best model saved → finetuned/smoke_test_full_hpo\hpo_trials\basemodel_pid20088_trial0\best_model  (val loss: 6.592907)
+2026-05-17 07:14:44 - basemodel_training_rank_0 - INFO - ✓ Best model saved → finetuned/1d_t4_hpo/basemodel/best_model  (val loss: 4.645067)
+2026-05-17 07:14:46 - basemodel_training_rank_0 - INFO - [Epoch 2/30, Step 20/11] LR: 0.000268  Loss: 4.5775
+2026-05-17 07:14:47 - basemodel_training_rank_0 - INFO - 
+--- Epoch 2/30 Summary ---
+  Train Loss : 4.693393
+  Val   Loss : 4.520689
+  Epoch Time : 0:00:02
+
+2026-05-17 07:14:47 - basemodel_training_rank_0 - INFO - ✓ Best model saved → finetuned/1d_t4_hpo/basemodel/best_model  (val loss: 4.520689)
+2026-05-17 07:14:49 - basemodel_training_rank_0 - INFO - [Epoch 3/30, Step 30/11] LR: 0.000376  Loss: 4.1889
+2026-05-17 07:14:49 - basemodel_training_rank_0 - INFO - 
+--- Epoch 3/30 Summary ---
+  Train Loss : 4.252041
+  Val   Loss : 4.329933
+  Epoch Time : 0:00:02
+
+2026-05-17 07:14:49 - basemodel_training_rank_0 - INFO - ✓ Best model saved → finetuned/1d_t4_hpo/basemodel/best_model  (val loss: 4.329933)
+2026-05-17 07:14:51 - basemodel_training_rank_0 - INFO - [Epoch 4/30, Step 40/11] LR: 0.000378  Loss: 3.8931
+2026-05-17 07:14:52 - basemodel_training_rank_0 - INFO - 
+--- Epoch 4/30 Summary ---
+  Train Loss : 3.947981
+  Val   Loss : 4.284915
+  Epoch Time : 0:00:02
+
+2026-05-17 07:14:52 - basemodel_training_rank_0 - INFO - ✓ Best model saved → finetuned/1d_t4_hpo/basemodel/best_model  (val loss: 4.284915)
+2026-05-17 07:14:53 - basemodel_training_rank_0 - INFO - [Epoch 5/30, Step 50/11] LR: 0.000375  Loss: 3.6784
+2026-05-17 07:14:54 - basemodel_training_rank_0 - INFO - 
+--- Epoch 5/30 Summary ---
+  Train Loss : 3.662367
+  Val   Loss : 4.433038
+  Epoch Time : 0:00:02
+
+2026-05-17 07:14:55 - basemodel_training_rank_0 - INFO - [Epoch 6/30, Step 60/11] LR: 0.000370  Loss: 3.3388
+2026-05-17 07:14:57 - basemodel_training_rank_0 - INFO - 
+--- Epoch 6/30 Summary ---
+  Train Loss : 3.347033
+  Val   Loss : 4.740929
+  Epoch Time : 0:00:02
+
+2026-05-17 07:14:58 - basemodel_training_rank_0 - INFO - [Epoch 7/30, Step 70/11] LR: 0.000363  Loss: 3.0353
+2026-05-17 07:14:59 - basemodel_training_rank_0 - INFO - 
+--- Epoch 7/30 Summary ---
+  Train Loss : 3.022630
+  Val   Loss : 5.068810
+  Epoch Time : 0:00:02
+
+2026-05-17 07:15:00 - basemodel_training_rank_0 - INFO - [Epoch 8/30, Step 80/11] LR: 0.000354  Loss: 2.7908
+2026-05-17 07:15:02 - basemodel_training_rank_0 - INFO - 
+--- Epoch 8/30 Summary ---
+  Train Loss : 2.726871
+  Val   Loss : 5.443906
+  Epoch Time : 0:00:02
+
+2026-05-17 07:15:02 - basemodel_training_rank_0 - INFO - [Epoch 9/30, Step 90/11] LR: 0.000344  Loss: 2.4924
+2026-05-17 07:15:04 - basemodel_training_rank_0 - INFO - 
+--- Epoch 9/30 Summary ---
+  Train Loss : 2.504552
+  Val   Loss : 5.675878
+  Epoch Time : 0:00:02
+
+2026-05-17 07:15:05 - basemodel_training_rank_0 - INFO - [Epoch 10/30, Step 100/11] LR: 0.000331  Loss: 2.5554
+2026-05-17 07:15:07 - basemodel_training_rank_0 - INFO - [Epoch 10/30, Step 110/11] LR: 0.000317  Loss: 2.3115
+2026-05-17 07:15:07 - basemodel_training_rank_0 - INFO - 
+--- Epoch 10/30 Summary ---
+  Train Loss : 2.348972
+  Val   Loss : 5.722508
+  Epoch Time : 0:00:02
+
+2026-05-17 07:15:09 - basemodel_training_rank_0 - INFO - [Epoch 11/30, Step 120/11] LR: 0.000302  Loss: 2.0249
+2026-05-17 07:15:10 - basemodel_training_rank_0 - INFO - 
+--- Epoch 11/30 Summary ---
+  Train Loss : 2.173679
+  Val   Loss : 5.873799
+  Epoch Time : 0:00:02
+
+2026-05-17 07:15:11 - basemodel_training_rank_0 - INFO - [Epoch 12/30, Step 130/11] LR: 0.000285  Loss: 2.0338
+2026-05-17 07:15:12 - basemodel_training_rank_0 - INFO - 
+--- Epoch 12/30 Summary ---
+  Train Loss : 2.040126
+  Val   Loss : 5.966989
+  Epoch Time : 0:00:02
+
+2026-05-17 07:15:14 - basemodel_training_rank_0 - INFO - [Epoch 13/30, Step 140/11] LR: 0.000267  Loss: 1.8267
+2026-05-17 07:15:15 - basemodel_training_rank_0 - INFO - 
+--- Epoch 13/30 Summary ---
+  Train Loss : 1.909443
+  Val   Loss : 6.101976
+  Epoch Time : 0:00:02
+
+2026-05-17 07:15:16 - basemodel_training_rank_0 - INFO - [Epoch 14/30, Step 150/11] LR: 0.000249  Loss: 1.7927
+2026-05-17 07:15:17 - basemodel_training_rank_0 - INFO - 
+--- Epoch 14/30 Summary ---
+  Train Loss : 1.813062
+  Val   Loss : 6.195870
+  Epoch Time : 0:00:02
+
+2026-05-17 07:15:18 - basemodel_training_rank_0 - INFO - [Epoch 15/30, Step 160/11] LR: 0.000229  Loss: 1.6903
+2026-05-17 07:15:20 - basemodel_training_rank_0 - INFO - 
+--- Epoch 15/30 Summary ---
+  Train Loss : 1.700253
+  Val   Loss : 6.364306
+  Epoch Time : 0:00:02
+
+2026-05-17 07:15:21 - basemodel_training_rank_0 - INFO - [Epoch 16/30, Step 170/11] LR: 0.000210  Loss: 1.6306
+2026-05-17 07:15:22 - basemodel_training_rank_0 - INFO - 
+--- Epoch 16/30 Summary ---
+  Train Loss : 1.632787
+  Val   Loss : 6.429851
+  Epoch Time : 0:00:02
+
+2026-05-17 07:15:23 - basemodel_training_rank_0 - INFO - [Epoch 17/30, Step 180/11] LR: 0.000190  Loss: 1.5346
+2026-05-17 07:15:25 - basemodel_training_rank_0 - INFO - 
+--- Epoch 17/30 Summary ---
+  Train Loss : 1.582093
+  Val   Loss : 6.487051
+  Epoch Time : 0:00:02
+
+2026-05-17 07:15:25 - basemodel_training_rank_0 - INFO - [Epoch 18/30, Step 190/11] LR: 0.000170  Loss: 1.5352
+2026-05-17 07:15:27 - basemodel_training_rank_0 - INFO - 
+--- Epoch 18/30 Summary ---
+  Train Loss : 1.519012
+  Val   Loss : 6.514397
+  Epoch Time : 0:00:02
+
+2026-05-17 07:15:28 - basemodel_training_rank_0 - INFO - [Epoch 19/30, Step 200/11] LR: 0.000150  Loss: 1.5341
+2026-05-17 07:15:30 - basemodel_training_rank_0 - INFO - 
+--- Epoch 19/30 Summary ---
+  Train Loss : 1.474047
+  Val   Loss : 6.548087
+  Epoch Time : 0:00:02
+
+2026-05-17 07:15:30 - basemodel_training_rank_0 - INFO - [Epoch 20/30, Step 210/11] LR: 0.000131  Loss: 1.4659
+2026-05-17 07:15:32 - basemodel_training_rank_0 - INFO - [Epoch 20/30, Step 220/11] LR: 0.000112  Loss: 1.4378
+2026-05-17 07:15:32 - basemodel_training_rank_0 - INFO - 
+--- Epoch 20/30 Summary ---
+  Train Loss : 1.442221
+  Val   Loss : 6.604577
+  Epoch Time : 0:00:02
+
+2026-05-17 07:15:34 - basemodel_training_rank_0 - INFO - [Epoch 21/30, Step 230/11] LR: 0.000094  Loss: 1.3581
+2026-05-17 07:15:35 - basemodel_training_rank_0 - INFO - 
+--- Epoch 21/30 Summary ---
+  Train Loss : 1.399695
+  Val   Loss : 6.626465
+  Epoch Time : 0:00:02
+
+2026-05-17 07:15:37 - basemodel_training_rank_0 - INFO - [Epoch 22/30, Step 240/11] LR: 0.000078  Loss: 1.3639
+2026-05-17 07:15:37 - basemodel_training_rank_0 - INFO - 
+--- Epoch 22/30 Summary ---
+  Train Loss : 1.381617
+  Val   Loss : 6.647118
+  Epoch Time : 0:00:02
+
+2026-05-17 07:15:39 - basemodel_training_rank_0 - INFO - [Epoch 23/30, Step 250/11] LR: 0.000062  Loss: 1.3635
+2026-05-17 07:15:40 - basemodel_training_rank_0 - INFO - 
+--- Epoch 23/30 Summary ---
+  Train Loss : 1.358930
+  Val   Loss : 6.681557
+  Epoch Time : 0:00:02
+
+2026-05-17 07:15:42 - basemodel_training_rank_0 - INFO - [Epoch 24/30, Step 260/11] LR: 0.000048  Loss: 1.3244
+2026-05-17 07:15:43 - basemodel_training_rank_0 - INFO - 
+--- Epoch 24/30 Summary ---
+  Train Loss : 1.342545
+  Val   Loss : 6.693789
+  Epoch Time : 0:00:02
+
+2026-05-17 07:15:44 - basemodel_training_rank_0 - INFO - [Epoch 25/30, Step 270/11] LR: 0.000036  Loss: 1.3191
+2026-05-17 07:15:45 - basemodel_training_rank_0 - INFO - 
+--- Epoch 25/30 Summary ---
+  Train Loss : 1.329156
+  Val   Loss : 6.711730
+  Epoch Time : 0:00:02
+
+2026-05-17 07:15:46 - basemodel_training_rank_0 - INFO - [Epoch 26/30, Step 280/11] LR: 0.000025  Loss: 1.3204
+2026-05-17 07:15:48 - basemodel_training_rank_0 - INFO - 
+--- Epoch 26/30 Summary ---
+  Train Loss : 1.326763
+  Val   Loss : 6.722200
+  Epoch Time : 0:00:02
+
+2026-05-17 07:15:49 - basemodel_training_rank_0 - INFO - [Epoch 27/30, Step 290/11] LR: 0.000016  Loss: 1.3297
+2026-05-17 07:15:50 - basemodel_training_rank_0 - INFO - 
+--- Epoch 27/30 Summary ---
+  Train Loss : 1.316370
+  Val   Loss : 6.721284
+  Epoch Time : 0:00:02
+
+2026-05-17 07:15:51 - basemodel_training_rank_0 - INFO - [Epoch 28/30, Step 300/11] LR: 0.000009  Loss: 1.3364
+2026-05-17 07:15:53 - basemodel_training_rank_0 - INFO - 
+--- Epoch 28/30 Summary ---
+  Train Loss : 1.316487
+  Val   Loss : 6.720575
+  Epoch Time : 0:00:02
+
+2026-05-17 07:15:53 - basemodel_training_rank_0 - INFO - [Epoch 29/30, Step 310/11] LR: 0.000004  Loss: 1.3150
+2026-05-17 07:15:56 - basemodel_training_rank_0 - INFO - 
+--- Epoch 29/30 Summary ---
+  Train Loss : 1.315080
+  Val   Loss : 6.722671
+  Epoch Time : 0:00:02
+
+2026-05-17 07:15:56 - basemodel_training_rank_0 - INFO - [Epoch 30/30, Step 320/11] LR: 0.000001  Loss: 1.3168
+2026-05-17 07:15:58 - basemodel_training_rank_0 - INFO - [Epoch 30/30, Step 330/11] LR: 0.000000  Loss: 1.3774
+2026-05-17 07:15:58 - basemodel_training_rank_0 - INFO - 
+--- Epoch 30/30 Summary ---
+  Train Loss : 1.314285
+  Val   Loss : 6.719721
+  Epoch Time : 0:00:02
+
+2026-05-17 07:15:58 - basemodel_training_rank_0 - INFO - Basemodel training completed! Best validation loss: 4.2849
+Training time: 1.27 minutes
+Model saved to: finetuned/1d_t4_hpo/basemodel
 
 ```
 
 ---
 
-### `finetuned/smoke_test_full_hpo/hpo_trials/basemodel_pid20088_trial1/trial.log`
+### `finetuned/1d_t4_hpo/logs/tokenizer_training_rank_0.log`
 
 ```text
-2026-05-15 21:46:32 [INFO] Starting base-model training …
-2026-05-15 21:48:19 [INFO] 
---- Epoch 1/1 Summary ---
-  Train Loss : 6.812303
-  Val   Loss : 6.711541
-  Epoch Time : 0:01:47
+2026-05-17 07:11:49 - tokenizer_training_rank_0 - INFO - === Tokenizer Training Started ===
+2026-05-17 07:11:49 - tokenizer_training_rank_0 - INFO - Experiment Name: 1d_t4_hpo
+2026-05-17 07:11:49 - tokenizer_training_rank_0 - INFO - Log Directory: finetuned/1d_t4_hpo/logs
+2026-05-17 07:11:49 - tokenizer_training_rank_0 - INFO - Rank: 0
+2026-05-17 07:11:49 - tokenizer_training_rank_0 - INFO - Timestamp: 2026-05-17 07:11:49
+2026-05-17 07:11:49 - tokenizer_training_rank_0 - INFO - Loading pretrained tokenizer...
+2026-05-17 07:11:49 - tokenizer_training_rank_0 - INFO - Tokenizer parameters: 3,958,042
+2026-05-17 07:11:49 - tokenizer_training_rank_0 - INFO - === Training Configuration ===
+2026-05-17 07:11:49 - tokenizer_training_rank_0 - INFO - Data path: data/1d.csv
+2026-05-17 07:11:49 - tokenizer_training_rank_0 - INFO - Lookback window: 90
+2026-05-17 07:11:49 - tokenizer_training_rank_0 - INFO - Predict window: 14
+2026-05-17 07:11:49 - tokenizer_training_rank_0 - INFO - Batch size: 128
+2026-05-17 07:11:49 - tokenizer_training_rank_0 - INFO - Learning rate: 0.0021627162139822797
+2026-05-17 07:11:49 - tokenizer_training_rank_0 - INFO - Training epochs: 50
+2026-05-17 07:11:49 - tokenizer_training_rank_0 - INFO - Device: cuda:0
+2026-05-17 07:11:49 - tokenizer_training_rank_0 - INFO - Distributed training: False
+2026-05-17 07:11:49 - tokenizer_training_rank_0 - INFO - Starting tokenizer fine-tuning training...
+2026-05-17 07:11:49 - tokenizer_training_rank_0 - INFO - Starting tokenizer training...
+2026-05-17 07:11:54 - tokenizer_training_rank_0 - INFO - [Epoch 1/50, Step 10/11] LR: 0.000374, Loss: 0.0361
+2026-05-17 07:11:55 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 1/50 Summary ---
+Validation Loss: 0.119014
+Epoch Time: 0:00:04
 
-2026-05-15 21:48:19 [INFO] ✓ Best model saved → finetuned/smoke_test_full_hpo\hpo_trials\basemodel_pid20088_trial1\best_model  (val loss: 6.711541)
+2026-05-17 07:11:55 - tokenizer_training_rank_0 - INFO - Best model saved: finetuned/1d_t4_hpo/tokenizer/best_model (val loss: 0.119014)
+2026-05-17 07:11:57 - tokenizer_training_rank_0 - INFO - [Epoch 2/50, Step 20/11] LR: 0.000797, Loss: -0.0513
+2026-05-17 07:11:58 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 2/50 Summary ---
+Validation Loss: 0.091160
+Epoch Time: 0:00:03
+
+2026-05-17 07:11:58 - tokenizer_training_rank_0 - INFO - Best model saved: finetuned/1d_t4_hpo/tokenizer/best_model (val loss: 0.091160)
+2026-05-17 07:12:01 - tokenizer_training_rank_0 - INFO - [Epoch 3/50, Step 30/11] LR: 0.001348, Loss: -0.1186
+2026-05-17 07:12:02 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 3/50 Summary ---
+Validation Loss: 0.079762
+Epoch Time: 0:00:03
+
+2026-05-17 07:12:02 - tokenizer_training_rank_0 - INFO - Best model saved: finetuned/1d_t4_hpo/tokenizer/best_model (val loss: 0.079762)
+2026-05-17 07:12:04 - tokenizer_training_rank_0 - INFO - [Epoch 4/50, Step 40/11] LR: 0.001847, Loss: -0.1567
+2026-05-17 07:12:05 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 4/50 Summary ---
+Validation Loss: 0.068567
+Epoch Time: 0:00:03
+
+2026-05-17 07:12:05 - tokenizer_training_rank_0 - INFO - Best model saved: finetuned/1d_t4_hpo/tokenizer/best_model (val loss: 0.068567)
+2026-05-17 07:12:07 - tokenizer_training_rank_0 - INFO - [Epoch 5/50, Step 50/11] LR: 0.002132, Loss: -0.1905
+2026-05-17 07:12:09 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 5/50 Summary ---
+Validation Loss: 0.064920
+Epoch Time: 0:00:03
+
+2026-05-17 07:12:09 - tokenizer_training_rank_0 - INFO - Best model saved: finetuned/1d_t4_hpo/tokenizer/best_model (val loss: 0.064920)
+2026-05-17 07:12:11 - tokenizer_training_rank_0 - INFO - [Epoch 6/50, Step 60/11] LR: 0.002162, Loss: -0.2086
+2026-05-17 07:12:13 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 6/50 Summary ---
+Validation Loss: 0.059318
+Epoch Time: 0:00:03
+
+2026-05-17 07:12:13 - tokenizer_training_rank_0 - INFO - Best model saved: finetuned/1d_t4_hpo/tokenizer/best_model (val loss: 0.059318)
+2026-05-17 07:12:14 - tokenizer_training_rank_0 - INFO - [Epoch 7/50, Step 70/11] LR: 0.002157, Loss: -0.2225
+2026-05-17 07:12:16 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 7/50 Summary ---
+Validation Loss: 0.056564
+Epoch Time: 0:00:03
+
+2026-05-17 07:12:16 - tokenizer_training_rank_0 - INFO - Best model saved: finetuned/1d_t4_hpo/tokenizer/best_model (val loss: 0.056564)
+2026-05-17 07:12:17 - tokenizer_training_rank_0 - INFO - [Epoch 8/50, Step 80/11] LR: 0.002148, Loss: -0.2298
+2026-05-17 07:12:20 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 8/50 Summary ---
+Validation Loss: 0.058682
+Epoch Time: 0:00:03
+
+2026-05-17 07:12:20 - tokenizer_training_rank_0 - INFO - [Epoch 9/50, Step 90/11] LR: 0.002135, Loss: -0.2355
+2026-05-17 07:12:23 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 9/50 Summary ---
+Validation Loss: 0.052077
+Epoch Time: 0:00:03
+
+2026-05-17 07:12:23 - tokenizer_training_rank_0 - INFO - Best model saved: finetuned/1d_t4_hpo/tokenizer/best_model (val loss: 0.052077)
+2026-05-17 07:12:24 - tokenizer_training_rank_0 - INFO - [Epoch 10/50, Step 100/11] LR: 0.002118, Loss: -0.2412
+2026-05-17 07:12:26 - tokenizer_training_rank_0 - INFO - [Epoch 10/50, Step 110/11] LR: 0.002096, Loss: -0.2398
+2026-05-17 07:12:27 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 10/50 Summary ---
+Validation Loss: 0.054823
+Epoch Time: 0:00:03
+
+2026-05-17 07:12:30 - tokenizer_training_rank_0 - INFO - [Epoch 11/50, Step 120/11] LR: 0.002070, Loss: -0.2474
+2026-05-17 07:12:30 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 11/50 Summary ---
+Validation Loss: 0.054190
+Epoch Time: 0:00:03
+
+2026-05-17 07:12:33 - tokenizer_training_rank_0 - INFO - [Epoch 12/50, Step 130/11] LR: 0.002040, Loss: -0.2505
+2026-05-17 07:12:33 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 12/50 Summary ---
+Validation Loss: 0.051983
+Epoch Time: 0:00:03
+
+2026-05-17 07:12:33 - tokenizer_training_rank_0 - INFO - Best model saved: finetuned/1d_t4_hpo/tokenizer/best_model (val loss: 0.051983)
+2026-05-17 07:12:36 - tokenizer_training_rank_0 - INFO - [Epoch 13/50, Step 140/11] LR: 0.002007, Loss: -0.2478
+2026-05-17 07:12:37 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 13/50 Summary ---
+Validation Loss: 0.052626
+Epoch Time: 0:00:03
+
+2026-05-17 07:12:39 - tokenizer_training_rank_0 - INFO - [Epoch 14/50, Step 150/11] LR: 0.001969, Loss: -0.2547
+2026-05-17 07:12:40 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 14/50 Summary ---
+Validation Loss: 0.053510
+Epoch Time: 0:00:03
+
+2026-05-17 07:12:42 - tokenizer_training_rank_0 - INFO - [Epoch 15/50, Step 160/11] LR: 0.001928, Loss: -0.2564
+2026-05-17 07:12:43 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 15/50 Summary ---
+Validation Loss: 0.051254
+Epoch Time: 0:00:03
+
+2026-05-17 07:12:43 - tokenizer_training_rank_0 - INFO - Best model saved: finetuned/1d_t4_hpo/tokenizer/best_model (val loss: 0.051254)
+2026-05-17 07:12:45 - tokenizer_training_rank_0 - INFO - [Epoch 16/50, Step 170/11] LR: 0.001884, Loss: -0.2576
+2026-05-17 07:12:47 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 16/50 Summary ---
+Validation Loss: 0.051031
+Epoch Time: 0:00:03
+
+2026-05-17 07:12:47 - tokenizer_training_rank_0 - INFO - Best model saved: finetuned/1d_t4_hpo/tokenizer/best_model (val loss: 0.051031)
+2026-05-17 07:12:48 - tokenizer_training_rank_0 - INFO - [Epoch 17/50, Step 180/11] LR: 0.001836, Loss: -0.2612
+2026-05-17 07:12:50 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 17/50 Summary ---
+Validation Loss: 0.057854
+Epoch Time: 0:00:03
+
+2026-05-17 07:12:51 - tokenizer_training_rank_0 - INFO - [Epoch 18/50, Step 190/11] LR: 0.001786, Loss: -0.2596
+2026-05-17 07:12:53 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 18/50 Summary ---
+Validation Loss: 0.054282
+Epoch Time: 0:00:03
+
+2026-05-17 07:12:54 - tokenizer_training_rank_0 - INFO - [Epoch 19/50, Step 200/11] LR: 0.001732, Loss: -0.2637
+2026-05-17 07:12:57 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 19/50 Summary ---
+Validation Loss: 0.054062
+Epoch Time: 0:00:03
+
+2026-05-17 07:12:57 - tokenizer_training_rank_0 - INFO - [Epoch 20/50, Step 210/11] LR: 0.001676, Loss: -0.2641
+2026-05-17 07:13:00 - tokenizer_training_rank_0 - INFO - [Epoch 20/50, Step 220/11] LR: 0.001617, Loss: -0.2632
+2026-05-17 07:13:00 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 20/50 Summary ---
+Validation Loss: 0.052563
+Epoch Time: 0:00:03
+
+2026-05-17 07:13:03 - tokenizer_training_rank_0 - INFO - [Epoch 21/50, Step 230/11] LR: 0.001557, Loss: -0.2661
+2026-05-17 07:13:03 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 21/50 Summary ---
+Validation Loss: 0.050338
+Epoch Time: 0:00:03
+
+2026-05-17 07:13:03 - tokenizer_training_rank_0 - INFO - Best model saved: finetuned/1d_t4_hpo/tokenizer/best_model (val loss: 0.050338)
+2026-05-17 07:13:06 - tokenizer_training_rank_0 - INFO - [Epoch 22/50, Step 240/11] LR: 0.001494, Loss: -0.2659
+2026-05-17 07:13:07 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 22/50 Summary ---
+Validation Loss: 0.053006
+Epoch Time: 0:00:03
+
+2026-05-17 07:13:09 - tokenizer_training_rank_0 - INFO - [Epoch 23/50, Step 250/11] LR: 0.001430, Loss: -0.2692
+2026-05-17 07:13:10 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 23/50 Summary ---
+Validation Loss: 0.053697
+Epoch Time: 0:00:03
+
+2026-05-17 07:13:12 - tokenizer_training_rank_0 - INFO - [Epoch 24/50, Step 260/11] LR: 0.001364, Loss: -0.2701
+2026-05-17 07:13:14 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 24/50 Summary ---
+Validation Loss: 0.052960
+Epoch Time: 0:00:03
+
+2026-05-17 07:13:15 - tokenizer_training_rank_0 - INFO - [Epoch 25/50, Step 270/11] LR: 0.001297, Loss: -0.2689
+2026-05-17 07:13:17 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 25/50 Summary ---
+Validation Loss: 0.053371
+Epoch Time: 0:00:03
+
+2026-05-17 07:13:18 - tokenizer_training_rank_0 - INFO - [Epoch 26/50, Step 280/11] LR: 0.001230, Loss: -0.2707
+2026-05-17 07:13:20 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 26/50 Summary ---
+Validation Loss: 0.052022
+Epoch Time: 0:00:03
+
+2026-05-17 07:13:22 - tokenizer_training_rank_0 - INFO - [Epoch 27/50, Step 290/11] LR: 0.001161, Loss: -0.2716
+2026-05-17 07:13:24 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 27/50 Summary ---
+Validation Loss: 0.054940
+Epoch Time: 0:00:03
+
+2026-05-17 07:13:25 - tokenizer_training_rank_0 - INFO - [Epoch 28/50, Step 300/11] LR: 0.001093, Loss: -0.2725
+2026-05-17 07:13:27 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 28/50 Summary ---
+Validation Loss: 0.054098
+Epoch Time: 0:00:03
+
+2026-05-17 07:13:28 - tokenizer_training_rank_0 - INFO - [Epoch 29/50, Step 310/11] LR: 0.001024, Loss: -0.2716
+2026-05-17 07:13:31 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 29/50 Summary ---
+Validation Loss: 0.053061
+Epoch Time: 0:00:03
+
+2026-05-17 07:13:31 - tokenizer_training_rank_0 - INFO - [Epoch 30/50, Step 320/11] LR: 0.000956, Loss: -0.2726
+2026-05-17 07:13:34 - tokenizer_training_rank_0 - INFO - [Epoch 30/50, Step 330/11] LR: 0.000888, Loss: -0.2745
+2026-05-17 07:13:34 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 30/50 Summary ---
+Validation Loss: 0.054280
+Epoch Time: 0:00:03
+
+2026-05-17 07:13:37 - tokenizer_training_rank_0 - INFO - [Epoch 31/50, Step 340/11] LR: 0.000821, Loss: -0.2737
+2026-05-17 07:13:38 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 31/50 Summary ---
+Validation Loss: 0.055258
+Epoch Time: 0:00:03
+
+2026-05-17 07:13:40 - tokenizer_training_rank_0 - INFO - [Epoch 32/50, Step 350/11] LR: 0.000755, Loss: -0.2746
+2026-05-17 07:13:41 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 32/50 Summary ---
+Validation Loss: 0.053723
+Epoch Time: 0:00:03
+
+2026-05-17 07:13:43 - tokenizer_training_rank_0 - INFO - [Epoch 33/50, Step 360/11] LR: 0.000690, Loss: -0.2764
+2026-05-17 07:13:45 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 33/50 Summary ---
+Validation Loss: 0.052671
+Epoch Time: 0:00:03
+
+2026-05-17 07:13:47 - tokenizer_training_rank_0 - INFO - [Epoch 34/50, Step 370/11] LR: 0.000627, Loss: -0.2761
+2026-05-17 07:13:48 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 34/50 Summary ---
+Validation Loss: 0.054220
+Epoch Time: 0:00:03
+
+2026-05-17 07:13:50 - tokenizer_training_rank_0 - INFO - [Epoch 35/50, Step 380/11] LR: 0.000565, Loss: -0.2755
+2026-05-17 07:13:51 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 35/50 Summary ---
+Validation Loss: 0.054730
+Epoch Time: 0:00:03
+
+2026-05-17 07:13:53 - tokenizer_training_rank_0 - INFO - [Epoch 36/50, Step 390/11] LR: 0.000506, Loss: -0.2770
+2026-05-17 07:13:55 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 36/50 Summary ---
+Validation Loss: 0.054964
+Epoch Time: 0:00:03
+
+2026-05-17 07:13:56 - tokenizer_training_rank_0 - INFO - [Epoch 37/50, Step 400/11] LR: 0.000449, Loss: -0.2783
+2026-05-17 07:13:58 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 37/50 Summary ---
+Validation Loss: 0.055089
+Epoch Time: 0:00:03
+
+2026-05-17 07:13:59 - tokenizer_training_rank_0 - INFO - [Epoch 38/50, Step 410/11] LR: 0.000395, Loss: -0.2771
+2026-05-17 07:14:01 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 38/50 Summary ---
+Validation Loss: 0.053634
+Epoch Time: 0:00:03
+
+2026-05-17 07:14:02 - tokenizer_training_rank_0 - INFO - [Epoch 39/50, Step 420/11] LR: 0.000343, Loss: -0.2769
+2026-05-17 07:14:05 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 39/50 Summary ---
+Validation Loss: 0.054066
+Epoch Time: 0:00:03
+
+2026-05-17 07:14:05 - tokenizer_training_rank_0 - INFO - [Epoch 40/50, Step 430/11] LR: 0.000294, Loss: -0.2789
+2026-05-17 07:14:08 - tokenizer_training_rank_0 - INFO - [Epoch 40/50, Step 440/11] LR: 0.000249, Loss: -0.2784
+2026-05-17 07:14:08 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 40/50 Summary ---
+Validation Loss: 0.054495
+Epoch Time: 0:00:03
+
+2026-05-17 07:14:11 - tokenizer_training_rank_0 - INFO - [Epoch 41/50, Step 450/11] LR: 0.000207, Loss: -0.2784
+2026-05-17 07:14:11 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 41/50 Summary ---
+Validation Loss: 0.054262
+Epoch Time: 0:00:03
+
+2026-05-17 07:14:14 - tokenizer_training_rank_0 - INFO - [Epoch 42/50, Step 460/11] LR: 0.000168, Loss: -0.2787
+2026-05-17 07:14:15 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 42/50 Summary ---
+Validation Loss: 0.054672
+Epoch Time: 0:00:03
+
+2026-05-17 07:14:17 - tokenizer_training_rank_0 - INFO - [Epoch 43/50, Step 470/11] LR: 0.000133, Loss: -0.2784
+2026-05-17 07:14:18 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 43/50 Summary ---
+Validation Loss: 0.054912
+Epoch Time: 0:00:03
+
+2026-05-17 07:14:20 - tokenizer_training_rank_0 - INFO - [Epoch 44/50, Step 480/11] LR: 0.000102, Loss: -0.2792
+2026-05-17 07:14:21 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 44/50 Summary ---
+Validation Loss: 0.055603
+Epoch Time: 0:00:03
+
+2026-05-17 07:14:23 - tokenizer_training_rank_0 - INFO - [Epoch 45/50, Step 490/11] LR: 0.000075, Loss: -0.2781
+2026-05-17 07:14:25 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 45/50 Summary ---
+Validation Loss: 0.055655
+Epoch Time: 0:00:03
+
+2026-05-17 07:14:26 - tokenizer_training_rank_0 - INFO - [Epoch 46/50, Step 500/11] LR: 0.000052, Loss: -0.2779
+2026-05-17 07:14:28 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 46/50 Summary ---
+Validation Loss: 0.055599
+Epoch Time: 0:00:03
+
+2026-05-17 07:14:29 - tokenizer_training_rank_0 - INFO - [Epoch 47/50, Step 510/11] LR: 0.000033, Loss: -0.2782
+2026-05-17 07:14:31 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 47/50 Summary ---
+Validation Loss: 0.055318
+Epoch Time: 0:00:03
+
+2026-05-17 07:14:32 - tokenizer_training_rank_0 - INFO - [Epoch 48/50, Step 520/11] LR: 0.000018, Loss: -0.2794
+2026-05-17 07:14:35 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 48/50 Summary ---
+Validation Loss: 0.055422
+Epoch Time: 0:00:03
+
+2026-05-17 07:14:35 - tokenizer_training_rank_0 - INFO - [Epoch 49/50, Step 530/11] LR: 0.000008, Loss: -0.2788
+2026-05-17 07:14:38 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 49/50 Summary ---
+Validation Loss: 0.055499
+Epoch Time: 0:00:03
+
+2026-05-17 07:14:38 - tokenizer_training_rank_0 - INFO - [Epoch 50/50, Step 540/11] LR: 0.000002, Loss: -0.2784
+2026-05-17 07:14:41 - tokenizer_training_rank_0 - INFO - [Epoch 50/50, Step 550/11] LR: 0.000000, Loss: -0.2791
+2026-05-17 07:14:41 - tokenizer_training_rank_0 - INFO - 
+--- Epoch 50/50 Summary ---
+Validation Loss: 0.055485
+Epoch Time: 0:00:03
+
+2026-05-17 07:14:42 - tokenizer_training_rank_0 - INFO - Tokenizer training completed! Best validation loss: 0.0503
+Training time: 2.88 minutes
+Model saved to: finetuned/1d_t4_hpo/tokenizer
 
 ```
 
 ---
 
-### `finetuned/smoke_test_full_hpo/hpo_trials/tokenizer_pid20088_trial0/trial.log`
+### `finetuned/1d_t4_hpo/tokenizer/trial.log`
 
 ```text
-2026-05-15 21:36:28 [INFO] Starting tokenizer training...
-2026-05-15 21:38:38 [INFO] 
---- Epoch 1/1 Summary ---
-Validation Loss: 0.457058
-Epoch Time: 0:02:07
+2026-05-17 07:06:29 [INFO] Starting tokenizer training...
+2026-05-17 07:06:32 [INFO] [Epoch 1/50, Step 10/11] LR: 0.000374, Loss: -0.1784
+2026-05-17 07:06:32 [INFO] 
+--- Epoch 1/50 Summary ---
+Validation Loss: 0.087068
+Epoch Time: 0:00:03
 
-2026-05-15 21:38:38 [INFO] Best model saved: finetuned/smoke_test_full_hpo\hpo_trials\tokenizer_pid20088_trial0\best_model (val loss: 0.457058)
+2026-05-17 07:06:32 [INFO] Best model saved: finetuned/1d_t4_hpo/tokenizer/best_model (val loss: 0.087068)
+2026-05-17 07:06:35 [INFO] [Epoch 2/50, Step 20/11] LR: 0.000797, Loss: -0.2155
+2026-05-17 07:06:36 [INFO] 
+--- Epoch 2/50 Summary ---
+Validation Loss: 0.066257
+Epoch Time: 0:00:03
 
-```
+2026-05-17 07:06:36 [INFO] Best model saved: finetuned/1d_t4_hpo/tokenizer/best_model (val loss: 0.066257)
+2026-05-17 07:06:38 [INFO] [Epoch 3/50, Step 30/11] LR: 0.001348, Loss: -0.2384
+2026-05-17 07:06:39 [INFO] 
+--- Epoch 3/50 Summary ---
+Validation Loss: 0.054230
+Epoch Time: 0:00:03
 
----
+2026-05-17 07:06:39 [INFO] Best model saved: finetuned/1d_t4_hpo/tokenizer/best_model (val loss: 0.054230)
+2026-05-17 07:06:41 [INFO] [Epoch 4/50, Step 40/11] LR: 0.001847, Loss: -0.2449
+2026-05-17 07:06:43 [INFO] 
+--- Epoch 4/50 Summary ---
+Validation Loss: 0.047967
+Epoch Time: 0:00:03
 
-### `finetuned/smoke_test_full_hpo/hpo_trials/tokenizer_pid20088_trial1/trial.log`
+2026-05-17 07:06:43 [INFO] Best model saved: finetuned/1d_t4_hpo/tokenizer/best_model (val loss: 0.047967)
+2026-05-17 07:06:44 [INFO] [Epoch 5/50, Step 50/11] LR: 0.002132, Loss: -0.2566
+2026-05-17 07:06:46 [INFO] 
+--- Epoch 5/50 Summary ---
+Validation Loss: 0.045639
+Epoch Time: 0:00:03
 
-```text
-2026-05-15 21:38:41 [INFO] Starting tokenizer training...
-2026-05-15 21:40:39 [INFO] 
---- Epoch 1/1 Summary ---
-Validation Loss: 0.589649
-Epoch Time: 0:01:57
+2026-05-17 07:06:46 [INFO] Best model saved: finetuned/1d_t4_hpo/tokenizer/best_model (val loss: 0.045639)
+2026-05-17 07:06:48 [INFO] [Epoch 6/50, Step 60/11] LR: 0.002162, Loss: -0.2640
+2026-05-17 07:06:50 [INFO] 
+--- Epoch 6/50 Summary ---
+Validation Loss: 0.045230
+Epoch Time: 0:00:03
 
-2026-05-15 21:40:39 [INFO] Best model saved: finetuned/smoke_test_full_hpo\hpo_trials\tokenizer_pid20088_trial1\best_model (val loss: 0.589649)
+2026-05-17 07:06:50 [INFO] Best model saved: finetuned/1d_t4_hpo/tokenizer/best_model (val loss: 0.045230)
+2026-05-17 07:06:51 [INFO] [Epoch 7/50, Step 70/11] LR: 0.002157, Loss: -0.2656
+2026-05-17 07:06:53 [INFO] 
+--- Epoch 7/50 Summary ---
+Validation Loss: 0.047613
+Epoch Time: 0:00:03
 
-```
+2026-05-17 07:06:54 [INFO] [Epoch 8/50, Step 80/11] LR: 0.002148, Loss: -0.2728
+2026-05-17 07:06:57 [INFO] 
+--- Epoch 8/50 Summary ---
+Validation Loss: 0.045344
+Epoch Time: 0:00:03
 
----
+2026-05-17 07:06:57 [INFO] [Epoch 9/50, Step 90/11] LR: 0.002135, Loss: -0.2738
+2026-05-17 07:07:00 [INFO] 
+--- Epoch 9/50 Summary ---
+Validation Loss: 0.046707
+Epoch Time: 0:00:03
 
-### `finetuned/smoke_test_full_hpo/logs/basemodel_training_rank_0.log`
+2026-05-17 07:07:00 [INFO] [Epoch 10/50, Step 100/11] LR: 0.002118, Loss: -0.2750
+2026-05-17 07:07:03 [INFO] [Epoch 10/50, Step 110/11] LR: 0.002096, Loss: -0.2779
+2026-05-17 07:07:03 [INFO] 
+--- Epoch 10/50 Summary ---
+Validation Loss: 0.049689
+Epoch Time: 0:00:03
 
-```text
-2026-05-15 21:58:00 - basemodel_training_rank_0 - INFO - === Basemodel Training Started ===
-2026-05-15 21:58:00 - basemodel_training_rank_0 - INFO - Experiment: smoke_test_full_hpo
-2026-05-15 21:58:00 - basemodel_training_rank_0 - INFO - Log dir:    finetuned/smoke_test_full_hpo\logs
-2026-05-15 21:58:00 - basemodel_training_rank_0 - INFO - Rank:       0
-2026-05-15 21:58:00 - basemodel_training_rank_0 - INFO - Timestamp:  2026-05-15 21:58:00
-2026-05-15 21:58:00 - basemodel_training_rank_0 - INFO - Loading fine-tuned tokenizer...
-2026-05-15 21:58:00 - basemodel_training_rank_0 - INFO - Loading pretrained predictor...
-2026-05-15 21:58:00 - basemodel_training_rank_0 - INFO - Model parameters: 4,108,032
-2026-05-15 21:58:00 - basemodel_training_rank_0 - INFO - === Training Configuration ===
-2026-05-15 21:58:00 - basemodel_training_rank_0 - INFO - Data path: data/1d.csv
-2026-05-15 21:58:00 - basemodel_training_rank_0 - INFO - Lookback window: 3
-2026-05-15 21:58:00 - basemodel_training_rank_0 - INFO - Predict window: 2
-2026-05-15 21:58:00 - basemodel_training_rank_0 - INFO - Batch size: 1
-2026-05-15 21:58:00 - basemodel_training_rank_0 - INFO - Learning rate: 1.3292918943162153e-06
-2026-05-15 21:58:00 - basemodel_training_rank_0 - INFO - Training epochs: 2
-2026-05-15 21:58:00 - basemodel_training_rank_0 - INFO - Device: cuda:0
-2026-05-15 21:58:00 - basemodel_training_rank_0 - INFO - Tokenizer path: finetuned/smoke_test_full_hpo/tokenizer/best_model
-2026-05-15 21:58:00 - basemodel_training_rank_0 - INFO - Pretrained model path: models/nos_mini
-2026-05-15 21:58:00 - basemodel_training_rank_0 - INFO - Starting fine-tuning training...
-2026-05-15 21:58:00 - basemodel_training_rank_0 - INFO - Starting base-model training …
-2026-05-15 21:58:11 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 10/1794] LR: 0.000000  Loss: 6.0878
-2026-05-15 21:58:11 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 20/1794] LR: 0.000001  Loss: 7.8186
-2026-05-15 21:58:12 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 30/1794] LR: 0.000001  Loss: 9.0534
-2026-05-15 21:58:12 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 40/1794] LR: 0.000001  Loss: 7.5791
-2026-05-15 21:58:12 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 50/1794] LR: 0.000001  Loss: 7.7302
-2026-05-15 21:58:13 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 60/1794] LR: 0.000001  Loss: 8.3658
-2026-05-15 21:58:13 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 70/1794] LR: 0.000001  Loss: 8.3715
-2026-05-15 21:58:14 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 80/1794] LR: 0.000001  Loss: 7.7935
-2026-05-15 21:58:14 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 90/1794] LR: 0.000001  Loss: 6.7388
-2026-05-15 21:58:15 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 100/1794] LR: 0.000001  Loss: 6.6046
-2026-05-15 21:58:15 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 110/1794] LR: 0.000001  Loss: 5.7785
-2026-05-15 21:58:15 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 120/1794] LR: 0.000001  Loss: 7.4133
-2026-05-15 21:58:16 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 130/1794] LR: 0.000001  Loss: 4.3124
-2026-05-15 21:58:16 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 140/1794] LR: 0.000001  Loss: 6.2734
-2026-05-15 21:58:17 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 150/1794] LR: 0.000001  Loss: 8.1511
-2026-05-15 21:58:17 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 160/1794] LR: 0.000001  Loss: 6.5824
-2026-05-15 21:58:18 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 170/1794] LR: 0.000001  Loss: 7.9326
-2026-05-15 21:58:18 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 180/1794] LR: 0.000001  Loss: 6.9654
-2026-05-15 21:58:18 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 190/1794] LR: 0.000001  Loss: 6.3368
-2026-05-15 21:58:19 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 200/1794] LR: 0.000001  Loss: 8.1660
-2026-05-15 21:58:19 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 210/1794] LR: 0.000001  Loss: 7.3577
-2026-05-15 21:58:20 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 220/1794] LR: 0.000001  Loss: 7.1350
-2026-05-15 21:58:20 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 230/1794] LR: 0.000001  Loss: 5.3583
-2026-05-15 21:58:20 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 240/1794] LR: 0.000001  Loss: 5.9936
-2026-05-15 21:58:21 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 250/1794] LR: 0.000001  Loss: 9.5113
-2026-05-15 21:58:21 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 260/1794] LR: 0.000001  Loss: 7.4828
-2026-05-15 21:58:22 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 270/1794] LR: 0.000001  Loss: 4.2376
-2026-05-15 21:58:22 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 280/1794] LR: 0.000001  Loss: 7.0154
-2026-05-15 21:58:23 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 290/1794] LR: 0.000001  Loss: 6.2785
-2026-05-15 21:58:23 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 300/1794] LR: 0.000001  Loss: 8.1898
-2026-05-15 21:58:24 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 310/1794] LR: 0.000001  Loss: 6.7221
-2026-05-15 21:58:24 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 320/1794] LR: 0.000001  Loss: 8.4432
-2026-05-15 21:58:24 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 330/1794] LR: 0.000001  Loss: 5.6606
-2026-05-15 21:58:25 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 340/1794] LR: 0.000001  Loss: 6.9166
-2026-05-15 21:58:25 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 350/1794] LR: 0.000001  Loss: 7.9993
-2026-05-15 21:58:26 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 360/1794] LR: 0.000001  Loss: 7.2830
-2026-05-15 21:58:26 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 370/1794] LR: 0.000001  Loss: 7.3009
-2026-05-15 21:58:26 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 380/1794] LR: 0.000001  Loss: 6.0146
-2026-05-15 21:58:27 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 390/1794] LR: 0.000001  Loss: 6.2142
-2026-05-15 21:58:27 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 400/1794] LR: 0.000001  Loss: 6.8091
-2026-05-15 21:58:28 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 410/1794] LR: 0.000001  Loss: 8.3810
-2026-05-15 21:58:28 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 420/1794] LR: 0.000001  Loss: 7.8329
-2026-05-15 21:58:28 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 430/1794] LR: 0.000001  Loss: 8.2790
-2026-05-15 21:58:29 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 440/1794] LR: 0.000001  Loss: 6.8179
-2026-05-15 21:58:29 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 450/1794] LR: 0.000001  Loss: 6.6183
-2026-05-15 21:58:30 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 460/1794] LR: 0.000001  Loss: 8.2882
-2026-05-15 21:58:30 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 470/1794] LR: 0.000001  Loss: 6.6144
-2026-05-15 21:58:30 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 480/1794] LR: 0.000001  Loss: 8.5469
-2026-05-15 21:58:31 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 490/1794] LR: 0.000001  Loss: 5.7255
-2026-05-15 21:58:31 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 500/1794] LR: 0.000001  Loss: 7.0486
-2026-05-15 21:58:32 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 510/1794] LR: 0.000001  Loss: 6.7122
-2026-05-15 21:58:32 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 520/1794] LR: 0.000001  Loss: 8.6196
-2026-05-15 21:58:32 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 530/1794] LR: 0.000001  Loss: 5.7079
-2026-05-15 21:58:33 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 540/1794] LR: 0.000001  Loss: 6.3289
-2026-05-15 21:58:33 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 550/1794] LR: 0.000001  Loss: 6.7723
-2026-05-15 21:58:34 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 560/1794] LR: 0.000001  Loss: 5.2375
-2026-05-15 21:58:34 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 570/1794] LR: 0.000001  Loss: 5.5144
-2026-05-15 21:58:35 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 580/1794] LR: 0.000001  Loss: 8.9952
-2026-05-15 21:58:35 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 590/1794] LR: 0.000001  Loss: 7.0892
-2026-05-15 21:58:35 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 600/1794] LR: 0.000001  Loss: 7.0084
-2026-05-15 21:58:36 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 610/1794] LR: 0.000001  Loss: 6.8636
-2026-05-15 21:58:36 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 620/1794] LR: 0.000001  Loss: 5.1036
-2026-05-15 21:58:37 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 630/1794] LR: 0.000001  Loss: 7.8978
-2026-05-15 21:58:37 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 640/1794] LR: 0.000001  Loss: 5.4780
-2026-05-15 21:58:37 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 650/1794] LR: 0.000001  Loss: 7.8894
-2026-05-15 21:58:38 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 660/1794] LR: 0.000001  Loss: 6.7433
-2026-05-15 21:58:38 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 670/1794] LR: 0.000001  Loss: 7.9692
-2026-05-15 21:58:39 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 680/1794] LR: 0.000001  Loss: 7.5640
-2026-05-15 21:58:39 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 690/1794] LR: 0.000001  Loss: 8.2115
-2026-05-15 21:58:39 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 700/1794] LR: 0.000001  Loss: 6.7912
-2026-05-15 21:58:40 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 710/1794] LR: 0.000001  Loss: 5.7785
-2026-05-15 21:58:40 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 720/1794] LR: 0.000001  Loss: 7.0543
-2026-05-15 21:58:41 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 730/1794] LR: 0.000001  Loss: 4.2969
-2026-05-15 21:58:41 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 740/1794] LR: 0.000001  Loss: 6.4855
-2026-05-15 21:58:41 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 750/1794] LR: 0.000001  Loss: 6.5109
-2026-05-15 21:58:42 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 760/1794] LR: 0.000001  Loss: 5.7851
-2026-05-15 21:58:42 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 770/1794] LR: 0.000001  Loss: 5.0529
-2026-05-15 21:58:43 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 780/1794] LR: 0.000001  Loss: 6.4990
-2026-05-15 21:58:43 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 790/1794] LR: 0.000001  Loss: 7.5906
-2026-05-15 21:58:43 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 800/1794] LR: 0.000001  Loss: 5.7993
-2026-05-15 21:58:44 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 810/1794] LR: 0.000001  Loss: 7.5439
-2026-05-15 21:58:44 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 820/1794] LR: 0.000001  Loss: 6.0796
-2026-05-15 21:58:45 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 830/1794] LR: 0.000001  Loss: 8.9155
-2026-05-15 21:58:45 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 840/1794] LR: 0.000001  Loss: 7.9628
-2026-05-15 21:58:46 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 850/1794] LR: 0.000001  Loss: 7.2383
-2026-05-15 21:58:46 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 860/1794] LR: 0.000001  Loss: 5.8134
-2026-05-15 21:58:46 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 870/1794] LR: 0.000001  Loss: 6.0238
-2026-05-15 21:58:47 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 880/1794] LR: 0.000001  Loss: 6.5158
-2026-05-15 21:58:47 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 890/1794] LR: 0.000001  Loss: 5.8257
-2026-05-15 21:58:48 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 900/1794] LR: 0.000001  Loss: 7.2646
-2026-05-15 21:58:48 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 910/1794] LR: 0.000001  Loss: 7.1047
-2026-05-15 21:58:48 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 920/1794] LR: 0.000001  Loss: 7.1466
-2026-05-15 21:58:49 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 930/1794] LR: 0.000001  Loss: 7.7298
-2026-05-15 21:58:49 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 940/1794] LR: 0.000001  Loss: 7.5728
-2026-05-15 21:58:50 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 950/1794] LR: 0.000001  Loss: 7.4751
-2026-05-15 21:58:50 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 960/1794] LR: 0.000001  Loss: 4.7443
-2026-05-15 21:58:50 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 970/1794] LR: 0.000001  Loss: 7.1207
-2026-05-15 21:58:51 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 980/1794] LR: 0.000001  Loss: 8.0237
-2026-05-15 21:58:51 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 990/1794] LR: 0.000001  Loss: 7.4085
-2026-05-15 21:58:52 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1000/1794] LR: 0.000001  Loss: 6.0280
-2026-05-15 21:58:52 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1010/1794] LR: 0.000001  Loss: 7.1263
-2026-05-15 21:58:52 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1020/1794] LR: 0.000001  Loss: 7.5011
-2026-05-15 21:58:53 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1030/1794] LR: 0.000001  Loss: 6.8924
-2026-05-15 21:58:53 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1040/1794] LR: 0.000001  Loss: 5.0690
-2026-05-15 21:58:54 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1050/1794] LR: 0.000001  Loss: 5.7510
-2026-05-15 21:58:54 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1060/1794] LR: 0.000001  Loss: 8.0840
-2026-05-15 21:58:54 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1070/1794] LR: 0.000001  Loss: 6.1376
-2026-05-15 21:58:55 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1080/1794] LR: 0.000001  Loss: 8.0532
-2026-05-15 21:58:55 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1090/1794] LR: 0.000001  Loss: 6.7824
-2026-05-15 21:58:56 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1100/1794] LR: 0.000001  Loss: 8.1990
-2026-05-15 21:58:56 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1110/1794] LR: 0.000001  Loss: 4.2648
-2026-05-15 21:58:57 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1120/1794] LR: 0.000001  Loss: 3.5304
-2026-05-15 21:58:57 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1130/1794] LR: 0.000001  Loss: 5.6564
-2026-05-15 21:58:57 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1140/1794] LR: 0.000001  Loss: 7.1262
-2026-05-15 21:58:58 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1150/1794] LR: 0.000001  Loss: 6.4940
-2026-05-15 21:58:58 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1160/1794] LR: 0.000001  Loss: 7.7888
-2026-05-15 21:58:59 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1170/1794] LR: 0.000001  Loss: 6.8624
-2026-05-15 21:58:59 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1180/1794] LR: 0.000001  Loss: 6.1779
-2026-05-15 21:59:00 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1190/1794] LR: 0.000001  Loss: 6.9867
-2026-05-15 21:59:00 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1200/1794] LR: 0.000001  Loss: 5.5341
-2026-05-15 21:59:00 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1210/1794] LR: 0.000001  Loss: 7.0560
-2026-05-15 21:59:01 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1220/1794] LR: 0.000001  Loss: 5.1570
-2026-05-15 21:59:01 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1230/1794] LR: 0.000001  Loss: 6.7527
-2026-05-15 21:59:02 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1240/1794] LR: 0.000001  Loss: 7.9329
-2026-05-15 21:59:02 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1250/1794] LR: 0.000001  Loss: 6.4122
-2026-05-15 21:59:02 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1260/1794] LR: 0.000001  Loss: 7.1196
-2026-05-15 21:59:03 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1270/1794] LR: 0.000001  Loss: 6.2920
-2026-05-15 21:59:03 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1280/1794] LR: 0.000001  Loss: 5.4692
-2026-05-15 21:59:04 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1290/1794] LR: 0.000001  Loss: 4.6464
-2026-05-15 21:59:04 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1300/1794] LR: 0.000001  Loss: 7.1967
-2026-05-15 21:59:04 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1310/1794] LR: 0.000001  Loss: 6.8948
-2026-05-15 21:59:05 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1320/1794] LR: 0.000001  Loss: 6.4065
-2026-05-15 21:59:05 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1330/1794] LR: 0.000001  Loss: 7.9638
-2026-05-15 21:59:06 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1340/1794] LR: 0.000001  Loss: 6.3921
-2026-05-15 21:59:06 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1350/1794] LR: 0.000001  Loss: 6.7522
-2026-05-15 21:59:07 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1360/1794] LR: 0.000001  Loss: 5.9398
-2026-05-15 21:59:07 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1370/1794] LR: 0.000001  Loss: 7.5382
-2026-05-15 21:59:07 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1380/1794] LR: 0.000001  Loss: 7.4681
-2026-05-15 21:59:08 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1390/1794] LR: 0.000001  Loss: 6.0841
-2026-05-15 21:59:08 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1400/1794] LR: 0.000001  Loss: 8.0195
-2026-05-15 21:59:09 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1410/1794] LR: 0.000001  Loss: 7.5665
-2026-05-15 21:59:09 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1420/1794] LR: 0.000001  Loss: 8.0281
-2026-05-15 21:59:10 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1430/1794] LR: 0.000001  Loss: 7.6966
-2026-05-15 21:59:10 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1440/1794] LR: 0.000001  Loss: 6.8888
-2026-05-15 21:59:11 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1450/1794] LR: 0.000001  Loss: 5.7377
-2026-05-15 21:59:11 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1460/1794] LR: 0.000001  Loss: 4.4185
-2026-05-15 21:59:12 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1470/1794] LR: 0.000001  Loss: 5.8494
-2026-05-15 21:59:12 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1480/1794] LR: 0.000001  Loss: 7.8785
-2026-05-15 21:59:13 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1490/1794] LR: 0.000001  Loss: 6.9940
-2026-05-15 21:59:13 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1500/1794] LR: 0.000001  Loss: 7.9382
-2026-05-15 21:59:13 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1510/1794] LR: 0.000001  Loss: 7.5699
-2026-05-15 21:59:14 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1520/1794] LR: 0.000001  Loss: 7.5138
-2026-05-15 21:59:14 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1530/1794] LR: 0.000001  Loss: 6.5208
-2026-05-15 21:59:15 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1540/1794] LR: 0.000001  Loss: 6.2944
-2026-05-15 21:59:15 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1550/1794] LR: 0.000001  Loss: 6.3023
-2026-05-15 21:59:15 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1560/1794] LR: 0.000001  Loss: 4.0611
-2026-05-15 21:59:16 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1570/1794] LR: 0.000001  Loss: 6.7449
-2026-05-15 21:59:17 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1580/1794] LR: 0.000001  Loss: 5.4866
-2026-05-15 21:59:17 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1590/1794] LR: 0.000001  Loss: 7.5962
-2026-05-15 21:59:18 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1600/1794] LR: 0.000001  Loss: 7.8451
-2026-05-15 21:59:18 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1610/1794] LR: 0.000001  Loss: 6.0204
-2026-05-15 21:59:19 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1620/1794] LR: 0.000001  Loss: 5.5739
-2026-05-15 21:59:19 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1630/1794] LR: 0.000001  Loss: 5.7568
-2026-05-15 21:59:20 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1640/1794] LR: 0.000001  Loss: 7.0386
-2026-05-15 21:59:21 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1650/1794] LR: 0.000001  Loss: 5.6961
-2026-05-15 21:59:21 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1660/1794] LR: 0.000001  Loss: 7.4736
-2026-05-15 21:59:21 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1670/1794] LR: 0.000001  Loss: 6.0850
-2026-05-15 21:59:22 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1680/1794] LR: 0.000001  Loss: 6.2303
-2026-05-15 21:59:22 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1690/1794] LR: 0.000001  Loss: 7.3153
-2026-05-15 21:59:23 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1700/1794] LR: 0.000001  Loss: 8.0360
-2026-05-15 21:59:23 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1710/1794] LR: 0.000001  Loss: 6.4830
-2026-05-15 21:59:23 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1720/1794] LR: 0.000001  Loss: 7.4346
-2026-05-15 21:59:24 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1730/1794] LR: 0.000001  Loss: 6.9003
-2026-05-15 21:59:24 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1740/1794] LR: 0.000001  Loss: 6.6870
-2026-05-15 21:59:25 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1750/1794] LR: 0.000001  Loss: 5.9802
-2026-05-15 21:59:25 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1760/1794] LR: 0.000001  Loss: 6.5568
-2026-05-15 21:59:26 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1770/1794] LR: 0.000001  Loss: 5.9597
-2026-05-15 21:59:26 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1780/1794] LR: 0.000001  Loss: 7.3455
-2026-05-15 21:59:26 - basemodel_training_rank_0 - INFO - [Epoch 1/2, Step 1790/1794] LR: 0.000001  Loss: 5.6959
-2026-05-15 21:59:40 - basemodel_training_rank_0 - INFO - 
---- Epoch 1/2 Summary ---
-  Train Loss : 6.938168
-  Val   Loss : 6.556541
-  Epoch Time : 0:01:40
+2026-05-17 07:07:06 [INFO] [Epoch 11/50, Step 120/11] LR: 0.002070, Loss: -0.2773
+2026-05-17 07:07:07 [INFO] 
+--- Epoch 11/50 Summary ---
+Validation Loss: 0.047271
+Epoch Time: 0:00:03
 
-2026-05-15 21:59:41 - basemodel_training_rank_0 - INFO - ✓ Best model saved → finetuned/smoke_test_full_hpo\basemodel\best_model  (val loss: 6.556541)
-2026-05-15 21:59:41 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 1800/1794] LR: 0.000001  Loss: 6.8747
-2026-05-15 21:59:41 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 1810/1794] LR: 0.000001  Loss: 7.4042
-2026-05-15 21:59:42 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 1820/1794] LR: 0.000001  Loss: 6.1652
-2026-05-15 21:59:42 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 1830/1794] LR: 0.000001  Loss: 7.4556
-2026-05-15 21:59:43 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 1840/1794] LR: 0.000001  Loss: 7.0307
-2026-05-15 21:59:43 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 1850/1794] LR: 0.000001  Loss: 7.1201
-2026-05-15 21:59:44 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 1860/1794] LR: 0.000001  Loss: 7.9635
-2026-05-15 21:59:44 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 1870/1794] LR: 0.000001  Loss: 8.3787
-2026-05-15 21:59:44 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 1880/1794] LR: 0.000001  Loss: 8.6691
-2026-05-15 21:59:45 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 1890/1794] LR: 0.000001  Loss: 6.0956
-2026-05-15 21:59:45 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 1900/1794] LR: 0.000001  Loss: 7.4894
-2026-05-15 21:59:46 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 1910/1794] LR: 0.000001  Loss: 6.3062
-2026-05-15 21:59:46 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 1920/1794] LR: 0.000001  Loss: 6.7310
-2026-05-15 21:59:47 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 1930/1794] LR: 0.000001  Loss: 4.4663
-2026-05-15 21:59:47 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 1940/1794] LR: 0.000001  Loss: 6.6806
-2026-05-15 21:59:48 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 1950/1794] LR: 0.000001  Loss: 7.6941
-2026-05-15 21:59:48 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 1960/1794] LR: 0.000001  Loss: 5.9783
-2026-05-15 21:59:48 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 1970/1794] LR: 0.000001  Loss: 6.6295
-2026-05-15 21:59:49 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 1980/1794] LR: 0.000001  Loss: 6.5137
-2026-05-15 21:59:49 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 1990/1794] LR: 0.000001  Loss: 7.1209
-2026-05-15 21:59:50 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2000/1794] LR: 0.000001  Loss: 7.9844
-2026-05-15 21:59:50 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2010/1794] LR: 0.000001  Loss: 7.3541
-2026-05-15 21:59:50 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2020/1794] LR: 0.000001  Loss: 7.0681
-2026-05-15 21:59:51 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2030/1794] LR: 0.000001  Loss: 5.2895
-2026-05-15 21:59:51 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2040/1794] LR: 0.000001  Loss: 6.1039
-2026-05-15 21:59:52 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2050/1794] LR: 0.000001  Loss: 5.7074
-2026-05-15 21:59:52 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2060/1794] LR: 0.000001  Loss: 6.7788
-2026-05-15 21:59:52 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2070/1794] LR: 0.000001  Loss: 7.2636
-2026-05-15 21:59:53 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2080/1794] LR: 0.000001  Loss: 6.1499
-2026-05-15 21:59:53 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2090/1794] LR: 0.000001  Loss: 5.5407
-2026-05-15 21:59:54 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2100/1794] LR: 0.000000  Loss: 6.1092
-2026-05-15 21:59:54 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2110/1794] LR: 0.000000  Loss: 6.4248
-2026-05-15 21:59:55 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2120/1794] LR: 0.000000  Loss: 5.2587
-2026-05-15 21:59:55 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2130/1794] LR: 0.000000  Loss: 7.0053
-2026-05-15 21:59:55 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2140/1794] LR: 0.000000  Loss: 7.8562
-2026-05-15 21:59:56 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2150/1794] LR: 0.000000  Loss: 7.8888
-2026-05-15 21:59:56 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2160/1794] LR: 0.000000  Loss: 7.5895
-2026-05-15 21:59:57 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2170/1794] LR: 0.000000  Loss: 6.2289
-2026-05-15 21:59:57 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2180/1794] LR: 0.000000  Loss: 7.4013
-2026-05-15 21:59:58 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2190/1794] LR: 0.000000  Loss: 7.2676
-2026-05-15 21:59:59 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2200/1794] LR: 0.000000  Loss: 6.3565
-2026-05-15 21:59:59 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2210/1794] LR: 0.000000  Loss: 6.5330
-2026-05-15 22:00:00 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2220/1794] LR: 0.000000  Loss: 6.3500
-2026-05-15 22:00:00 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2230/1794] LR: 0.000000  Loss: 5.8350
-2026-05-15 22:00:01 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2240/1794] LR: 0.000000  Loss: 6.1169
-2026-05-15 22:00:01 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2250/1794] LR: 0.000000  Loss: 6.7367
-2026-05-15 22:00:02 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2260/1794] LR: 0.000000  Loss: 5.7155
-2026-05-15 22:00:02 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2270/1794] LR: 0.000000  Loss: 6.7260
-2026-05-15 22:00:03 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2280/1794] LR: 0.000000  Loss: 7.2162
-2026-05-15 22:00:03 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2290/1794] LR: 0.000000  Loss: 6.4210
-2026-05-15 22:00:04 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2300/1794] LR: 0.000000  Loss: 6.5946
-2026-05-15 22:00:04 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2310/1794] LR: 0.000000  Loss: 6.3798
-2026-05-15 22:00:05 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2320/1794] LR: 0.000000  Loss: 7.8730
-2026-05-15 22:00:06 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2330/1794] LR: 0.000000  Loss: 5.6484
-2026-05-15 22:00:06 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2340/1794] LR: 0.000000  Loss: 5.1258
-2026-05-15 22:00:07 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2350/1794] LR: 0.000000  Loss: 7.3026
-2026-05-15 22:00:07 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2360/1794] LR: 0.000000  Loss: 6.6431
-2026-05-15 22:00:08 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2370/1794] LR: 0.000000  Loss: 8.2434
-2026-05-15 22:00:08 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2380/1794] LR: 0.000000  Loss: 5.6608
-2026-05-15 22:00:09 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2390/1794] LR: 0.000000  Loss: 6.4952
-2026-05-15 22:00:09 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2400/1794] LR: 0.000000  Loss: 6.1842
-2026-05-15 22:00:09 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2410/1794] LR: 0.000000  Loss: 6.5156
-2026-05-15 22:00:10 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2420/1794] LR: 0.000000  Loss: 5.9064
-2026-05-15 22:00:10 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2430/1794] LR: 0.000000  Loss: 6.8604
-2026-05-15 22:00:11 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2440/1794] LR: 0.000000  Loss: 6.2352
-2026-05-15 22:00:11 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2450/1794] LR: 0.000000  Loss: 8.7647
-2026-05-15 22:00:12 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2460/1794] LR: 0.000000  Loss: 6.7053
-2026-05-15 22:00:12 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2470/1794] LR: 0.000000  Loss: 5.2143
-2026-05-15 22:00:12 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2480/1794] LR: 0.000000  Loss: 8.9139
-2026-05-15 22:00:13 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2490/1794] LR: 0.000000  Loss: 6.2923
-2026-05-15 22:00:13 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2500/1794] LR: 0.000000  Loss: 7.3140
-2026-05-15 22:00:14 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2510/1794] LR: 0.000000  Loss: 6.2111
-2026-05-15 22:00:14 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2520/1794] LR: 0.000000  Loss: 4.6267
-2026-05-15 22:00:14 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2530/1794] LR: 0.000000  Loss: 6.4367
-2026-05-15 22:00:15 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2540/1794] LR: 0.000000  Loss: 6.5726
-2026-05-15 22:00:15 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2550/1794] LR: 0.000000  Loss: 5.0899
-2026-05-15 22:00:16 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2560/1794] LR: 0.000000  Loss: 5.3149
-2026-05-15 22:00:16 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2570/1794] LR: 0.000000  Loss: 7.3770
-2026-05-15 22:00:17 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2580/1794] LR: 0.000000  Loss: 8.4491
-2026-05-15 22:00:17 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2590/1794] LR: 0.000000  Loss: 6.0128
-2026-05-15 22:00:17 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2600/1794] LR: 0.000000  Loss: 7.9546
-2026-05-15 22:00:18 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2610/1794] LR: 0.000000  Loss: 7.0301
-2026-05-15 22:00:18 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2620/1794] LR: 0.000000  Loss: 6.2088
-2026-05-15 22:00:19 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2630/1794] LR: 0.000000  Loss: 7.6196
-2026-05-15 22:00:19 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2640/1794] LR: 0.000000  Loss: 6.2946
-2026-05-15 22:00:20 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2650/1794] LR: 0.000000  Loss: 6.6772
-2026-05-15 22:00:20 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2660/1794] LR: 0.000000  Loss: 5.3274
-2026-05-15 22:00:20 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2670/1794] LR: 0.000000  Loss: 6.7526
-2026-05-15 22:00:21 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2680/1794] LR: 0.000000  Loss: 6.1773
-2026-05-15 22:00:21 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2690/1794] LR: 0.000000  Loss: 6.9623
-2026-05-15 22:00:22 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2700/1794] LR: 0.000000  Loss: 6.7525
-2026-05-15 22:00:22 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2710/1794] LR: 0.000000  Loss: 5.8814
-2026-05-15 22:00:22 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2720/1794] LR: 0.000000  Loss: 5.7925
-2026-05-15 22:00:23 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2730/1794] LR: 0.000000  Loss: 6.4242
-2026-05-15 22:00:23 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2740/1794] LR: 0.000000  Loss: 6.5647
-2026-05-15 22:00:24 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2750/1794] LR: 0.000000  Loss: 6.5257
-2026-05-15 22:00:24 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2760/1794] LR: 0.000000  Loss: 6.1524
-2026-05-15 22:00:25 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2770/1794] LR: 0.000000  Loss: 4.7907
-2026-05-15 22:00:25 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2780/1794] LR: 0.000000  Loss: 6.4771
-2026-05-15 22:00:26 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2790/1794] LR: 0.000000  Loss: 6.3547
-2026-05-15 22:00:26 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2800/1794] LR: 0.000000  Loss: 8.4004
-2026-05-15 22:00:27 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2810/1794] LR: 0.000000  Loss: 8.4364
-2026-05-15 22:00:28 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2820/1794] LR: 0.000000  Loss: 7.4172
-2026-05-15 22:00:28 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2830/1794] LR: 0.000000  Loss: 7.7326
-2026-05-15 22:00:29 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2840/1794] LR: 0.000000  Loss: 5.7115
-2026-05-15 22:00:29 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2850/1794] LR: 0.000000  Loss: 7.6926
-2026-05-15 22:00:30 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2860/1794] LR: 0.000000  Loss: 7.5321
-2026-05-15 22:00:31 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2870/1794] LR: 0.000000  Loss: 7.2155
-2026-05-15 22:00:31 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2880/1794] LR: 0.000000  Loss: 5.9637
-2026-05-15 22:00:32 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2890/1794] LR: 0.000000  Loss: 5.3592
-2026-05-15 22:00:32 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2900/1794] LR: 0.000000  Loss: 6.9166
-2026-05-15 22:00:33 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2910/1794] LR: 0.000000  Loss: 5.5388
-2026-05-15 22:00:33 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2920/1794] LR: 0.000000  Loss: 7.4923
-2026-05-15 22:00:34 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2930/1794] LR: 0.000000  Loss: 7.1705
-2026-05-15 22:00:35 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2940/1794] LR: 0.000000  Loss: 7.5704
-2026-05-15 22:00:35 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2950/1794] LR: 0.000000  Loss: 6.5248
-2026-05-15 22:00:36 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2960/1794] LR: 0.000000  Loss: 7.3530
-2026-05-15 22:00:36 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2970/1794] LR: 0.000000  Loss: 6.9696
-2026-05-15 22:00:37 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2980/1794] LR: 0.000000  Loss: 7.1953
-2026-05-15 22:00:38 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 2990/1794] LR: 0.000000  Loss: 4.4221
-2026-05-15 22:00:39 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3000/1794] LR: 0.000000  Loss: 5.4496
-2026-05-15 22:00:40 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3010/1794] LR: 0.000000  Loss: 7.2656
-2026-05-15 22:00:41 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3020/1794] LR: 0.000000  Loss: 6.9236
-2026-05-15 22:00:41 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3030/1794] LR: 0.000000  Loss: 7.2571
-2026-05-15 22:00:42 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3040/1794] LR: 0.000000  Loss: 8.8563
-2026-05-15 22:00:43 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3050/1794] LR: 0.000000  Loss: 5.5690
-2026-05-15 22:00:43 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3060/1794] LR: 0.000000  Loss: 7.4525
-2026-05-15 22:00:44 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3070/1794] LR: 0.000000  Loss: 5.6516
-2026-05-15 22:00:44 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3080/1794] LR: 0.000000  Loss: 6.1751
-2026-05-15 22:00:45 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3090/1794] LR: 0.000000  Loss: 6.1530
-2026-05-15 22:00:46 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3100/1794] LR: 0.000000  Loss: 4.6695
-2026-05-15 22:00:46 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3110/1794] LR: 0.000000  Loss: 7.4454
-2026-05-15 22:00:47 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3120/1794] LR: 0.000000  Loss: 5.8209
-2026-05-15 22:00:47 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3130/1794] LR: 0.000000  Loss: 5.8700
-2026-05-15 22:00:48 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3140/1794] LR: 0.000000  Loss: 7.3106
-2026-05-15 22:00:49 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3150/1794] LR: 0.000000  Loss: 7.6604
-2026-05-15 22:00:50 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3160/1794] LR: 0.000000  Loss: 6.3596
-2026-05-15 22:00:50 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3170/1794] LR: 0.000000  Loss: 6.3808
-2026-05-15 22:00:51 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3180/1794] LR: 0.000000  Loss: 5.0820
-2026-05-15 22:00:52 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3190/1794] LR: 0.000000  Loss: 8.6529
-2026-05-15 22:00:52 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3200/1794] LR: 0.000000  Loss: 8.4370
-2026-05-15 22:00:53 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3210/1794] LR: 0.000000  Loss: 7.5671
-2026-05-15 22:00:54 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3220/1794] LR: 0.000000  Loss: 8.2981
-2026-05-15 22:00:55 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3230/1794] LR: 0.000000  Loss: 6.4124
-2026-05-15 22:00:56 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3240/1794] LR: 0.000000  Loss: 6.9811
-2026-05-15 22:00:56 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3250/1794] LR: 0.000000  Loss: 7.4438
-2026-05-15 22:00:57 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3260/1794] LR: 0.000000  Loss: 6.1068
-2026-05-15 22:00:58 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3270/1794] LR: 0.000000  Loss: 8.1449
-2026-05-15 22:00:58 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3280/1794] LR: 0.000000  Loss: 6.0273
-2026-05-15 22:00:59 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3290/1794] LR: 0.000000  Loss: 5.0708
-2026-05-15 22:01:00 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3300/1794] LR: 0.000000  Loss: 5.7382
-2026-05-15 22:01:00 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3310/1794] LR: 0.000000  Loss: 6.7520
-2026-05-15 22:01:01 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3320/1794] LR: 0.000000  Loss: 7.2662
-2026-05-15 22:01:01 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3330/1794] LR: 0.000000  Loss: 6.8461
-2026-05-15 22:01:02 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3340/1794] LR: 0.000000  Loss: 5.8791
-2026-05-15 22:01:02 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3350/1794] LR: 0.000000  Loss: 6.8828
-2026-05-15 22:01:03 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3360/1794] LR: 0.000000  Loss: 9.3677
-2026-05-15 22:01:03 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3370/1794] LR: 0.000000  Loss: 6.3464
-2026-05-15 22:01:04 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3380/1794] LR: 0.000000  Loss: 5.5902
-2026-05-15 22:01:04 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3390/1794] LR: 0.000000  Loss: 6.3147
-2026-05-15 22:01:05 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3400/1794] LR: 0.000000  Loss: 7.5460
-2026-05-15 22:01:06 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3410/1794] LR: 0.000000  Loss: 6.9013
-2026-05-15 22:01:06 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3420/1794] LR: 0.000000  Loss: 6.5338
-2026-05-15 22:01:07 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3430/1794] LR: 0.000000  Loss: 7.3296
-2026-05-15 22:01:07 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3440/1794] LR: 0.000000  Loss: 7.8815
-2026-05-15 22:01:08 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3450/1794] LR: 0.000000  Loss: 7.1921
-2026-05-15 22:01:08 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3460/1794] LR: 0.000000  Loss: 6.8186
-2026-05-15 22:01:09 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3470/1794] LR: 0.000000  Loss: 6.2331
-2026-05-15 22:01:09 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3480/1794] LR: 0.000000  Loss: 7.2265
-2026-05-15 22:01:10 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3490/1794] LR: 0.000000  Loss: 7.1151
-2026-05-15 22:01:11 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3500/1794] LR: 0.000000  Loss: 7.9452
-2026-05-15 22:01:11 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3510/1794] LR: 0.000000  Loss: 8.0360
-2026-05-15 22:01:12 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3520/1794] LR: 0.000000  Loss: 8.0401
-2026-05-15 22:01:13 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3530/1794] LR: 0.000000  Loss: 6.2872
-2026-05-15 22:01:13 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3540/1794] LR: 0.000000  Loss: 5.7967
-2026-05-15 22:01:14 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3550/1794] LR: 0.000000  Loss: 7.0809
-2026-05-15 22:01:14 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3560/1794] LR: 0.000000  Loss: 5.5050
-2026-05-15 22:01:15 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3570/1794] LR: 0.000000  Loss: 4.8762
-2026-05-15 22:01:15 - basemodel_training_rank_0 - INFO - [Epoch 2/2, Step 3580/1794] LR: 0.000000  Loss: 7.5143
-2026-05-15 22:01:21 - basemodel_training_rank_0 - INFO - 
---- Epoch 2/2 Summary ---
-  Train Loss : 6.717719
-  Val   Loss : 6.567409
-  Epoch Time : 0:01:40
+2026-05-17 07:07:09 [INFO] [Epoch 12/50, Step 130/11] LR: 0.002040, Loss: -0.2813
+2026-05-17 07:07:10 [INFO] 
+--- Epoch 12/50 Summary ---
+Validation Loss: 0.046672
+Epoch Time: 0:00:03
 
-2026-05-15 22:01:23 - basemodel_training_rank_0 - INFO - Basemodel training completed! Best validation loss: 6.5565
-Training time: 3.38 minutes
-Model saved to: finetuned/smoke_test_full_hpo\basemodel
+2026-05-17 07:07:12 [INFO] [Epoch 13/50, Step 140/11] LR: 0.002007, Loss: -0.2795
+2026-05-17 07:07:13 [INFO] 
+--- Epoch 13/50 Summary ---
+Validation Loss: 0.049256
+Epoch Time: 0:00:03
+
+2026-05-17 07:07:15 [INFO] [Epoch 14/50, Step 150/11] LR: 0.001969, Loss: -0.2835
+2026-05-17 07:07:17 [INFO] 
+--- Epoch 14/50 Summary ---
+Validation Loss: 0.048708
+Epoch Time: 0:00:03
+
+2026-05-17 07:07:18 [INFO] [Epoch 15/50, Step 160/11] LR: 0.001928, Loss: -0.2839
+2026-05-17 07:07:20 [INFO] 
+--- Epoch 15/50 Summary ---
+Validation Loss: 0.048479
+Epoch Time: 0:00:03
+
+2026-05-17 07:07:21 [INFO] [Epoch 16/50, Step 170/11] LR: 0.001884, Loss: -0.2855
+2026-05-17 07:07:23 [INFO] 
+--- Epoch 16/50 Summary ---
+Validation Loss: 0.049386
+Epoch Time: 0:00:03
+
+2026-05-17 07:07:24 [INFO] [Epoch 17/50, Step 180/11] LR: 0.001836, Loss: -0.2849
+2026-05-17 07:07:26 [INFO] 
+--- Epoch 17/50 Summary ---
+Validation Loss: 0.052336
+Epoch Time: 0:00:03
+
+2026-05-17 07:07:27 [INFO] [Epoch 18/50, Step 190/11] LR: 0.001786, Loss: -0.2851
+2026-05-17 07:07:30 [INFO] 
+--- Epoch 18/50 Summary ---
+Validation Loss: 0.051633
+Epoch Time: 0:00:03
+
+2026-05-17 07:07:30 [INFO] [Epoch 19/50, Step 200/11] LR: 0.001732, Loss: -0.2881
+2026-05-17 07:07:33 [INFO] 
+--- Epoch 19/50 Summary ---
+Validation Loss: 0.052634
+Epoch Time: 0:00:03
+
+2026-05-17 07:07:33 [INFO] [Epoch 20/50, Step 210/11] LR: 0.001676, Loss: -0.2883
+2026-05-17 07:07:36 [INFO] [Epoch 20/50, Step 220/11] LR: 0.001617, Loss: -0.2883
+2026-05-17 07:07:36 [INFO] 
+--- Epoch 20/50 Summary ---
+Validation Loss: 0.054674
+Epoch Time: 0:00:03
+
+2026-05-17 07:07:39 [INFO] [Epoch 21/50, Step 230/11] LR: 0.001557, Loss: -0.2894
+2026-05-17 07:07:39 [INFO] 
+--- Epoch 21/50 Summary ---
+Validation Loss: 0.053140
+Epoch Time: 0:00:03
+
+2026-05-17 07:07:42 [INFO] [Epoch 22/50, Step 240/11] LR: 0.001494, Loss: -0.2901
+2026-05-17 07:07:42 [INFO] 
+--- Epoch 22/50 Summary ---
+Validation Loss: 0.055888
+Epoch Time: 0:00:03
+
+2026-05-17 07:07:45 [INFO] [Epoch 23/50, Step 250/11] LR: 0.001430, Loss: -0.2905
+2026-05-17 07:07:46 [INFO] 
+--- Epoch 23/50 Summary ---
+Validation Loss: 0.056180
+Epoch Time: 0:00:03
+
+2026-05-17 07:07:48 [INFO] [Epoch 24/50, Step 260/11] LR: 0.001364, Loss: -0.2929
+2026-05-17 07:07:49 [INFO] 
+--- Epoch 24/50 Summary ---
+Validation Loss: 0.057684
+Epoch Time: 0:00:03
+
+2026-05-17 07:07:51 [INFO] [Epoch 25/50, Step 270/11] LR: 0.001297, Loss: -0.2931
+2026-05-17 07:07:52 [INFO] 
+--- Epoch 25/50 Summary ---
+Validation Loss: 0.058917
+Epoch Time: 0:00:03
+
+2026-05-17 07:07:54 [INFO] [Epoch 26/50, Step 280/11] LR: 0.001230, Loss: -0.2932
+2026-05-17 07:07:56 [INFO] 
+--- Epoch 26/50 Summary ---
+Validation Loss: 0.057438
+Epoch Time: 0:00:03
+
+2026-05-17 07:07:57 [INFO] [Epoch 27/50, Step 290/11] LR: 0.001161, Loss: -0.2944
+2026-05-17 07:07:59 [INFO] 
+--- Epoch 27/50 Summary ---
+Validation Loss: 0.059616
+Epoch Time: 0:00:03
+
+2026-05-17 07:08:00 [INFO] [Epoch 28/50, Step 300/11] LR: 0.001093, Loss: -0.2949
+2026-05-17 07:08:02 [INFO] 
+--- Epoch 28/50 Summary ---
+Validation Loss: 0.059907
+Epoch Time: 0:00:03
+
+2026-05-17 07:08:03 [INFO] [Epoch 29/50, Step 310/11] LR: 0.001024, Loss: -0.2952
+2026-05-17 07:08:06 [INFO] 
+--- Epoch 29/50 Summary ---
+Validation Loss: 0.060406
+Epoch Time: 0:00:03
+
+2026-05-17 07:08:06 [INFO] [Epoch 30/50, Step 320/11] LR: 0.000956, Loss: -0.2948
+2026-05-17 07:08:09 [INFO] [Epoch 30/50, Step 330/11] LR: 0.000888, Loss: -0.2955
+2026-05-17 07:08:09 [INFO] 
+--- Epoch 30/50 Summary ---
+Validation Loss: 0.060676
+Epoch Time: 0:00:03
+
+2026-05-17 07:08:12 [INFO] [Epoch 31/50, Step 340/11] LR: 0.000821, Loss: -0.2968
+2026-05-17 07:08:12 [INFO] 
+--- Epoch 31/50 Summary ---
+Validation Loss: 0.061203
+Epoch Time: 0:00:03
+
+2026-05-17 07:08:15 [INFO] [Epoch 32/50, Step 350/11] LR: 0.000755, Loss: -0.2964
+2026-05-17 07:08:16 [INFO] 
+--- Epoch 32/50 Summary ---
+Validation Loss: 0.061604
+Epoch Time: 0:00:03
+
+2026-05-17 07:08:18 [INFO] [Epoch 33/50, Step 360/11] LR: 0.000690, Loss: -0.2970
+2026-05-17 07:08:19 [INFO] 
+--- Epoch 33/50 Summary ---
+Validation Loss: 0.062301
+Epoch Time: 0:00:03
+
+2026-05-17 07:08:21 [INFO] [Epoch 34/50, Step 370/11] LR: 0.000627, Loss: -0.2978
+2026-05-17 07:08:23 [INFO] 
+--- Epoch 34/50 Summary ---
+Validation Loss: 0.062812
+Epoch Time: 0:00:03
+
+2026-05-17 07:08:24 [INFO] [Epoch 35/50, Step 380/11] LR: 0.000565, Loss: -0.2979
+2026-05-17 07:08:26 [INFO] 
+--- Epoch 35/50 Summary ---
+Validation Loss: 0.064499
+Epoch Time: 0:00:03
+
+2026-05-17 07:08:27 [INFO] [Epoch 36/50, Step 390/11] LR: 0.000506, Loss: -0.2981
+2026-05-17 07:08:29 [INFO] 
+--- Epoch 36/50 Summary ---
+Validation Loss: 0.064907
+Epoch Time: 0:00:03
+
+2026-05-17 07:08:31 [INFO] [Epoch 37/50, Step 400/11] LR: 0.000449, Loss: -0.2983
+2026-05-17 07:08:33 [INFO] 
+--- Epoch 37/50 Summary ---
+Validation Loss: 0.066471
+Epoch Time: 0:00:03
+
+2026-05-17 07:08:34 [INFO] [Epoch 38/50, Step 410/11] LR: 0.000395, Loss: -0.2983
+2026-05-17 07:08:36 [INFO] 
+--- Epoch 38/50 Summary ---
+Validation Loss: 0.066884
+Epoch Time: 0:00:03
+
+2026-05-17 07:08:37 [INFO] [Epoch 39/50, Step 420/11] LR: 0.000343, Loss: -0.2990
+2026-05-17 07:08:39 [INFO] 
+--- Epoch 39/50 Summary ---
+Validation Loss: 0.066256
+Epoch Time: 0:00:03
+
+2026-05-17 07:08:40 [INFO] [Epoch 40/50, Step 430/11] LR: 0.000294, Loss: -0.2994
+2026-05-17 07:08:42 [INFO] [Epoch 40/50, Step 440/11] LR: 0.000249, Loss: -0.2996
+2026-05-17 07:08:43 [INFO] 
+--- Epoch 40/50 Summary ---
+Validation Loss: 0.066787
+Epoch Time: 0:00:03
+
+2026-05-17 07:08:45 [INFO] [Epoch 41/50, Step 450/11] LR: 0.000207, Loss: -0.2999
+2026-05-17 07:08:46 [INFO] 
+--- Epoch 41/50 Summary ---
+Validation Loss: 0.066963
+Epoch Time: 0:00:03
+
+2026-05-17 07:08:49 [INFO] [Epoch 42/50, Step 460/11] LR: 0.000168, Loss: -0.2997
+2026-05-17 07:08:49 [INFO] 
+--- Epoch 42/50 Summary ---
+Validation Loss: 0.067538
+Epoch Time: 0:00:03
+
+2026-05-17 07:08:52 [INFO] [Epoch 43/50, Step 470/11] LR: 0.000133, Loss: -0.2995
+2026-05-17 07:08:53 [INFO] 
+--- Epoch 43/50 Summary ---
+Validation Loss: 0.068086
+Epoch Time: 0:00:03
+
+2026-05-17 07:08:55 [INFO] [Epoch 44/50, Step 480/11] LR: 0.000102, Loss: -0.3004
+2026-05-17 07:08:56 [INFO] 
+--- Epoch 44/50 Summary ---
+Validation Loss: 0.068216
+Epoch Time: 0:00:03
+
+2026-05-17 07:08:58 [INFO] [Epoch 45/50, Step 490/11] LR: 0.000075, Loss: -0.3003
+2026-05-17 07:08:59 [INFO] 
+--- Epoch 45/50 Summary ---
+Validation Loss: 0.067886
+Epoch Time: 0:00:03
+
+2026-05-17 07:09:01 [INFO] [Epoch 46/50, Step 500/11] LR: 0.000052, Loss: -0.3007
+2026-05-17 07:09:03 [INFO] 
+--- Epoch 46/50 Summary ---
+Validation Loss: 0.068284
+Epoch Time: 0:00:03
+
+2026-05-17 07:09:04 [INFO] [Epoch 47/50, Step 510/11] LR: 0.000033, Loss: -0.3003
+2026-05-17 07:09:06 [INFO] 
+--- Epoch 47/50 Summary ---
+Validation Loss: 0.068507
+Epoch Time: 0:00:03
+
+2026-05-17 07:09:07 [INFO] [Epoch 48/50, Step 520/11] LR: 0.000018, Loss: -0.3002
+2026-05-17 07:09:09 [INFO] 
+--- Epoch 48/50 Summary ---
+Validation Loss: 0.068597
+Epoch Time: 0:00:03
+
+2026-05-17 07:09:10 [INFO] [Epoch 49/50, Step 530/11] LR: 0.000008, Loss: -0.3005
+2026-05-17 07:09:13 [INFO] 
+--- Epoch 49/50 Summary ---
+Validation Loss: 0.068614
+Epoch Time: 0:00:03
+
+2026-05-17 07:09:13 [INFO] [Epoch 50/50, Step 540/11] LR: 0.000002, Loss: -0.3008
+2026-05-17 07:09:16 [INFO] [Epoch 50/50, Step 550/11] LR: 0.000000, Loss: -0.3003
+2026-05-17 07:09:16 [INFO] 
+--- Epoch 50/50 Summary ---
+Validation Loss: 0.068614
+Epoch Time: 0:00:03
+
 
 ```
 
 ---
 
-### `finetuned/smoke_test_full_hpo/logs/tokenizer_training_rank_0.log`
-
-```text
-2026-05-15 21:54:15 - tokenizer_training_rank_0 - INFO - === Tokenizer Training Started ===
-2026-05-15 21:54:15 - tokenizer_training_rank_0 - INFO - Experiment Name: smoke_test_full_hpo
-2026-05-15 21:54:15 - tokenizer_training_rank_0 - INFO - Log Directory: finetuned/smoke_test_full_hpo\logs
-2026-05-15 21:54:15 - tokenizer_training_rank_0 - INFO - Rank: 0
-2026-05-15 21:54:15 - tokenizer_training_rank_0 - INFO - Timestamp: 2026-05-15 21:54:15
-2026-05-15 21:54:15 - tokenizer_training_rank_0 - INFO - Loading pretrained tokenizer...
-2026-05-15 21:54:15 - tokenizer_training_rank_0 - INFO - Tokenizer parameters: 3,958,042
-2026-05-15 21:54:15 - tokenizer_training_rank_0 - INFO - === Training Configuration ===
-2026-05-15 21:54:15 - tokenizer_training_rank_0 - INFO - Data path: data/1d.csv
-2026-05-15 21:54:15 - tokenizer_training_rank_0 - INFO - Lookback window: 3
-2026-05-15 21:54:15 - tokenizer_training_rank_0 - INFO - Predict window: 2
-2026-05-15 21:54:15 - tokenizer_training_rank_0 - INFO - Batch size: 1
-2026-05-15 21:54:15 - tokenizer_training_rank_0 - INFO - Learning rate: 0.0001025350969016849
-2026-05-15 21:54:15 - tokenizer_training_rank_0 - INFO - Training epochs: 2
-2026-05-15 21:54:15 - tokenizer_training_rank_0 - INFO - Device: cuda:0
-2026-05-15 21:54:15 - tokenizer_training_rank_0 - INFO - Distributed training: False
-2026-05-15 21:54:15 - tokenizer_training_rank_0 - INFO - Starting tokenizer fine-tuning training...
-2026-05-15 21:54:15 - tokenizer_training_rank_0 - INFO - Starting tokenizer training...
-2026-05-15 21:54:26 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 10/1794] LR: 0.000030, Loss: 2.3433
-2026-05-15 21:54:27 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 20/1794] LR: 0.000054, Loss: 0.7943
-2026-05-15 21:54:27 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 30/1794] LR: 0.000082, Loss: 1.2861
-2026-05-15 21:54:28 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 40/1794] LR: 0.000100, Loss: 1.3876
-2026-05-15 21:54:28 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 50/1794] LR: 0.000103, Loss: 7.0425
-2026-05-15 21:54:29 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 60/1794] LR: 0.000103, Loss: 6.1461
-2026-05-15 21:54:29 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 70/1794] LR: 0.000103, Loss: 2.7023
-2026-05-15 21:54:30 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 80/1794] LR: 0.000103, Loss: 0.5079
-2026-05-15 21:54:31 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 90/1794] LR: 0.000102, Loss: 2.2205
-2026-05-15 21:54:31 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 100/1794] LR: 0.000102, Loss: 6.5140
-2026-05-15 21:54:32 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 110/1794] LR: 0.000102, Loss: 0.8430
-2026-05-15 21:54:32 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 120/1794] LR: 0.000102, Loss: 1.5388
-2026-05-15 21:54:33 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 130/1794] LR: 0.000102, Loss: 5.1875
-2026-05-15 21:54:33 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 140/1794] LR: 0.000102, Loss: 1.0642
-2026-05-15 21:54:34 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 150/1794] LR: 0.000102, Loss: 1.2118
-2026-05-15 21:54:35 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 160/1794] LR: 0.000102, Loss: 0.2296
-2026-05-15 21:54:35 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 170/1794] LR: 0.000102, Loss: 1.7278
-2026-05-15 21:54:36 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 180/1794] LR: 0.000102, Loss: 3.2777
-2026-05-15 21:54:36 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 190/1794] LR: 0.000102, Loss: 4.1288
-2026-05-15 21:54:37 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 200/1794] LR: 0.000102, Loss: 5.2337
-2026-05-15 21:54:37 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 210/1794] LR: 0.000102, Loss: 0.7865
-2026-05-15 21:54:38 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 220/1794] LR: 0.000102, Loss: 5.0216
-2026-05-15 21:54:39 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 230/1794] LR: 0.000102, Loss: 1.0496
-2026-05-15 21:54:39 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 240/1794] LR: 0.000102, Loss: 1.5882
-2026-05-15 21:54:40 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 250/1794] LR: 0.000102, Loss: 0.6286
-2026-05-15 21:54:40 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 260/1794] LR: 0.000102, Loss: 0.5014
-2026-05-15 21:54:41 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 270/1794] LR: 0.000102, Loss: 0.8294
-2026-05-15 21:54:41 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 280/1794] LR: 0.000101, Loss: 2.3095
-2026-05-15 21:54:42 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 290/1794] LR: 0.000101, Loss: 3.0071
-2026-05-15 21:54:42 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 300/1794] LR: 0.000101, Loss: 0.3673
-2026-05-15 21:54:43 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 310/1794] LR: 0.000101, Loss: 1.9188
-2026-05-15 21:54:43 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 320/1794] LR: 0.000101, Loss: 0.8183
-2026-05-15 21:54:44 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 330/1794] LR: 0.000101, Loss: 6.9320
-2026-05-15 21:54:44 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 340/1794] LR: 0.000101, Loss: 0.7634
-2026-05-15 21:54:45 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 350/1794] LR: 0.000101, Loss: 1.3306
-2026-05-15 21:54:45 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 360/1794] LR: 0.000101, Loss: 1.4901
-2026-05-15 21:54:46 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 370/1794] LR: 0.000100, Loss: 3.3172
-2026-05-15 21:54:46 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 380/1794] LR: 0.000100, Loss: 0.6478
-2026-05-15 21:54:47 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 390/1794] LR: 0.000100, Loss: 0.5142
-2026-05-15 21:54:47 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 400/1794] LR: 0.000100, Loss: 1.0890
-2026-05-15 21:54:48 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 410/1794] LR: 0.000100, Loss: 1.0484
-2026-05-15 21:54:48 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 420/1794] LR: 0.000100, Loss: 0.1895
-2026-05-15 21:54:49 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 430/1794] LR: 0.000100, Loss: 2.0020
-2026-05-15 21:54:49 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 440/1794] LR: 0.000099, Loss: 2.3173
-2026-05-15 21:54:50 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 450/1794] LR: 0.000099, Loss: 3.4154
-2026-05-15 21:54:50 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 460/1794] LR: 0.000099, Loss: 0.2529
-2026-05-15 21:54:51 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 470/1794] LR: 0.000099, Loss: 1.2558
-2026-05-15 21:54:51 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 480/1794] LR: 0.000099, Loss: 1.4201
-2026-05-15 21:54:52 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 490/1794] LR: 0.000099, Loss: 0.5216
-2026-05-15 21:54:52 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 500/1794] LR: 0.000098, Loss: 2.5613
-2026-05-15 21:54:53 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 510/1794] LR: 0.000098, Loss: 2.0690
-2026-05-15 21:54:53 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 520/1794] LR: 0.000098, Loss: 2.5403
-2026-05-15 21:54:54 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 530/1794] LR: 0.000098, Loss: 0.5441
-2026-05-15 21:54:55 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 540/1794] LR: 0.000098, Loss: 2.3873
-2026-05-15 21:54:55 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 550/1794] LR: 0.000097, Loss: 2.6983
-2026-05-15 21:54:56 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 560/1794] LR: 0.000097, Loss: 1.6089
-2026-05-15 21:54:56 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 570/1794] LR: 0.000097, Loss: 1.4164
-2026-05-15 21:54:57 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 580/1794] LR: 0.000097, Loss: 3.6365
-2026-05-15 21:54:57 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 590/1794] LR: 0.000097, Loss: 0.5469
-2026-05-15 21:54:58 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 600/1794] LR: 0.000096, Loss: 0.9913
-2026-05-15 21:54:58 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 610/1794] LR: 0.000096, Loss: 3.1757
-2026-05-15 21:54:59 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 620/1794] LR: 0.000096, Loss: 2.4659
-2026-05-15 21:54:59 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 630/1794] LR: 0.000096, Loss: 0.4025
-2026-05-15 21:55:00 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 640/1794] LR: 0.000096, Loss: 2.3968
-2026-05-15 21:55:00 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 650/1794] LR: 0.000095, Loss: 1.4598
-2026-05-15 21:55:01 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 660/1794] LR: 0.000095, Loss: 2.1596
-2026-05-15 21:55:01 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 670/1794] LR: 0.000095, Loss: 0.9511
-2026-05-15 21:55:02 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 680/1794] LR: 0.000095, Loss: 1.8131
-2026-05-15 21:55:02 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 690/1794] LR: 0.000094, Loss: 2.6519
-2026-05-15 21:55:03 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 700/1794] LR: 0.000094, Loss: 0.3701
-2026-05-15 21:55:03 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 710/1794] LR: 0.000094, Loss: 0.8293
-2026-05-15 21:55:04 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 720/1794] LR: 0.000094, Loss: 2.3030
-2026-05-15 21:55:04 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 730/1794] LR: 0.000093, Loss: 3.3153
-2026-05-15 21:55:05 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 740/1794] LR: 0.000093, Loss: 0.5490
-2026-05-15 21:55:05 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 750/1794] LR: 0.000093, Loss: 0.8746
-2026-05-15 21:55:06 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 760/1794] LR: 0.000093, Loss: 0.4113
-2026-05-15 21:55:06 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 770/1794] LR: 0.000092, Loss: 1.8034
-2026-05-15 21:55:07 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 780/1794] LR: 0.000092, Loss: 0.8812
-2026-05-15 21:55:08 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 790/1794] LR: 0.000092, Loss: 3.9816
-2026-05-15 21:55:08 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 800/1794] LR: 0.000091, Loss: 2.1863
-2026-05-15 21:55:09 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 810/1794] LR: 0.000091, Loss: 2.1920
-2026-05-15 21:55:09 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 820/1794] LR: 0.000091, Loss: 0.7929
-2026-05-15 21:55:10 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 830/1794] LR: 0.000091, Loss: 1.5705
-2026-05-15 21:55:10 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 840/1794] LR: 0.000090, Loss: 1.4789
-2026-05-15 21:55:11 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 850/1794] LR: 0.000090, Loss: 4.2083
-2026-05-15 21:55:11 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 860/1794] LR: 0.000090, Loss: 2.0064
-2026-05-15 21:55:12 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 870/1794] LR: 0.000089, Loss: 4.8620
-2026-05-15 21:55:12 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 880/1794] LR: 0.000089, Loss: 0.9438
-2026-05-15 21:55:13 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 890/1794] LR: 0.000089, Loss: 2.5550
-2026-05-15 21:55:14 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 900/1794] LR: 0.000088, Loss: 2.9100
-2026-05-15 21:55:14 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 910/1794] LR: 0.000088, Loss: 0.7832
-2026-05-15 21:55:15 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 920/1794] LR: 0.000088, Loss: 0.4368
-2026-05-15 21:55:15 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 930/1794] LR: 0.000088, Loss: 1.3638
-2026-05-15 21:55:16 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 940/1794] LR: 0.000087, Loss: 3.1887
-2026-05-15 21:55:16 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 950/1794] LR: 0.000087, Loss: 1.3974
-2026-05-15 21:55:17 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 960/1794] LR: 0.000087, Loss: 0.8057
-2026-05-15 21:55:17 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 970/1794] LR: 0.000086, Loss: 0.4860
-2026-05-15 21:55:18 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 980/1794] LR: 0.000086, Loss: 2.3625
-2026-05-15 21:55:19 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 990/1794] LR: 0.000086, Loss: 0.1833
-2026-05-15 21:55:19 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1000/1794] LR: 0.000085, Loss: 3.9907
-2026-05-15 21:55:20 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1010/1794] LR: 0.000085, Loss: 0.3734
-2026-05-15 21:55:20 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1020/1794] LR: 0.000085, Loss: 1.1820
-2026-05-15 21:55:21 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1030/1794] LR: 0.000084, Loss: 0.1762
-2026-05-15 21:55:21 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1040/1794] LR: 0.000084, Loss: 1.5707
-2026-05-15 21:55:22 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1050/1794] LR: 0.000083, Loss: 0.8985
-2026-05-15 21:55:22 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1060/1794] LR: 0.000083, Loss: 0.1198
-2026-05-15 21:55:23 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1070/1794] LR: 0.000083, Loss: 1.1233
-2026-05-15 21:55:24 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1080/1794] LR: 0.000082, Loss: 0.1700
-2026-05-15 21:55:24 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1090/1794] LR: 0.000082, Loss: 1.7746
-2026-05-15 21:55:25 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1100/1794] LR: 0.000082, Loss: 1.7770
-2026-05-15 21:55:25 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1110/1794] LR: 0.000081, Loss: 2.5000
-2026-05-15 21:55:26 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1120/1794] LR: 0.000081, Loss: 0.7703
-2026-05-15 21:55:26 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1130/1794] LR: 0.000081, Loss: 2.4563
-2026-05-15 21:55:27 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1140/1794] LR: 0.000080, Loss: 1.0107
-2026-05-15 21:55:27 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1150/1794] LR: 0.000080, Loss: 2.7023
-2026-05-15 21:55:28 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1160/1794] LR: 0.000079, Loss: 3.8378
-2026-05-15 21:55:28 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1170/1794] LR: 0.000079, Loss: 2.0122
-2026-05-15 21:55:29 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1180/1794] LR: 0.000079, Loss: 1.3875
-2026-05-15 21:55:29 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1190/1794] LR: 0.000078, Loss: 1.0579
-2026-05-15 21:55:30 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1200/1794] LR: 0.000078, Loss: 0.9012
-2026-05-15 21:55:30 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1210/1794] LR: 0.000078, Loss: 2.3192
-2026-05-15 21:55:31 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1220/1794] LR: 0.000077, Loss: 3.8064
-2026-05-15 21:55:31 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1230/1794] LR: 0.000077, Loss: 0.7891
-2026-05-15 21:55:32 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1240/1794] LR: 0.000076, Loss: 1.9115
-2026-05-15 21:55:33 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1250/1794] LR: 0.000076, Loss: 2.7201
-2026-05-15 21:55:33 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1260/1794] LR: 0.000076, Loss: 0.1943
-2026-05-15 21:55:34 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1270/1794] LR: 0.000075, Loss: 1.4699
-2026-05-15 21:55:34 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1280/1794] LR: 0.000075, Loss: 1.1149
-2026-05-15 21:55:35 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1290/1794] LR: 0.000074, Loss: 0.6376
-2026-05-15 21:55:35 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1300/1794] LR: 0.000074, Loss: 1.2081
-2026-05-15 21:55:36 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1310/1794] LR: 0.000074, Loss: 3.4864
-2026-05-15 21:55:36 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1320/1794] LR: 0.000073, Loss: 0.2395
-2026-05-15 21:55:37 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1330/1794] LR: 0.000073, Loss: 2.0649
-2026-05-15 21:55:37 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1340/1794] LR: 0.000072, Loss: 3.4442
-2026-05-15 21:55:38 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1350/1794] LR: 0.000072, Loss: 0.3660
-2026-05-15 21:55:38 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1360/1794] LR: 0.000071, Loss: 0.4066
-2026-05-15 21:55:39 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1370/1794] LR: 0.000071, Loss: 3.6787
-2026-05-15 21:55:39 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1380/1794] LR: 0.000071, Loss: 2.8982
-2026-05-15 21:55:40 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1390/1794] LR: 0.000070, Loss: 1.5900
-2026-05-15 21:55:40 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1400/1794] LR: 0.000070, Loss: 2.1567
-2026-05-15 21:55:41 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1410/1794] LR: 0.000069, Loss: 2.2690
-2026-05-15 21:55:42 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1420/1794] LR: 0.000069, Loss: 0.8841
-2026-05-15 21:55:42 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1430/1794] LR: 0.000068, Loss: 1.6766
-2026-05-15 21:55:43 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1440/1794] LR: 0.000068, Loss: 0.2725
-2026-05-15 21:55:43 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1450/1794] LR: 0.000068, Loss: 2.8324
-2026-05-15 21:55:44 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1460/1794] LR: 0.000067, Loss: 1.5426
-2026-05-15 21:55:44 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1470/1794] LR: 0.000067, Loss: 1.1839
-2026-05-15 21:55:45 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1480/1794] LR: 0.000066, Loss: 0.2866
-2026-05-15 21:55:45 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1490/1794] LR: 0.000066, Loss: 0.6184
-2026-05-15 21:55:46 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1500/1794] LR: 0.000065, Loss: 0.4147
-2026-05-15 21:55:47 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1510/1794] LR: 0.000065, Loss: 1.5428
-2026-05-15 21:55:47 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1520/1794] LR: 0.000065, Loss: 4.2842
-2026-05-15 21:55:48 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1530/1794] LR: 0.000064, Loss: 0.2330
-2026-05-15 21:55:48 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1540/1794] LR: 0.000064, Loss: 1.6186
-2026-05-15 21:55:49 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1550/1794] LR: 0.000063, Loss: 3.4042
-2026-05-15 21:55:49 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1560/1794] LR: 0.000063, Loss: 1.2969
-2026-05-15 21:55:50 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1570/1794] LR: 0.000062, Loss: 1.7230
-2026-05-15 21:55:50 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1580/1794] LR: 0.000062, Loss: 0.6542
-2026-05-15 21:55:51 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1590/1794] LR: 0.000061, Loss: 0.8374
-2026-05-15 21:55:51 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1600/1794] LR: 0.000061, Loss: 1.0742
-2026-05-15 21:55:52 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1610/1794] LR: 0.000061, Loss: 0.6512
-2026-05-15 21:55:52 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1620/1794] LR: 0.000060, Loss: 1.0854
-2026-05-15 21:55:53 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1630/1794] LR: 0.000060, Loss: 1.0582
-2026-05-15 21:55:53 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1640/1794] LR: 0.000059, Loss: 0.4105
-2026-05-15 21:55:54 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1650/1794] LR: 0.000059, Loss: 2.7758
-2026-05-15 21:55:55 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1660/1794] LR: 0.000058, Loss: 2.1717
-2026-05-15 21:55:55 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1670/1794] LR: 0.000058, Loss: 2.6133
-2026-05-15 21:55:56 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1680/1794] LR: 0.000057, Loss: 0.6220
-2026-05-15 21:55:56 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1690/1794] LR: 0.000057, Loss: 1.8014
-2026-05-15 21:55:57 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1700/1794] LR: 0.000057, Loss: 0.2278
-2026-05-15 21:55:57 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1710/1794] LR: 0.000056, Loss: 0.7974
-2026-05-15 21:55:58 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1720/1794] LR: 0.000056, Loss: 2.5021
-2026-05-15 21:55:58 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1730/1794] LR: 0.000055, Loss: 0.1977
-2026-05-15 21:55:59 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1740/1794] LR: 0.000055, Loss: 0.2237
-2026-05-15 21:55:59 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1750/1794] LR: 0.000054, Loss: 0.5298
-2026-05-15 21:56:00 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1760/1794] LR: 0.000054, Loss: 4.9111
-2026-05-15 21:56:00 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1770/1794] LR: 0.000053, Loss: 0.2248
-2026-05-15 21:56:01 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1780/1794] LR: 0.000053, Loss: 0.9455
-2026-05-15 21:56:02 - tokenizer_training_rank_0 - INFO - [Epoch 1/2, Step 1790/1794] LR: 0.000052, Loss: 1.2231
-2026-05-15 21:56:14 - tokenizer_training_rank_0 - INFO - 
---- Epoch 1/2 Summary ---
-Validation Loss: 0.615959
-Epoch Time: 0:01:57
-
-2026-05-15 21:56:14 - tokenizer_training_rank_0 - INFO - Best model saved: finetuned/smoke_test_full_hpo\tokenizer\best_model (val loss: 0.615959)
-2026-05-15 21:56:14 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 1800/1794] LR: 0.000052, Loss: 0.2977
-2026-05-15 21:56:15 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 1810/1794] LR: 0.000052, Loss: 0.1778
-2026-05-15 21:56:16 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 1820/1794] LR: 0.000051, Loss: 3.9521
-2026-05-15 21:56:16 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 1830/1794] LR: 0.000051, Loss: 1.2857
-2026-05-15 21:56:17 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 1840/1794] LR: 0.000050, Loss: 1.1588
-2026-05-15 21:56:17 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 1850/1794] LR: 0.000050, Loss: 0.1830
-2026-05-15 21:56:18 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 1860/1794] LR: 0.000049, Loss: 0.3476
-2026-05-15 21:56:18 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 1870/1794] LR: 0.000049, Loss: 0.6507
-2026-05-15 21:56:19 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 1880/1794] LR: 0.000048, Loss: 1.8438
-2026-05-15 21:56:19 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 1890/1794] LR: 0.000048, Loss: 1.3943
-2026-05-15 21:56:20 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 1900/1794] LR: 0.000047, Loss: 1.0754
-2026-05-15 21:56:20 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 1910/1794] LR: 0.000047, Loss: 1.9065
-2026-05-15 21:56:21 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 1920/1794] LR: 0.000047, Loss: 0.2941
-2026-05-15 21:56:21 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 1930/1794] LR: 0.000046, Loss: 3.6046
-2026-05-15 21:56:22 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 1940/1794] LR: 0.000046, Loss: 0.2206
-2026-05-15 21:56:23 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 1950/1794] LR: 0.000045, Loss: 1.9597
-2026-05-15 21:56:23 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 1960/1794] LR: 0.000045, Loss: 1.4106
-2026-05-15 21:56:24 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 1970/1794] LR: 0.000044, Loss: 1.3728
-2026-05-15 21:56:24 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 1980/1794] LR: 0.000044, Loss: 2.4945
-2026-05-15 21:56:25 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 1990/1794] LR: 0.000043, Loss: 0.2393
-2026-05-15 21:56:25 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2000/1794] LR: 0.000043, Loss: 0.3872
-2026-05-15 21:56:26 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2010/1794] LR: 0.000042, Loss: 1.0203
-2026-05-15 21:56:26 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2020/1794] LR: 0.000042, Loss: 2.0481
-2026-05-15 21:56:27 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2030/1794] LR: 0.000042, Loss: 0.4110
-2026-05-15 21:56:27 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2040/1794] LR: 0.000041, Loss: 3.1853
-2026-05-15 21:56:28 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2050/1794] LR: 0.000041, Loss: 1.4692
-2026-05-15 21:56:29 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2060/1794] LR: 0.000040, Loss: 1.2761
-2026-05-15 21:56:29 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2070/1794] LR: 0.000040, Loss: 0.5946
-2026-05-15 21:56:30 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2080/1794] LR: 0.000039, Loss: 4.6789
-2026-05-15 21:56:30 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2090/1794] LR: 0.000039, Loss: 2.7726
-2026-05-15 21:56:31 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2100/1794] LR: 0.000038, Loss: 2.0857
-2026-05-15 21:56:31 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2110/1794] LR: 0.000038, Loss: 1.8000
-2026-05-15 21:56:32 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2120/1794] LR: 0.000038, Loss: 0.1474
-2026-05-15 21:56:32 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2130/1794] LR: 0.000037, Loss: 1.3305
-2026-05-15 21:56:33 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2140/1794] LR: 0.000037, Loss: 0.3396
-2026-05-15 21:56:33 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2150/1794] LR: 0.000036, Loss: 3.1193
-2026-05-15 21:56:34 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2160/1794] LR: 0.000036, Loss: 0.7854
-2026-05-15 21:56:34 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2170/1794] LR: 0.000035, Loss: 0.5174
-2026-05-15 21:56:35 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2180/1794] LR: 0.000035, Loss: 2.4320
-2026-05-15 21:56:36 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2190/1794] LR: 0.000035, Loss: 2.0438
-2026-05-15 21:56:36 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2200/1794] LR: 0.000034, Loss: 0.4376
-2026-05-15 21:56:37 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2210/1794] LR: 0.000034, Loss: 0.3862
-2026-05-15 21:56:37 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2220/1794] LR: 0.000033, Loss: 0.7790
-2026-05-15 21:56:38 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2230/1794] LR: 0.000033, Loss: 0.3568
-2026-05-15 21:56:38 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2240/1794] LR: 0.000032, Loss: 1.7608
-2026-05-15 21:56:39 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2250/1794] LR: 0.000032, Loss: 1.9485
-2026-05-15 21:56:40 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2260/1794] LR: 0.000032, Loss: 0.9995
-2026-05-15 21:56:40 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2270/1794] LR: 0.000031, Loss: 0.3120
-2026-05-15 21:56:41 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2280/1794] LR: 0.000031, Loss: 0.7003
-2026-05-15 21:56:41 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2290/1794] LR: 0.000030, Loss: 1.5609
-2026-05-15 21:56:42 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2300/1794] LR: 0.000030, Loss: 1.4056
-2026-05-15 21:56:42 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2310/1794] LR: 0.000030, Loss: 1.3968
-2026-05-15 21:56:43 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2320/1794] LR: 0.000029, Loss: 1.3855
-2026-05-15 21:56:43 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2330/1794] LR: 0.000029, Loss: 1.1748
-2026-05-15 21:56:44 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2340/1794] LR: 0.000028, Loss: 0.2092
-2026-05-15 21:56:44 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2350/1794] LR: 0.000028, Loss: 0.5808
-2026-05-15 21:56:45 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2360/1794] LR: 0.000027, Loss: 0.2573
-2026-05-15 21:56:46 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2370/1794] LR: 0.000027, Loss: 3.5308
-2026-05-15 21:56:46 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2380/1794] LR: 0.000027, Loss: 1.7458
-2026-05-15 21:56:47 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2390/1794] LR: 0.000026, Loss: 0.8730
-2026-05-15 21:56:47 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2400/1794] LR: 0.000026, Loss: 1.9835
-2026-05-15 21:56:48 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2410/1794] LR: 0.000025, Loss: 0.6289
-2026-05-15 21:56:48 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2420/1794] LR: 0.000025, Loss: 1.4762
-2026-05-15 21:56:49 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2430/1794] LR: 0.000025, Loss: 1.7674
-2026-05-15 21:56:49 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2440/1794] LR: 0.000024, Loss: 1.1428
-2026-05-15 21:56:50 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2450/1794] LR: 0.000024, Loss: 0.9088
-2026-05-15 21:56:50 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2460/1794] LR: 0.000024, Loss: 3.2989
-2026-05-15 21:56:51 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2470/1794] LR: 0.000023, Loss: 0.3570
-2026-05-15 21:56:52 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2480/1794] LR: 0.000023, Loss: 0.8197
-2026-05-15 21:56:52 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2490/1794] LR: 0.000022, Loss: 2.3705
-2026-05-15 21:56:53 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2500/1794] LR: 0.000022, Loss: 2.0822
-2026-05-15 21:56:53 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2510/1794] LR: 0.000022, Loss: 3.6792
-2026-05-15 21:56:54 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2520/1794] LR: 0.000021, Loss: 0.3575
-2026-05-15 21:56:54 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2530/1794] LR: 0.000021, Loss: 3.0172
-2026-05-15 21:56:55 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2540/1794] LR: 0.000021, Loss: 1.1172
-2026-05-15 21:56:55 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2550/1794] LR: 0.000020, Loss: 1.6670
-2026-05-15 21:56:56 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2560/1794] LR: 0.000020, Loss: 2.5001
-2026-05-15 21:56:56 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2570/1794] LR: 0.000019, Loss: 1.4365
-2026-05-15 21:56:57 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2580/1794] LR: 0.000019, Loss: 0.4521
-2026-05-15 21:56:58 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2590/1794] LR: 0.000019, Loss: 0.7723
-2026-05-15 21:56:58 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2600/1794] LR: 0.000018, Loss: 4.0757
-2026-05-15 21:56:59 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2610/1794] LR: 0.000018, Loss: 0.4973
-2026-05-15 21:56:59 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2620/1794] LR: 0.000018, Loss: 0.8383
-2026-05-15 21:57:00 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2630/1794] LR: 0.000017, Loss: 1.2434
-2026-05-15 21:57:00 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2640/1794] LR: 0.000017, Loss: 0.1972
-2026-05-15 21:57:01 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2650/1794] LR: 0.000017, Loss: 0.4647
-2026-05-15 21:57:01 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2660/1794] LR: 0.000016, Loss: 2.1016
-2026-05-15 21:57:02 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2670/1794] LR: 0.000016, Loss: 1.7797
-2026-05-15 21:57:02 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2680/1794] LR: 0.000016, Loss: 1.2606
-2026-05-15 21:57:03 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2690/1794] LR: 0.000015, Loss: 1.5311
-2026-05-15 21:57:04 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2700/1794] LR: 0.000015, Loss: 1.0364
-2026-05-15 21:57:04 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2710/1794] LR: 0.000015, Loss: 0.2310
-2026-05-15 21:57:05 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2720/1794] LR: 0.000014, Loss: 1.2254
-2026-05-15 21:57:05 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2730/1794] LR: 0.000014, Loss: 0.7537
-2026-05-15 21:57:06 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2740/1794] LR: 0.000014, Loss: 0.3321
-2026-05-15 21:57:07 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2750/1794] LR: 0.000013, Loss: 1.2203
-2026-05-15 21:57:07 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2760/1794] LR: 0.000013, Loss: 1.7602
-2026-05-15 21:57:08 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2770/1794] LR: 0.000013, Loss: 1.8017
-2026-05-15 21:57:08 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2780/1794] LR: 0.000013, Loss: 2.2819
-2026-05-15 21:57:09 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2790/1794] LR: 0.000012, Loss: 0.8650
-2026-05-15 21:57:09 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2800/1794] LR: 0.000012, Loss: 1.5406
-2026-05-15 21:57:10 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2810/1794] LR: 0.000012, Loss: 1.3338
-2026-05-15 21:57:11 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2820/1794] LR: 0.000011, Loss: 0.6097
-2026-05-15 21:57:11 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2830/1794] LR: 0.000011, Loss: 0.6356
-2026-05-15 21:57:12 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2840/1794] LR: 0.000011, Loss: 1.0146
-2026-05-15 21:57:12 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2850/1794] LR: 0.000011, Loss: 2.0886
-2026-05-15 21:57:13 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2860/1794] LR: 0.000010, Loss: 0.1597
-2026-05-15 21:57:13 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2870/1794] LR: 0.000010, Loss: 0.3865
-2026-05-15 21:57:14 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2880/1794] LR: 0.000010, Loss: 0.2864
-2026-05-15 21:57:14 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2890/1794] LR: 0.000009, Loss: 1.4818
-2026-05-15 21:57:15 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2900/1794] LR: 0.000009, Loss: 0.3737
-2026-05-15 21:57:16 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2910/1794] LR: 0.000009, Loss: 0.3744
-2026-05-15 21:57:16 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2920/1794] LR: 0.000009, Loss: 0.3389
-2026-05-15 21:57:17 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2930/1794] LR: 0.000008, Loss: 0.7624
-2026-05-15 21:57:17 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2940/1794] LR: 0.000008, Loss: 1.1356
-2026-05-15 21:57:18 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2950/1794] LR: 0.000008, Loss: 3.0660
-2026-05-15 21:57:19 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2960/1794] LR: 0.000008, Loss: 2.3993
-2026-05-15 21:57:19 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2970/1794] LR: 0.000007, Loss: 4.4355
-2026-05-15 21:57:20 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2980/1794] LR: 0.000007, Loss: 0.7552
-2026-05-15 21:57:20 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 2990/1794] LR: 0.000007, Loss: 4.4602
-2026-05-15 21:57:21 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3000/1794] LR: 0.000007, Loss: 0.3369
-2026-05-15 21:57:22 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3010/1794] LR: 0.000007, Loss: 0.1387
-2026-05-15 21:57:22 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3020/1794] LR: 0.000006, Loss: 0.6729
-2026-05-15 21:57:23 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3030/1794] LR: 0.000006, Loss: 3.1809
-2026-05-15 21:57:23 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3040/1794] LR: 0.000006, Loss: 0.3831
-2026-05-15 21:57:24 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3050/1794] LR: 0.000006, Loss: 0.2780
-2026-05-15 21:57:24 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3060/1794] LR: 0.000006, Loss: 0.2683
-2026-05-15 21:57:25 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3070/1794] LR: 0.000005, Loss: 0.3906
-2026-05-15 21:57:26 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3080/1794] LR: 0.000005, Loss: 0.8128
-2026-05-15 21:57:26 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3090/1794] LR: 0.000005, Loss: 1.8650
-2026-05-15 21:57:27 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3100/1794] LR: 0.000005, Loss: 0.2816
-2026-05-15 21:57:27 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3110/1794] LR: 0.000005, Loss: 0.2632
-2026-05-15 21:57:28 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3120/1794] LR: 0.000004, Loss: 1.3896
-2026-05-15 21:57:29 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3130/1794] LR: 0.000004, Loss: 2.1945
-2026-05-15 21:57:29 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3140/1794] LR: 0.000004, Loss: 1.0838
-2026-05-15 21:57:30 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3150/1794] LR: 0.000004, Loss: 0.4745
-2026-05-15 21:57:30 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3160/1794] LR: 0.000004, Loss: 0.2575
-2026-05-15 21:57:31 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3170/1794] LR: 0.000003, Loss: 0.4368
-2026-05-15 21:57:31 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3180/1794] LR: 0.000003, Loss: 0.2905
-2026-05-15 21:57:32 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3190/1794] LR: 0.000003, Loss: 1.3888
-2026-05-15 21:57:33 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3200/1794] LR: 0.000003, Loss: 0.3012
-2026-05-15 21:57:33 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3210/1794] LR: 0.000003, Loss: 0.9543
-2026-05-15 21:57:34 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3220/1794] LR: 0.000003, Loss: 0.4134
-2026-05-15 21:57:34 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3230/1794] LR: 0.000003, Loss: 1.3708
-2026-05-15 21:57:35 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3240/1794] LR: 0.000002, Loss: 0.6229
-2026-05-15 21:57:35 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3250/1794] LR: 0.000002, Loss: 1.4378
-2026-05-15 21:57:36 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3260/1794] LR: 0.000002, Loss: 3.1213
-2026-05-15 21:57:36 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3270/1794] LR: 0.000002, Loss: 0.6572
-2026-05-15 21:57:37 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3280/1794] LR: 0.000002, Loss: 1.2480
-2026-05-15 21:57:38 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3290/1794] LR: 0.000002, Loss: 1.0981
-2026-05-15 21:57:38 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3300/1794] LR: 0.000002, Loss: 0.4321
-2026-05-15 21:57:39 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3310/1794] LR: 0.000002, Loss: 2.3303
-2026-05-15 21:57:39 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3320/1794] LR: 0.000001, Loss: 0.9430
-2026-05-15 21:57:40 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3330/1794] LR: 0.000001, Loss: 5.1340
-2026-05-15 21:57:40 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3340/1794] LR: 0.000001, Loss: 2.7393
-2026-05-15 21:57:41 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3350/1794] LR: 0.000001, Loss: 0.8171
-2026-05-15 21:57:42 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3360/1794] LR: 0.000001, Loss: 0.8582
-2026-05-15 21:57:42 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3370/1794] LR: 0.000001, Loss: 1.5488
-2026-05-15 21:57:43 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3380/1794] LR: 0.000001, Loss: 1.7059
-2026-05-15 21:57:43 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3390/1794] LR: 0.000001, Loss: 0.3557
-2026-05-15 21:57:44 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3400/1794] LR: 0.000001, Loss: 1.3660
-2026-05-15 21:57:44 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3410/1794] LR: 0.000001, Loss: 0.2612
-2026-05-15 21:57:45 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3420/1794] LR: 0.000001, Loss: 0.2913
-2026-05-15 21:57:46 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3430/1794] LR: 0.000000, Loss: 0.4107
-2026-05-15 21:57:46 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3440/1794] LR: 0.000000, Loss: 0.2296
-2026-05-15 21:57:47 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3450/1794] LR: 0.000000, Loss: 3.2555
-2026-05-15 21:57:47 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3460/1794] LR: 0.000000, Loss: 2.1433
-2026-05-15 21:57:48 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3470/1794] LR: 0.000000, Loss: 0.9287
-2026-05-15 21:57:48 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3480/1794] LR: 0.000000, Loss: 0.1606
-2026-05-15 21:57:49 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3490/1794] LR: 0.000000, Loss: 1.1455
-2026-05-15 21:57:49 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3500/1794] LR: 0.000000, Loss: 1.2582
-2026-05-15 21:57:50 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3510/1794] LR: 0.000000, Loss: 1.5929
-2026-05-15 21:57:51 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3520/1794] LR: 0.000000, Loss: 0.1948
-2026-05-15 21:57:51 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3530/1794] LR: 0.000000, Loss: 0.5979
-2026-05-15 21:57:52 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3540/1794] LR: 0.000000, Loss: 0.1246
-2026-05-15 21:57:52 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3550/1794] LR: 0.000000, Loss: 0.4311
-2026-05-15 21:57:53 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3560/1794] LR: 0.000000, Loss: 0.4204
-2026-05-15 21:57:54 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3570/1794] LR: 0.000000, Loss: 0.6093
-2026-05-15 21:57:54 - tokenizer_training_rank_0 - INFO - [Epoch 2/2, Step 3580/1794] LR: 0.000000, Loss: 1.4297
-2026-05-15 21:57:58 - tokenizer_training_rank_0 - INFO - 
---- Epoch 2/2 Summary ---
-Validation Loss: 0.581158
-Epoch Time: 0:01:43
-
-2026-05-15 21:57:58 - tokenizer_training_rank_0 - INFO - Best model saved: finetuned/smoke_test_full_hpo\tokenizer\best_model (val loss: 0.581158)
-2026-05-15 21:58:00 - tokenizer_training_rank_0 - INFO - Tokenizer training completed! Best validation loss: 0.5812
-Training time: 3.75 minutes
-Model saved to: finetuned/smoke_test_full_hpo\tokenizer
-
-```
-
----
-
-### `finetuned/smoke_test_full_hpo/tokenizer/trial.log`
-
-```text
-2026-05-15 21:40:45 [INFO] Starting tokenizer training...
-2026-05-15 21:40:54 [INFO] [Epoch 1/2, Step 10/1794] LR: 0.000030, Loss: 0.0934
-2026-05-15 21:40:55 [INFO] [Epoch 1/2, Step 20/1794] LR: 0.000054, Loss: 0.1672
-2026-05-15 21:40:55 [INFO] [Epoch 1/2, Step 30/1794] LR: 0.000082, Loss: 0.9532
-2026-05-15 21:40:56 [INFO] [Epoch 1/2, Step 40/1794] LR: 0.000100, Loss: 0.1144
-2026-05-15 21:40:56 [INFO] [Epoch 1/2, Step 50/1794] LR: 0.000103, Loss: 2.5285
-2026-05-15 21:40:57 [INFO] [Epoch 1/2, Step 60/1794] LR: 0.000103, Loss: 1.0392
-2026-05-15 21:40:57 [INFO] [Epoch 1/2, Step 70/1794] LR: 0.000103, Loss: 2.6632
-2026-05-15 21:40:58 [INFO] [Epoch 1/2, Step 80/1794] LR: 0.000103, Loss: 0.9657
-2026-05-15 21:40:58 [INFO] [Epoch 1/2, Step 90/1794] LR: 0.000102, Loss: 1.2757
-2026-05-15 21:40:59 [INFO] [Epoch 1/2, Step 100/1794] LR: 0.000102, Loss: 1.2360
-2026-05-15 21:41:00 [INFO] [Epoch 1/2, Step 110/1794] LR: 0.000102, Loss: 1.2800
-2026-05-15 21:41:00 [INFO] [Epoch 1/2, Step 120/1794] LR: 0.000102, Loss: 2.1414
-2026-05-15 21:41:01 [INFO] [Epoch 1/2, Step 130/1794] LR: 0.000102, Loss: 1.6991
-2026-05-15 21:41:01 [INFO] [Epoch 1/2, Step 140/1794] LR: 0.000102, Loss: 2.6306
-2026-05-15 21:41:02 [INFO] [Epoch 1/2, Step 150/1794] LR: 0.000102, Loss: 0.2886
-2026-05-15 21:41:02 [INFO] [Epoch 1/2, Step 160/1794] LR: 0.000102, Loss: 0.7892
-2026-05-15 21:41:03 [INFO] [Epoch 1/2, Step 170/1794] LR: 0.000102, Loss: 0.1407
-2026-05-15 21:41:03 [INFO] [Epoch 1/2, Step 180/1794] LR: 0.000102, Loss: 1.1482
-2026-05-15 21:41:04 [INFO] [Epoch 1/2, Step 190/1794] LR: 0.000102, Loss: 0.1159
-2026-05-15 21:41:04 [INFO] [Epoch 1/2, Step 200/1794] LR: 0.000102, Loss: 0.2784
-2026-05-15 21:41:05 [INFO] [Epoch 1/2, Step 210/1794] LR: 0.000102, Loss: 0.9711
-2026-05-15 21:41:05 [INFO] [Epoch 1/2, Step 220/1794] LR: 0.000102, Loss: 1.8608
-2026-05-15 21:41:06 [INFO] [Epoch 1/2, Step 230/1794] LR: 0.000102, Loss: 1.2936
-2026-05-15 21:41:06 [INFO] [Epoch 1/2, Step 240/1794] LR: 0.000102, Loss: 0.8538
-2026-05-15 21:41:07 [INFO] [Epoch 1/2, Step 250/1794] LR: 0.000102, Loss: 0.1301
-2026-05-15 21:41:07 [INFO] [Epoch 1/2, Step 260/1794] LR: 0.000102, Loss: 0.1195
-2026-05-15 21:41:08 [INFO] [Epoch 1/2, Step 270/1794] LR: 0.000102, Loss: 0.1528
-2026-05-15 21:41:08 [INFO] [Epoch 1/2, Step 280/1794] LR: 0.000101, Loss: 2.0660
-2026-05-15 21:41:09 [INFO] [Epoch 1/2, Step 290/1794] LR: 0.000101, Loss: 0.2262
-2026-05-15 21:41:09 [INFO] [Epoch 1/2, Step 300/1794] LR: 0.000101, Loss: 0.7963
-2026-05-15 21:41:10 [INFO] [Epoch 1/2, Step 310/1794] LR: 0.000101, Loss: 0.4644
-2026-05-15 21:41:10 [INFO] [Epoch 1/2, Step 320/1794] LR: 0.000101, Loss: 0.1159
-2026-05-15 21:41:11 [INFO] [Epoch 1/2, Step 330/1794] LR: 0.000101, Loss: 0.8148
-2026-05-15 21:41:11 [INFO] [Epoch 1/2, Step 340/1794] LR: 0.000101, Loss: 0.1579
-2026-05-15 21:41:12 [INFO] [Epoch 1/2, Step 350/1794] LR: 0.000101, Loss: 0.0235
-2026-05-15 21:41:12 [INFO] [Epoch 1/2, Step 360/1794] LR: 0.000101, Loss: 0.1147
-2026-05-15 21:41:13 [INFO] [Epoch 1/2, Step 370/1794] LR: 0.000100, Loss: 2.1354
-2026-05-15 21:41:13 [INFO] [Epoch 1/2, Step 380/1794] LR: 0.000100, Loss: 0.0492
-2026-05-15 21:41:14 [INFO] [Epoch 1/2, Step 390/1794] LR: 0.000100, Loss: 0.6292
-2026-05-15 21:41:15 [INFO] [Epoch 1/2, Step 400/1794] LR: 0.000100, Loss: 0.9925
-2026-05-15 21:41:15 [INFO] [Epoch 1/2, Step 410/1794] LR: 0.000100, Loss: 0.0856
-2026-05-15 21:41:15 [INFO] [Epoch 1/2, Step 420/1794] LR: 0.000100, Loss: 0.3889
-2026-05-15 21:41:16 [INFO] [Epoch 1/2, Step 430/1794] LR: 0.000100, Loss: 0.2932
-2026-05-15 21:41:17 [INFO] [Epoch 1/2, Step 440/1794] LR: 0.000099, Loss: 0.2335
-2026-05-15 21:41:17 [INFO] [Epoch 1/2, Step 450/1794] LR: 0.000099, Loss: 1.4390
-2026-05-15 21:41:18 [INFO] [Epoch 1/2, Step 460/1794] LR: 0.000099, Loss: 0.8128
-2026-05-15 21:41:18 [INFO] [Epoch 1/2, Step 470/1794] LR: 0.000099, Loss: 0.3874
-2026-05-15 21:41:19 [INFO] [Epoch 1/2, Step 480/1794] LR: 0.000099, Loss: 0.5893
-2026-05-15 21:41:19 [INFO] [Epoch 1/2, Step 490/1794] LR: 0.000099, Loss: 0.1835
-2026-05-15 21:41:20 [INFO] [Epoch 1/2, Step 500/1794] LR: 0.000098, Loss: 1.0969
-2026-05-15 21:41:20 [INFO] [Epoch 1/2, Step 510/1794] LR: 0.000098, Loss: 0.1519
-2026-05-15 21:41:21 [INFO] [Epoch 1/2, Step 520/1794] LR: 0.000098, Loss: 0.8324
-2026-05-15 21:41:21 [INFO] [Epoch 1/2, Step 530/1794] LR: 0.000098, Loss: 1.0496
-2026-05-15 21:41:22 [INFO] [Epoch 1/2, Step 540/1794] LR: 0.000098, Loss: 1.1442
-2026-05-15 21:41:22 [INFO] [Epoch 1/2, Step 550/1794] LR: 0.000097, Loss: 0.2789
-2026-05-15 21:41:23 [INFO] [Epoch 1/2, Step 560/1794] LR: 0.000097, Loss: 0.7488
-2026-05-15 21:41:23 [INFO] [Epoch 1/2, Step 570/1794] LR: 0.000097, Loss: 1.3129
-2026-05-15 21:41:24 [INFO] [Epoch 1/2, Step 580/1794] LR: 0.000097, Loss: 2.4026
-2026-05-15 21:41:24 [INFO] [Epoch 1/2, Step 590/1794] LR: 0.000097, Loss: 1.3990
-2026-05-15 21:41:25 [INFO] [Epoch 1/2, Step 600/1794] LR: 0.000096, Loss: 0.0489
-2026-05-15 21:41:25 [INFO] [Epoch 1/2, Step 610/1794] LR: 0.000096, Loss: 0.4102
-2026-05-15 21:41:26 [INFO] [Epoch 1/2, Step 620/1794] LR: 0.000096, Loss: 0.1486
-2026-05-15 21:41:26 [INFO] [Epoch 1/2, Step 630/1794] LR: 0.000096, Loss: 0.3594
-2026-05-15 21:41:27 [INFO] [Epoch 1/2, Step 640/1794] LR: 0.000096, Loss: 0.5644
-2026-05-15 21:41:27 [INFO] [Epoch 1/2, Step 650/1794] LR: 0.000095, Loss: 1.8278
-2026-05-15 21:41:28 [INFO] [Epoch 1/2, Step 660/1794] LR: 0.000095, Loss: 1.0655
-2026-05-15 21:41:28 [INFO] [Epoch 1/2, Step 670/1794] LR: 0.000095, Loss: 0.6607
-2026-05-15 21:41:29 [INFO] [Epoch 1/2, Step 680/1794] LR: 0.000095, Loss: 0.2191
-2026-05-15 21:41:29 [INFO] [Epoch 1/2, Step 690/1794] LR: 0.000094, Loss: 0.0685
-2026-05-15 21:41:30 [INFO] [Epoch 1/2, Step 700/1794] LR: 0.000094, Loss: 0.3370
-2026-05-15 21:41:30 [INFO] [Epoch 1/2, Step 710/1794] LR: 0.000094, Loss: 0.6745
-2026-05-15 21:41:31 [INFO] [Epoch 1/2, Step 720/1794] LR: 0.000094, Loss: 1.2939
-2026-05-15 21:41:31 [INFO] [Epoch 1/2, Step 730/1794] LR: 0.000093, Loss: 0.7149
-2026-05-15 21:41:32 [INFO] [Epoch 1/2, Step 740/1794] LR: 0.000093, Loss: 0.1756
-2026-05-15 21:41:33 [INFO] [Epoch 1/2, Step 750/1794] LR: 0.000093, Loss: 0.5963
-2026-05-15 21:41:33 [INFO] [Epoch 1/2, Step 760/1794] LR: 0.000093, Loss: 0.7046
-2026-05-15 21:41:34 [INFO] [Epoch 1/2, Step 770/1794] LR: 0.000092, Loss: 1.6956
-2026-05-15 21:41:34 [INFO] [Epoch 1/2, Step 780/1794] LR: 0.000092, Loss: 0.5007
-2026-05-15 21:41:35 [INFO] [Epoch 1/2, Step 790/1794] LR: 0.000092, Loss: 0.3058
-2026-05-15 21:41:36 [INFO] [Epoch 1/2, Step 800/1794] LR: 0.000091, Loss: 0.2088
-2026-05-15 21:41:36 [INFO] [Epoch 1/2, Step 810/1794] LR: 0.000091, Loss: 0.5786
-2026-05-15 21:41:37 [INFO] [Epoch 1/2, Step 820/1794] LR: 0.000091, Loss: 0.8601
-2026-05-15 21:41:37 [INFO] [Epoch 1/2, Step 830/1794] LR: 0.000091, Loss: 0.8821
-2026-05-15 21:41:38 [INFO] [Epoch 1/2, Step 840/1794] LR: 0.000090, Loss: 0.2951
-2026-05-15 21:41:38 [INFO] [Epoch 1/2, Step 850/1794] LR: 0.000090, Loss: 0.1388
-2026-05-15 21:41:39 [INFO] [Epoch 1/2, Step 860/1794] LR: 0.000090, Loss: 1.1992
-2026-05-15 21:41:39 [INFO] [Epoch 1/2, Step 870/1794] LR: 0.000089, Loss: 1.5692
-2026-05-15 21:41:40 [INFO] [Epoch 1/2, Step 880/1794] LR: 0.000089, Loss: 0.6004
-2026-05-15 21:41:41 [INFO] [Epoch 1/2, Step 890/1794] LR: 0.000089, Loss: 0.2031
-2026-05-15 21:41:41 [INFO] [Epoch 1/2, Step 900/1794] LR: 0.000088, Loss: 0.5946
-2026-05-15 21:41:42 [INFO] [Epoch 1/2, Step 910/1794] LR: 0.000088, Loss: 0.2468
-2026-05-15 21:41:42 [INFO] [Epoch 1/2, Step 920/1794] LR: 0.000088, Loss: 1.1475
-2026-05-15 21:41:43 [INFO] [Epoch 1/2, Step 930/1794] LR: 0.000088, Loss: 0.1896
-2026-05-15 21:41:43 [INFO] [Epoch 1/2, Step 940/1794] LR: 0.000087, Loss: 0.5529
-2026-05-15 21:41:44 [INFO] [Epoch 1/2, Step 950/1794] LR: 0.000087, Loss: 0.8473
-2026-05-15 21:41:44 [INFO] [Epoch 1/2, Step 960/1794] LR: 0.000087, Loss: 0.4131
-2026-05-15 21:41:45 [INFO] [Epoch 1/2, Step 970/1794] LR: 0.000086, Loss: 0.9431
-2026-05-15 21:41:45 [INFO] [Epoch 1/2, Step 980/1794] LR: 0.000086, Loss: 0.8457
-2026-05-15 21:41:46 [INFO] [Epoch 1/2, Step 990/1794] LR: 0.000086, Loss: 0.5924
-2026-05-15 21:41:46 [INFO] [Epoch 1/2, Step 1000/1794] LR: 0.000085, Loss: 0.2735
-2026-05-15 21:41:47 [INFO] [Epoch 1/2, Step 1010/1794] LR: 0.000085, Loss: 0.1044
-2026-05-15 21:41:47 [INFO] [Epoch 1/2, Step 1020/1794] LR: 0.000085, Loss: 0.8780
-2026-05-15 21:41:48 [INFO] [Epoch 1/2, Step 1030/1794] LR: 0.000084, Loss: 0.9956
-2026-05-15 21:41:48 [INFO] [Epoch 1/2, Step 1040/1794] LR: 0.000084, Loss: 0.5777
-2026-05-15 21:41:49 [INFO] [Epoch 1/2, Step 1050/1794] LR: 0.000083, Loss: 0.3414
-2026-05-15 21:41:49 [INFO] [Epoch 1/2, Step 1060/1794] LR: 0.000083, Loss: 0.6770
-2026-05-15 21:41:50 [INFO] [Epoch 1/2, Step 1070/1794] LR: 0.000083, Loss: 0.3499
-2026-05-15 21:41:50 [INFO] [Epoch 1/2, Step 1080/1794] LR: 0.000082, Loss: 0.2350
-2026-05-15 21:41:51 [INFO] [Epoch 1/2, Step 1090/1794] LR: 0.000082, Loss: 0.3666
-2026-05-15 21:41:51 [INFO] [Epoch 1/2, Step 1100/1794] LR: 0.000082, Loss: 0.5840
-2026-05-15 21:41:52 [INFO] [Epoch 1/2, Step 1110/1794] LR: 0.000081, Loss: 0.6245
-2026-05-15 21:41:52 [INFO] [Epoch 1/2, Step 1120/1794] LR: 0.000081, Loss: 0.5956
-2026-05-15 21:41:53 [INFO] [Epoch 1/2, Step 1130/1794] LR: 0.000081, Loss: 0.1235
-2026-05-15 21:41:54 [INFO] [Epoch 1/2, Step 1140/1794] LR: 0.000080, Loss: 0.1891
-2026-05-15 21:41:54 [INFO] [Epoch 1/2, Step 1150/1794] LR: 0.000080, Loss: 0.4188
-2026-05-15 21:41:55 [INFO] [Epoch 1/2, Step 1160/1794] LR: 0.000079, Loss: 0.0751
-2026-05-15 21:41:55 [INFO] [Epoch 1/2, Step 1170/1794] LR: 0.000079, Loss: 0.4550
-2026-05-15 21:41:56 [INFO] [Epoch 1/2, Step 1180/1794] LR: 0.000079, Loss: 0.5279
-2026-05-15 21:41:56 [INFO] [Epoch 1/2, Step 1190/1794] LR: 0.000078, Loss: 0.2572
-2026-05-15 21:41:57 [INFO] [Epoch 1/2, Step 1200/1794] LR: 0.000078, Loss: 0.9624
-2026-05-15 21:41:57 [INFO] [Epoch 1/2, Step 1210/1794] LR: 0.000078, Loss: 0.4356
-2026-05-15 21:41:58 [INFO] [Epoch 1/2, Step 1220/1794] LR: 0.000077, Loss: 0.1305
-2026-05-15 21:41:58 [INFO] [Epoch 1/2, Step 1230/1794] LR: 0.000077, Loss: 0.0690
-2026-05-15 21:41:59 [INFO] [Epoch 1/2, Step 1240/1794] LR: 0.000076, Loss: 0.2010
-2026-05-15 21:41:59 [INFO] [Epoch 1/2, Step 1250/1794] LR: 0.000076, Loss: 0.8517
-2026-05-15 21:42:00 [INFO] [Epoch 1/2, Step 1260/1794] LR: 0.000076, Loss: 0.1705
-2026-05-15 21:42:00 [INFO] [Epoch 1/2, Step 1270/1794] LR: 0.000075, Loss: 0.8618
-2026-05-15 21:42:01 [INFO] [Epoch 1/2, Step 1280/1794] LR: 0.000075, Loss: 0.3596
-2026-05-15 21:42:01 [INFO] [Epoch 1/2, Step 1290/1794] LR: 0.000074, Loss: 0.2135
-2026-05-15 21:42:02 [INFO] [Epoch 1/2, Step 1300/1794] LR: 0.000074, Loss: 0.1013
-2026-05-15 21:42:02 [INFO] [Epoch 1/2, Step 1310/1794] LR: 0.000074, Loss: 0.2392
-2026-05-15 21:42:03 [INFO] [Epoch 1/2, Step 1320/1794] LR: 0.000073, Loss: 0.2125
-2026-05-15 21:42:03 [INFO] [Epoch 1/2, Step 1330/1794] LR: 0.000073, Loss: 0.6525
-2026-05-15 21:42:04 [INFO] [Epoch 1/2, Step 1340/1794] LR: 0.000072, Loss: 0.7641
-2026-05-15 21:42:04 [INFO] [Epoch 1/2, Step 1350/1794] LR: 0.000072, Loss: 0.3308
-2026-05-15 21:42:05 [INFO] [Epoch 1/2, Step 1360/1794] LR: 0.000071, Loss: 0.6004
-2026-05-15 21:42:05 [INFO] [Epoch 1/2, Step 1370/1794] LR: 0.000071, Loss: 0.6063
-2026-05-15 21:42:06 [INFO] [Epoch 1/2, Step 1380/1794] LR: 0.000071, Loss: 0.5619
-2026-05-15 21:42:06 [INFO] [Epoch 1/2, Step 1390/1794] LR: 0.000070, Loss: 0.1106
-2026-05-15 21:42:07 [INFO] [Epoch 1/2, Step 1400/1794] LR: 0.000070, Loss: 0.7706
-2026-05-15 21:42:07 [INFO] [Epoch 1/2, Step 1410/1794] LR: 0.000069, Loss: 0.8052
-2026-05-15 21:42:08 [INFO] [Epoch 1/2, Step 1420/1794] LR: 0.000069, Loss: 0.0512
-2026-05-15 21:42:08 [INFO] [Epoch 1/2, Step 1430/1794] LR: 0.000068, Loss: 0.3990
-2026-05-15 21:42:09 [INFO] [Epoch 1/2, Step 1440/1794] LR: 0.000068, Loss: 0.8056
-2026-05-15 21:42:09 [INFO] [Epoch 1/2, Step 1450/1794] LR: 0.000068, Loss: 0.3479
-2026-05-15 21:42:10 [INFO] [Epoch 1/2, Step 1460/1794] LR: 0.000067, Loss: 0.3589
-2026-05-15 21:42:10 [INFO] [Epoch 1/2, Step 1470/1794] LR: 0.000067, Loss: 1.6948
-2026-05-15 21:42:11 [INFO] [Epoch 1/2, Step 1480/1794] LR: 0.000066, Loss: 0.7456
-2026-05-15 21:42:11 [INFO] [Epoch 1/2, Step 1490/1794] LR: 0.000066, Loss: 0.4041
-2026-05-15 21:42:12 [INFO] [Epoch 1/2, Step 1500/1794] LR: 0.000065, Loss: 0.2764
-2026-05-15 21:42:12 [INFO] [Epoch 1/2, Step 1510/1794] LR: 0.000065, Loss: 0.0675
-2026-05-15 21:42:13 [INFO] [Epoch 1/2, Step 1520/1794] LR: 0.000065, Loss: 0.1951
-2026-05-15 21:42:13 [INFO] [Epoch 1/2, Step 1530/1794] LR: 0.000064, Loss: 0.3156
-2026-05-15 21:42:14 [INFO] [Epoch 1/2, Step 1540/1794] LR: 0.000064, Loss: 0.6625
-2026-05-15 21:42:15 [INFO] [Epoch 1/2, Step 1550/1794] LR: 0.000063, Loss: 0.0712
-2026-05-15 21:42:15 [INFO] [Epoch 1/2, Step 1560/1794] LR: 0.000063, Loss: 0.1853
-2026-05-15 21:42:16 [INFO] [Epoch 1/2, Step 1570/1794] LR: 0.000062, Loss: 0.1329
-2026-05-15 21:42:16 [INFO] [Epoch 1/2, Step 1580/1794] LR: 0.000062, Loss: 1.9947
-2026-05-15 21:42:17 [INFO] [Epoch 1/2, Step 1590/1794] LR: 0.000061, Loss: 1.1370
-2026-05-15 21:42:17 [INFO] [Epoch 1/2, Step 1600/1794] LR: 0.000061, Loss: 0.3340
-2026-05-15 21:42:18 [INFO] [Epoch 1/2, Step 1610/1794] LR: 0.000061, Loss: 0.9324
-2026-05-15 21:42:18 [INFO] [Epoch 1/2, Step 1620/1794] LR: 0.000060, Loss: 0.2699
-2026-05-15 21:42:19 [INFO] [Epoch 1/2, Step 1630/1794] LR: 0.000060, Loss: 0.3760
-2026-05-15 21:42:19 [INFO] [Epoch 1/2, Step 1640/1794] LR: 0.000059, Loss: 0.4571
-2026-05-15 21:42:20 [INFO] [Epoch 1/2, Step 1650/1794] LR: 0.000059, Loss: 0.9502
-2026-05-15 21:42:20 [INFO] [Epoch 1/2, Step 1660/1794] LR: 0.000058, Loss: 0.6017
-2026-05-15 21:42:21 [INFO] [Epoch 1/2, Step 1670/1794] LR: 0.000058, Loss: 0.2305
-2026-05-15 21:42:21 [INFO] [Epoch 1/2, Step 1680/1794] LR: 0.000057, Loss: 2.7793
-2026-05-15 21:42:22 [INFO] [Epoch 1/2, Step 1690/1794] LR: 0.000057, Loss: 0.3284
-2026-05-15 21:42:22 [INFO] [Epoch 1/2, Step 1700/1794] LR: 0.000057, Loss: 0.3836
-2026-05-15 21:42:23 [INFO] [Epoch 1/2, Step 1710/1794] LR: 0.000056, Loss: 0.3774
-2026-05-15 21:42:23 [INFO] [Epoch 1/2, Step 1720/1794] LR: 0.000056, Loss: 0.2475
-2026-05-15 21:42:24 [INFO] [Epoch 1/2, Step 1730/1794] LR: 0.000055, Loss: 2.0099
-2026-05-15 21:42:24 [INFO] [Epoch 1/2, Step 1740/1794] LR: 0.000055, Loss: 2.0065
-2026-05-15 21:42:25 [INFO] [Epoch 1/2, Step 1750/1794] LR: 0.000054, Loss: 0.7834
-2026-05-15 21:42:25 [INFO] [Epoch 1/2, Step 1760/1794] LR: 0.000054, Loss: 0.1383
-2026-05-15 21:42:26 [INFO] [Epoch 1/2, Step 1770/1794] LR: 0.000053, Loss: 0.6199
-2026-05-15 21:42:26 [INFO] [Epoch 1/2, Step 1780/1794] LR: 0.000053, Loss: 0.4410
-2026-05-15 21:42:27 [INFO] [Epoch 1/2, Step 1790/1794] LR: 0.000052, Loss: 0.7222
-2026-05-15 21:42:40 [INFO] 
---- Epoch 1/2 Summary ---
-Validation Loss: 0.416737
-Epoch Time: 0:01:55
-
-2026-05-15 21:42:40 [INFO] Best model saved: finetuned/smoke_test_full_hpo\tokenizer\best_model (val loss: 0.416737)
-2026-05-15 21:42:40 [INFO] [Epoch 2/2, Step 1800/1794] LR: 0.000052, Loss: 0.2318
-2026-05-15 21:42:41 [INFO] [Epoch 2/2, Step 1810/1794] LR: 0.000052, Loss: 1.1494
-2026-05-15 21:42:41 [INFO] [Epoch 2/2, Step 1820/1794] LR: 0.000051, Loss: 0.5388
-2026-05-15 21:42:42 [INFO] [Epoch 2/2, Step 1830/1794] LR: 0.000051, Loss: 0.2261
-2026-05-15 21:42:42 [INFO] [Epoch 2/2, Step 1840/1794] LR: 0.000050, Loss: 0.1919
-2026-05-15 21:42:43 [INFO] [Epoch 2/2, Step 1850/1794] LR: 0.000050, Loss: 0.0320
-2026-05-15 21:42:43 [INFO] [Epoch 2/2, Step 1860/1794] LR: 0.000049, Loss: 0.0634
-2026-05-15 21:42:44 [INFO] [Epoch 2/2, Step 1870/1794] LR: 0.000049, Loss: 0.0711
-2026-05-15 21:42:44 [INFO] [Epoch 2/2, Step 1880/1794] LR: 0.000048, Loss: 0.3310
-2026-05-15 21:42:45 [INFO] [Epoch 2/2, Step 1890/1794] LR: 0.000048, Loss: 0.2815
-2026-05-15 21:42:45 [INFO] [Epoch 2/2, Step 1900/1794] LR: 0.000047, Loss: 0.0814
-2026-05-15 21:42:46 [INFO] [Epoch 2/2, Step 1910/1794] LR: 0.000047, Loss: 1.9446
-2026-05-15 21:42:46 [INFO] [Epoch 2/2, Step 1920/1794] LR: 0.000047, Loss: 0.4770
-2026-05-15 21:42:47 [INFO] [Epoch 2/2, Step 1930/1794] LR: 0.000046, Loss: 0.1961
-2026-05-15 21:42:47 [INFO] [Epoch 2/2, Step 1940/1794] LR: 0.000046, Loss: 0.7419
-2026-05-15 21:42:48 [INFO] [Epoch 2/2, Step 1950/1794] LR: 0.000045, Loss: 0.4748
-2026-05-15 21:42:48 [INFO] [Epoch 2/2, Step 1960/1794] LR: 0.000045, Loss: 0.5297
-2026-05-15 21:42:49 [INFO] [Epoch 2/2, Step 1970/1794] LR: 0.000044, Loss: 0.7692
-2026-05-15 21:42:49 [INFO] [Epoch 2/2, Step 1980/1794] LR: 0.000044, Loss: 0.4067
-2026-05-15 21:42:50 [INFO] [Epoch 2/2, Step 1990/1794] LR: 0.000043, Loss: 0.5611
-2026-05-15 21:42:50 [INFO] [Epoch 2/2, Step 2000/1794] LR: 0.000043, Loss: 1.0086
-2026-05-15 21:42:51 [INFO] [Epoch 2/2, Step 2010/1794] LR: 0.000042, Loss: 0.4568
-2026-05-15 21:42:51 [INFO] [Epoch 2/2, Step 2020/1794] LR: 0.000042, Loss: 0.4126
-2026-05-15 21:42:52 [INFO] [Epoch 2/2, Step 2030/1794] LR: 0.000042, Loss: 0.2150
-2026-05-15 21:42:52 [INFO] [Epoch 2/2, Step 2040/1794] LR: 0.000041, Loss: 0.3326
-2026-05-15 21:42:53 [INFO] [Epoch 2/2, Step 2050/1794] LR: 0.000041, Loss: 0.1433
-2026-05-15 21:42:53 [INFO] [Epoch 2/2, Step 2060/1794] LR: 0.000040, Loss: 0.7554
-2026-05-15 21:42:54 [INFO] [Epoch 2/2, Step 2070/1794] LR: 0.000040, Loss: 0.5539
-2026-05-15 21:42:54 [INFO] [Epoch 2/2, Step 2080/1794] LR: 0.000039, Loss: 0.0283
-2026-05-15 21:42:55 [INFO] [Epoch 2/2, Step 2090/1794] LR: 0.000039, Loss: 0.5014
-2026-05-15 21:42:55 [INFO] [Epoch 2/2, Step 2100/1794] LR: 0.000038, Loss: 1.1932
-2026-05-15 21:42:56 [INFO] [Epoch 2/2, Step 2110/1794] LR: 0.000038, Loss: 0.2107
-2026-05-15 21:42:57 [INFO] [Epoch 2/2, Step 2120/1794] LR: 0.000038, Loss: 1.0380
-2026-05-15 21:42:57 [INFO] [Epoch 2/2, Step 2130/1794] LR: 0.000037, Loss: 1.1829
-2026-05-15 21:42:58 [INFO] [Epoch 2/2, Step 2140/1794] LR: 0.000037, Loss: 0.1310
-2026-05-15 21:42:58 [INFO] [Epoch 2/2, Step 2150/1794] LR: 0.000036, Loss: 0.9582
-2026-05-15 21:42:59 [INFO] [Epoch 2/2, Step 2160/1794] LR: 0.000036, Loss: 0.2160
-2026-05-15 21:42:59 [INFO] [Epoch 2/2, Step 2170/1794] LR: 0.000035, Loss: 0.3350
-2026-05-15 21:43:00 [INFO] [Epoch 2/2, Step 2180/1794] LR: 0.000035, Loss: 0.1850
-2026-05-15 21:43:00 [INFO] [Epoch 2/2, Step 2190/1794] LR: 0.000035, Loss: 0.2518
-2026-05-15 21:43:01 [INFO] [Epoch 2/2, Step 2200/1794] LR: 0.000034, Loss: 0.1467
-2026-05-15 21:43:01 [INFO] [Epoch 2/2, Step 2210/1794] LR: 0.000034, Loss: 0.5146
-2026-05-15 21:43:02 [INFO] [Epoch 2/2, Step 2220/1794] LR: 0.000033, Loss: 0.3299
-2026-05-15 21:43:02 [INFO] [Epoch 2/2, Step 2230/1794] LR: 0.000033, Loss: 0.1376
-2026-05-15 21:43:03 [INFO] [Epoch 2/2, Step 2240/1794] LR: 0.000032, Loss: 0.3024
-2026-05-15 21:43:03 [INFO] [Epoch 2/2, Step 2250/1794] LR: 0.000032, Loss: 0.6334
-2026-05-15 21:43:04 [INFO] [Epoch 2/2, Step 2260/1794] LR: 0.000032, Loss: 0.1876
-2026-05-15 21:43:04 [INFO] [Epoch 2/2, Step 2270/1794] LR: 0.000031, Loss: 0.6306
-2026-05-15 21:43:05 [INFO] [Epoch 2/2, Step 2280/1794] LR: 0.000031, Loss: 0.4843
-2026-05-15 21:43:06 [INFO] [Epoch 2/2, Step 2290/1794] LR: 0.000030, Loss: 0.3089
-2026-05-15 21:43:06 [INFO] [Epoch 2/2, Step 2300/1794] LR: 0.000030, Loss: 0.1768
-2026-05-15 21:43:07 [INFO] [Epoch 2/2, Step 2310/1794] LR: 0.000030, Loss: 0.6731
-2026-05-15 21:43:07 [INFO] [Epoch 2/2, Step 2320/1794] LR: 0.000029, Loss: 0.4076
-2026-05-15 21:43:08 [INFO] [Epoch 2/2, Step 2330/1794] LR: 0.000029, Loss: 0.5024
-2026-05-15 21:43:08 [INFO] [Epoch 2/2, Step 2340/1794] LR: 0.000028, Loss: 0.1444
-2026-05-15 21:43:09 [INFO] [Epoch 2/2, Step 2350/1794] LR: 0.000028, Loss: 0.4710
-2026-05-15 21:43:09 [INFO] [Epoch 2/2, Step 2360/1794] LR: 0.000027, Loss: 0.1398
-2026-05-15 21:43:10 [INFO] [Epoch 2/2, Step 2370/1794] LR: 0.000027, Loss: 0.1770
-2026-05-15 21:43:10 [INFO] [Epoch 2/2, Step 2380/1794] LR: 0.000027, Loss: 0.2325
-2026-05-15 21:43:11 [INFO] [Epoch 2/2, Step 2390/1794] LR: 0.000026, Loss: 0.1824
-2026-05-15 21:43:11 [INFO] [Epoch 2/2, Step 2400/1794] LR: 0.000026, Loss: 0.4243
-2026-05-15 21:43:12 [INFO] [Epoch 2/2, Step 2410/1794] LR: 0.000025, Loss: 0.1152
-2026-05-15 21:43:12 [INFO] [Epoch 2/2, Step 2420/1794] LR: 0.000025, Loss: 0.2339
-2026-05-15 21:43:13 [INFO] [Epoch 2/2, Step 2430/1794] LR: 0.000025, Loss: 0.6044
-2026-05-15 21:43:13 [INFO] [Epoch 2/2, Step 2440/1794] LR: 0.000024, Loss: 0.5946
-2026-05-15 21:43:14 [INFO] [Epoch 2/2, Step 2450/1794] LR: 0.000024, Loss: 1.1153
-2026-05-15 21:43:14 [INFO] [Epoch 2/2, Step 2460/1794] LR: 0.000024, Loss: 0.0373
-2026-05-15 21:43:15 [INFO] [Epoch 2/2, Step 2470/1794] LR: 0.000023, Loss: 0.7118
-2026-05-15 21:43:15 [INFO] [Epoch 2/2, Step 2480/1794] LR: 0.000023, Loss: 0.3600
-2026-05-15 21:43:16 [INFO] [Epoch 2/2, Step 2490/1794] LR: 0.000022, Loss: 0.4604
-2026-05-15 21:43:16 [INFO] [Epoch 2/2, Step 2500/1794] LR: 0.000022, Loss: 1.3866
-2026-05-15 21:43:17 [INFO] [Epoch 2/2, Step 2510/1794] LR: 0.000022, Loss: 0.5305
-2026-05-15 21:43:18 [INFO] [Epoch 2/2, Step 2520/1794] LR: 0.000021, Loss: 0.2977
-2026-05-15 21:43:18 [INFO] [Epoch 2/2, Step 2530/1794] LR: 0.000021, Loss: 0.0576
-2026-05-15 21:43:19 [INFO] [Epoch 2/2, Step 2540/1794] LR: 0.000021, Loss: 0.2242
-2026-05-15 21:43:20 [INFO] [Epoch 2/2, Step 2550/1794] LR: 0.000020, Loss: 0.3800
-2026-05-15 21:43:20 [INFO] [Epoch 2/2, Step 2560/1794] LR: 0.000020, Loss: 0.0525
-2026-05-15 21:43:21 [INFO] [Epoch 2/2, Step 2570/1794] LR: 0.000019, Loss: 0.1171
-2026-05-15 21:43:21 [INFO] [Epoch 2/2, Step 2580/1794] LR: 0.000019, Loss: 0.9768
-2026-05-15 21:43:22 [INFO] [Epoch 2/2, Step 2590/1794] LR: 0.000019, Loss: 0.3202
-2026-05-15 21:43:22 [INFO] [Epoch 2/2, Step 2600/1794] LR: 0.000018, Loss: 2.2012
-2026-05-15 21:43:23 [INFO] [Epoch 2/2, Step 2610/1794] LR: 0.000018, Loss: 0.4861
-2026-05-15 21:43:23 [INFO] [Epoch 2/2, Step 2620/1794] LR: 0.000018, Loss: 1.1671
-2026-05-15 21:43:24 [INFO] [Epoch 2/2, Step 2630/1794] LR: 0.000017, Loss: 0.1209
-2026-05-15 21:43:24 [INFO] [Epoch 2/2, Step 2640/1794] LR: 0.000017, Loss: 0.0558
-2026-05-15 21:43:25 [INFO] [Epoch 2/2, Step 2650/1794] LR: 0.000017, Loss: 0.3452
-2026-05-15 21:43:25 [INFO] [Epoch 2/2, Step 2660/1794] LR: 0.000016, Loss: 0.4389
-2026-05-15 21:43:26 [INFO] [Epoch 2/2, Step 2670/1794] LR: 0.000016, Loss: 0.1484
-2026-05-15 21:43:26 [INFO] [Epoch 2/2, Step 2680/1794] LR: 0.000016, Loss: 0.2772
-2026-05-15 21:43:27 [INFO] [Epoch 2/2, Step 2690/1794] LR: 0.000015, Loss: 0.0829
-2026-05-15 21:43:27 [INFO] [Epoch 2/2, Step 2700/1794] LR: 0.000015, Loss: 0.4272
-2026-05-15 21:43:28 [INFO] [Epoch 2/2, Step 2710/1794] LR: 0.000015, Loss: 0.9020
-2026-05-15 21:43:28 [INFO] [Epoch 2/2, Step 2720/1794] LR: 0.000014, Loss: 0.3542
-2026-05-15 21:43:29 [INFO] [Epoch 2/2, Step 2730/1794] LR: 0.000014, Loss: 1.9191
-2026-05-15 21:43:30 [INFO] [Epoch 2/2, Step 2740/1794] LR: 0.000014, Loss: 1.6821
-2026-05-15 21:43:30 [INFO] [Epoch 2/2, Step 2750/1794] LR: 0.000013, Loss: 0.1932
-2026-05-15 21:43:31 [INFO] [Epoch 2/2, Step 2760/1794] LR: 0.000013, Loss: 0.1664
-2026-05-15 21:43:31 [INFO] [Epoch 2/2, Step 2770/1794] LR: 0.000013, Loss: 0.5260
-2026-05-15 21:43:32 [INFO] [Epoch 2/2, Step 2780/1794] LR: 0.000013, Loss: 0.3718
-2026-05-15 21:43:32 [INFO] [Epoch 2/2, Step 2790/1794] LR: 0.000012, Loss: 0.3926
-2026-05-15 21:43:33 [INFO] [Epoch 2/2, Step 2800/1794] LR: 0.000012, Loss: 0.1289
-2026-05-15 21:43:33 [INFO] [Epoch 2/2, Step 2810/1794] LR: 0.000012, Loss: 0.1799
-2026-05-15 21:43:34 [INFO] [Epoch 2/2, Step 2820/1794] LR: 0.000011, Loss: 0.6663
-2026-05-15 21:43:34 [INFO] [Epoch 2/2, Step 2830/1794] LR: 0.000011, Loss: 0.1717
-2026-05-15 21:43:35 [INFO] [Epoch 2/2, Step 2840/1794] LR: 0.000011, Loss: 0.4602
-2026-05-15 21:43:35 [INFO] [Epoch 2/2, Step 2850/1794] LR: 0.000011, Loss: 0.6861
-2026-05-15 21:43:36 [INFO] [Epoch 2/2, Step 2860/1794] LR: 0.000010, Loss: 0.2463
-2026-05-15 21:43:36 [INFO] [Epoch 2/2, Step 2870/1794] LR: 0.000010, Loss: 0.1948
-2026-05-15 21:43:37 [INFO] [Epoch 2/2, Step 2880/1794] LR: 0.000010, Loss: 0.8150
-2026-05-15 21:43:37 [INFO] [Epoch 2/2, Step 2890/1794] LR: 0.000009, Loss: 0.0595
-2026-05-15 21:43:38 [INFO] [Epoch 2/2, Step 2900/1794] LR: 0.000009, Loss: 0.7488
-2026-05-15 21:43:38 [INFO] [Epoch 2/2, Step 2910/1794] LR: 0.000009, Loss: 0.4902
-2026-05-15 21:43:39 [INFO] [Epoch 2/2, Step 2920/1794] LR: 0.000009, Loss: 0.0558
-2026-05-15 21:43:39 [INFO] [Epoch 2/2, Step 2930/1794] LR: 0.000008, Loss: 1.2533
-2026-05-15 21:43:40 [INFO] [Epoch 2/2, Step 2940/1794] LR: 0.000008, Loss: 1.2327
-2026-05-15 21:43:40 [INFO] [Epoch 2/2, Step 2950/1794] LR: 0.000008, Loss: 0.7448
-2026-05-15 21:43:41 [INFO] [Epoch 2/2, Step 2960/1794] LR: 0.000008, Loss: 0.7312
-2026-05-15 21:43:41 [INFO] [Epoch 2/2, Step 2970/1794] LR: 0.000007, Loss: 0.3513
-2026-05-15 21:43:42 [INFO] [Epoch 2/2, Step 2980/1794] LR: 0.000007, Loss: 0.3915
-2026-05-15 21:43:42 [INFO] [Epoch 2/2, Step 2990/1794] LR: 0.000007, Loss: 0.3130
-2026-05-15 21:43:43 [INFO] [Epoch 2/2, Step 3000/1794] LR: 0.000007, Loss: 0.2521
-2026-05-15 21:43:43 [INFO] [Epoch 2/2, Step 3010/1794] LR: 0.000007, Loss: 0.6075
-2026-05-15 21:43:44 [INFO] [Epoch 2/2, Step 3020/1794] LR: 0.000006, Loss: 0.7391
-2026-05-15 21:43:45 [INFO] [Epoch 2/2, Step 3030/1794] LR: 0.000006, Loss: 0.5915
-2026-05-15 21:43:45 [INFO] [Epoch 2/2, Step 3040/1794] LR: 0.000006, Loss: 0.4996
-2026-05-15 21:43:46 [INFO] [Epoch 2/2, Step 3050/1794] LR: 0.000006, Loss: 0.0864
-2026-05-15 21:43:46 [INFO] [Epoch 2/2, Step 3060/1794] LR: 0.000006, Loss: 0.3878
-2026-05-15 21:43:47 [INFO] [Epoch 2/2, Step 3070/1794] LR: 0.000005, Loss: 0.4578
-2026-05-15 21:43:47 [INFO] [Epoch 2/2, Step 3080/1794] LR: 0.000005, Loss: 0.3525
-2026-05-15 21:43:48 [INFO] [Epoch 2/2, Step 3090/1794] LR: 0.000005, Loss: 0.5483
-2026-05-15 21:43:48 [INFO] [Epoch 2/2, Step 3100/1794] LR: 0.000005, Loss: 0.1889
-2026-05-15 21:43:49 [INFO] [Epoch 2/2, Step 3110/1794] LR: 0.000005, Loss: 0.7412
-2026-05-15 21:43:49 [INFO] [Epoch 2/2, Step 3120/1794] LR: 0.000004, Loss: 0.7623
-2026-05-15 21:43:50 [INFO] [Epoch 2/2, Step 3130/1794] LR: 0.000004, Loss: 0.6740
-2026-05-15 21:43:50 [INFO] [Epoch 2/2, Step 3140/1794] LR: 0.000004, Loss: 0.3147
-2026-05-15 21:43:51 [INFO] [Epoch 2/2, Step 3150/1794] LR: 0.000004, Loss: 0.6153
-2026-05-15 21:43:51 [INFO] [Epoch 2/2, Step 3160/1794] LR: 0.000004, Loss: 0.2456
-2026-05-15 21:43:52 [INFO] [Epoch 2/2, Step 3170/1794] LR: 0.000003, Loss: 0.1917
-2026-05-15 21:43:52 [INFO] [Epoch 2/2, Step 3180/1794] LR: 0.000003, Loss: 0.0368
-2026-05-15 21:43:53 [INFO] [Epoch 2/2, Step 3190/1794] LR: 0.000003, Loss: 0.4084
-2026-05-15 21:43:53 [INFO] [Epoch 2/2, Step 3200/1794] LR: 0.000003, Loss: 0.0562
-2026-05-15 21:43:54 [INFO] [Epoch 2/2, Step 3210/1794] LR: 0.000003, Loss: 0.2346
-2026-05-15 21:43:54 [INFO] [Epoch 2/2, Step 3220/1794] LR: 0.000003, Loss: 0.9501
-2026-05-15 21:43:55 [INFO] [Epoch 2/2, Step 3230/1794] LR: 0.000003, Loss: 0.2933
-2026-05-15 21:43:56 [INFO] [Epoch 2/2, Step 3240/1794] LR: 0.000002, Loss: 0.2081
-2026-05-15 21:43:56 [INFO] [Epoch 2/2, Step 3250/1794] LR: 0.000002, Loss: 0.1389
-2026-05-15 21:43:57 [INFO] [Epoch 2/2, Step 3260/1794] LR: 0.000002, Loss: 0.0633
-2026-05-15 21:43:57 [INFO] [Epoch 2/2, Step 3270/1794] LR: 0.000002, Loss: 0.1165
-2026-05-15 21:43:58 [INFO] [Epoch 2/2, Step 3280/1794] LR: 0.000002, Loss: 0.1004
-2026-05-15 21:43:58 [INFO] [Epoch 2/2, Step 3290/1794] LR: 0.000002, Loss: 0.7955
-2026-05-15 21:43:59 [INFO] [Epoch 2/2, Step 3300/1794] LR: 0.000002, Loss: 0.4110
-2026-05-15 21:43:59 [INFO] [Epoch 2/2, Step 3310/1794] LR: 0.000002, Loss: 0.3762
-2026-05-15 21:44:00 [INFO] [Epoch 2/2, Step 3320/1794] LR: 0.000001, Loss: 0.0938
-2026-05-15 21:44:00 [INFO] [Epoch 2/2, Step 3330/1794] LR: 0.000001, Loss: 0.1018
-2026-05-15 21:44:01 [INFO] [Epoch 2/2, Step 3340/1794] LR: 0.000001, Loss: 0.3443
-2026-05-15 21:44:01 [INFO] [Epoch 2/2, Step 3350/1794] LR: 0.000001, Loss: 0.4096
-2026-05-15 21:44:02 [INFO] [Epoch 2/2, Step 3360/1794] LR: 0.000001, Loss: 0.3938
-2026-05-15 21:44:02 [INFO] [Epoch 2/2, Step 3370/1794] LR: 0.000001, Loss: 4.3789
-2026-05-15 21:44:03 [INFO] [Epoch 2/2, Step 3380/1794] LR: 0.000001, Loss: 0.2775
-2026-05-15 21:44:03 [INFO] [Epoch 2/2, Step 3390/1794] LR: 0.000001, Loss: 0.1829
-2026-05-15 21:44:04 [INFO] [Epoch 2/2, Step 3400/1794] LR: 0.000001, Loss: 4.5831
-2026-05-15 21:44:04 [INFO] [Epoch 2/2, Step 3410/1794] LR: 0.000001, Loss: 0.3400
-2026-05-15 21:44:05 [INFO] [Epoch 2/2, Step 3420/1794] LR: 0.000001, Loss: 0.4461
-2026-05-15 21:44:05 [INFO] [Epoch 2/2, Step 3430/1794] LR: 0.000000, Loss: 0.2138
-2026-05-15 21:44:06 [INFO] [Epoch 2/2, Step 3440/1794] LR: 0.000000, Loss: 0.4916
-2026-05-15 21:44:06 [INFO] [Epoch 2/2, Step 3450/1794] LR: 0.000000, Loss: 0.9511
-2026-05-15 21:44:07 [INFO] [Epoch 2/2, Step 3460/1794] LR: 0.000000, Loss: 0.0515
-2026-05-15 21:44:07 [INFO] [Epoch 2/2, Step 3470/1794] LR: 0.000000, Loss: 0.2127
-2026-05-15 21:44:08 [INFO] [Epoch 2/2, Step 3480/1794] LR: 0.000000, Loss: 0.5905
-2026-05-15 21:44:08 [INFO] [Epoch 2/2, Step 3490/1794] LR: 0.000000, Loss: 0.2647
-2026-05-15 21:44:09 [INFO] [Epoch 2/2, Step 3500/1794] LR: 0.000000, Loss: 0.1821
-2026-05-15 21:44:09 [INFO] [Epoch 2/2, Step 3510/1794] LR: 0.000000, Loss: 0.1969
-2026-05-15 21:44:10 [INFO] [Epoch 2/2, Step 3520/1794] LR: 0.000000, Loss: 0.8621
-2026-05-15 21:44:11 [INFO] [Epoch 2/2, Step 3530/1794] LR: 0.000000, Loss: 0.4778
-2026-05-15 21:44:11 [INFO] [Epoch 2/2, Step 3540/1794] LR: 0.000000, Loss: 0.3459
-2026-05-15 21:44:12 [INFO] [Epoch 2/2, Step 3550/1794] LR: 0.000000, Loss: 0.8007
-2026-05-15 21:44:12 [INFO] [Epoch 2/2, Step 3560/1794] LR: 0.000000, Loss: 0.5036
-2026-05-15 21:44:13 [INFO] [Epoch 2/2, Step 3570/1794] LR: 0.000000, Loss: 0.9126
-2026-05-15 21:44:13 [INFO] [Epoch 2/2, Step 3580/1794] LR: 0.000000, Loss: 0.4537
-2026-05-15 21:44:17 [INFO] 
---- Epoch 2/2 Summary ---
-Validation Loss: 0.390815
-Epoch Time: 0:01:37
-
-2026-05-15 21:44:17 [INFO] Best model saved: finetuned/smoke_test_full_hpo\tokenizer\best_model (val loss: 0.390815)
-
-```
-
----
-
-### `finetuned/smoke_test_full_hpo/tokenizer/best_model/config.json`
+### `finetuned/1d_t4_hpo/tokenizer/best_model/config.json`
 
 ```json
 {
@@ -2587,7 +2176,7 @@ Epoch Time: 0:01:37
 
 ---
 
-### `finetuned/smoke_test_full_hpo/tokenizer/best_model/model.safetensors`
+### `finetuned/1d_t4_hpo/tokenizer/best_model/model.safetensors`
 
 ```text
 [File too large to display: 15.1 MB]
@@ -2595,7 +2184,7 @@ Epoch Time: 0:01:37
 
 ---
 
-### `finetuned/smoke_test_full_hpo/tokenizer/best_model/README.md`
+### `finetuned/1d_t4_hpo/tokenizer/best_model/README.md`
 
 ```markdown
 ---
@@ -2608,6 +2197,14 @@ This model has been pushed to the Hub using the [PytorchModelHubMixin](https://h
 - Code: [More Information Needed]
 - Paper: [More Information Needed]
 - Docs: [More Information Needed]
+```
+
+---
+
+### `finetuned/tests/model.zip`
+
+```text
+[Binary file — content not displayed]
 ```
 
 ---
@@ -8961,6 +8558,501 @@ def main():
                 pass
         sys.exit(1)
 
+
+if __name__ == "__main__":
+    main()
+```
+
+---
+
+### `full_scale_backtest.py`
+
+```python
+import os
+import logging
+from typing import List, Dict, Any, Optional, Union
+import torch
+import pandas as pd
+import numpy as np
+from tqdm import tqdm
+
+from finetune_base_model import CustomFinetuneConfig
+from model import Nos, NosTokenizer, NosPredictor
+
+# =============================================================================
+# Constants & Configuration
+# =============================================================================
+
+CONFIG_PATH = "configs/config_t40_hpo_winner.yaml"  # Make sure this points to your active config
+RESULTS_DIR = "backtest_results"
+
+PRICE_COLS = frozenset(['open', 'high', 'low', 'close'])
+VOL_AMT_COLS = frozenset(['volume', 'amount'])
+
+class VerdictThresholds:
+    """Constants for signal verdict thresholds."""
+    ALPHA_EXCEPTIONAL = 57.0
+    ALPHA_STRONG = 55.0
+    ALPHA_BASE = 53.0
+    ALPHA_WEAK = 51.0
+    ALPHA_MARGINAL = 50.0
+
+    CORR_STRONG = 0.5
+    CORR_MODERATE = 0.3
+    CORR_WEAK = 0.1
+
+    EPSILON = 1e-10
+    DIR_MOVE_THRESHOLD = 0.0001
+
+# =============================================================================
+# Logging Setup
+# =============================================================================
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
+)
+logger = logging.getLogger("nos_backtest_engine")
+
+# =============================================================================
+# Utility Functions
+# =============================================================================
+
+def _sort_extra_cols(cols: List[str]) -> List[str]:
+    """Sort extra_* columns numerically when possible, alphabetically otherwise."""
+    def _sort_key(c: str) -> tuple:
+        try:
+            return (0, int(c.split('_')[1]))
+        except (ValueError, IndexError):
+            return (1, c)
+    return sorted(cols, key=_sort_key)
+
+
+def get_all_feature_cols(df: pd.DataFrame) -> List[str]:
+    """
+    Return the ordered list of all feature columns exactly as the model sees them.
+    """
+    base_cols = ['open', 'high', 'low', 'close', 'volume', 'amount']
+    extra_cols = [c for c in df.columns if c.startswith('extra_')]
+    extra_cols = _sort_extra_cols(extra_cols)
+    return base_cols + extra_cols
+
+
+def _get_column_category(col: str) -> str:
+    """Determine the logical category of a feature column."""
+    if col in PRICE_COLS:
+        return "PRICE"
+    elif col in VOL_AMT_COLS:
+        return "VOL/AMT"
+    elif col.startswith('extra_'):
+        return "EXTRA"
+    return "OTHER"
+
+
+def _get_column_verdict(acc: float, corr: float, category: str) -> str:
+    """Generate a categorical verdict string based on calculated metrics."""
+    if category in ("PRICE", "VOL/AMT"):
+        if np.isnan(acc):
+            if corr > VerdictThresholds.CORR_MODERATE:
+                return "🟡 CORRELATION SIGNAL"
+            return "⚪ INSUFFICIENT DATA"
+            
+        if acc > VerdictThresholds.ALPHA_EXCEPTIONAL:
+            return "🟢🟢 EXCEPTIONAL ALPHA"
+        elif acc > VerdictThresholds.ALPHA_STRONG:
+            return "🟢 STRONG ALPHA"
+        elif acc > VerdictThresholds.ALPHA_BASE:
+            return "🟢 MODEL HAS ALPHA"
+        elif acc > VerdictThresholds.ALPHA_WEAK:
+            return "🟡 WEAK SIGNAL"
+        elif acc > VerdictThresholds.ALPHA_MARGINAL:
+            return "🟡 MARGINAL"
+        return "🔴 NO SIGNAL"
+    else:
+        if np.isnan(acc):
+            if corr > VerdictThresholds.CORR_STRONG:
+                return "🟢 STRONG CORRELATION"
+            elif corr > VerdictThresholds.CORR_MODERATE:
+                return "🟡 MODERATE CORRELATION"
+            elif corr > VerdictThresholds.CORR_WEAK:
+                return "🟡 WEAK CORRELATION"
+            return "🔴 NO CORRELATION"
+            
+        if acc > VerdictThresholds.ALPHA_STRONG and corr > VerdictThresholds.CORR_MODERATE:
+            return "🟢🟢 EXCEPTIONAL (DIR+CORR)"
+        elif acc > VerdictThresholds.ALPHA_BASE:
+            return "🟢 STRONG SIGNAL"
+        elif acc > VerdictThresholds.ALPHA_WEAK:
+            return "🟡 WEAK SIGNAL"
+        elif acc > VerdictThresholds.ALPHA_MARGINAL:
+            return "🟡 MARGINAL"
+        return "🔴 NO SIGNAL"
+
+# =============================================================================
+# Mathematical & Metrics Engine
+# =============================================================================
+
+class MetricsCalculator:
+    """Encapsulates statistical operations for evaluating model predictions."""
+
+    @staticmethod
+    def compute_rmse(pred: np.ndarray, true: np.ndarray) -> float:
+        return float(np.sqrt(np.mean((pred - true) ** 2)))
+
+    @staticmethod
+    def compute_mape(pred: np.ndarray, true: np.ndarray) -> float:
+        denom = np.abs(true) + VerdictThresholds.EPSILON
+        return float(np.mean(np.abs((pred - true) / denom)) * 100)
+
+    @staticmethod
+    def compute_r2(pred: np.ndarray, true: np.ndarray) -> float:
+        ss_res = np.sum((pred - true) ** 2)
+        ss_tot = np.sum((true - np.mean(true)) ** 2)
+        return float(1.0 - (ss_res / (ss_tot + VerdictThresholds.EPSILON))) if ss_tot > VerdictThresholds.EPSILON else 0.0
+
+    @staticmethod
+    def compute_vectorized_path_accuracy(pred: np.ndarray, true: np.ndarray, initial_price: float) -> float:
+        """Vectorized approach to calculate full-path directional accuracy."""
+        if len(pred) < 1:
+            return np.nan
+
+        shifted_true = np.roll(true, 1)
+        shifted_true[0] = initial_price
+
+        t_moves = true - shifted_true
+        p_moves = pred - shifted_true
+
+        valid_mask = (np.abs(t_moves) / (np.abs(shifted_true) + VerdictThresholds.EPSILON)) > VerdictThresholds.DIR_MOVE_THRESHOLD
+        
+        if not np.any(valid_mask):
+            return np.nan
+
+        correct_dir = np.sign(p_moves[valid_mask]) == np.sign(t_moves[valid_mask])
+        return float(np.mean(correct_dir))
+
+def compute_metrics_all_columns(task: Dict[str, Any], pred_df: pd.DataFrame, feature_cols: List[str]) -> Optional[Dict[str, Any]]:
+    """
+    Compute directional accuracy, correlation, RMSE, MAPE for EVERY column.
+    """
+    truth_df = task['truth']
+    min_len = min(len(pred_df), len(truth_df))
+    
+    if min_len == 0:
+        return None
+
+    available_cols = [c for c in feature_cols if c in pred_df.columns and c in truth_df.columns]
+    if not available_cols:
+        return None
+
+    result = {
+        'start_time': task['y_ts'].iloc[0] if not task['y_ts'].empty else None,
+        'end_time': task['y_ts'].iloc[-1] if not task['y_ts'].empty else None,
+    }
+
+    col_corrs, col_rmses, col_mapes, col_accs = [], [], [], []
+
+    for col in available_cols:
+        pred_vals = pred_df[col].values[:min_len]
+        true_vals = truth_df[col].values[:min_len]
+        last_price = task['context'][col].iloc[-1] if col in task['context'].columns else None
+
+        # Base error metrics
+        rmse = MetricsCalculator.compute_rmse(pred_vals, true_vals)
+        mape = MetricsCalculator.compute_mape(pred_vals, true_vals)
+        mae = float(np.mean(np.abs(pred_vals - true_vals)))
+        r_squared = MetricsCalculator.compute_r2(pred_vals, true_vals)
+        
+        mean_true = np.mean(np.abs(true_vals)) + VerdictThresholds.EPSILON
+        nrmse = (rmse / mean_true) * 100
+
+        # Correlation
+        if min_len < 2 or np.std(pred_vals) < VerdictThresholds.EPSILON or np.std(true_vals) < VerdictThresholds.EPSILON:
+            corr = 0.0
+        else:
+            corr = np.corrcoef(pred_vals, true_vals)[0, 1]
+            if np.isnan(corr): corr = 0.0
+
+        # Directional Accuracy (T+1 and Path)
+        correct_dir = None
+        path_acc = np.nan
+        
+        if last_price is not None and not np.isnan(last_price):
+            pred_move = pred_vals[0] - last_price
+            true_move = true_vals[0] - last_price
+            
+            if abs(true_move) / (abs(last_price) + VerdictThresholds.EPSILON) > VerdictThresholds.DIR_MOVE_THRESHOLD:
+                correct_dir = 1 if (np.sign(pred_move) == np.sign(true_move)) else 0
+
+            if min_len > 1:
+                path_acc = MetricsCalculator.compute_vectorized_path_accuracy(pred_vals, true_vals, last_price)
+
+        # Build column results
+        result.update({
+            f'{col}_corr': corr,
+            f'{col}_rmse': rmse,
+            f'{col}_nrmse': nrmse,
+            f'{col}_mape': mape,
+            f'{col}_mae': mae,
+            f'{col}_r2': r_squared,
+            f'{col}_path_acc': path_acc,
+            f'{col}_last_price': float(last_price) if last_price is not None else np.nan,
+            f'{col}_pred_t1': float(pred_vals[0]),
+            f'{col}_true_t1': float(true_vals[0])
+        })
+
+        if correct_dir is not None:
+            result[f'{col}_acc'] = correct_dir
+            col_accs.append(correct_dir)
+
+        col_corrs.append(corr)
+        col_rmses.append(rmse)
+        col_mapes.append(mape)
+
+    # Global Aggregates
+    result['avg_corr_all'] = np.mean(col_corrs) if col_corrs else 0.0
+    result['avg_rmse_all'] = np.mean(col_rmses) if col_rmses else 0.0
+    result['avg_mape_all'] = np.mean(col_mapes) if col_mapes else 0.0
+    result['avg_acc_all'] = np.mean(col_accs) if col_accs else np.nan
+
+    # Group Aggregates (PRICE vs VOL/AMT)
+    price_accs = [result[f'{c}_acc'] for c in PRICE_COLS if f'{c}_acc' in result]
+    result['avg_acc_price'] = np.mean(price_accs) if price_accs else np.nan
+
+    va_accs = [result[f'{c}_acc'] for c in VOL_AMT_COLS if f'{c}_acc' in result]
+    result['avg_acc_va'] = np.mean(va_accs) if va_accs else np.nan
+
+    return result
+
+# =============================================================================
+# Reporting & I/O Engine
+# =============================================================================
+
+class DataExporter:
+    """Handles writing backtest results to disk efficiently."""
+    
+    @staticmethod
+    def save_results(df_res: pd.DataFrame, col_summary_rows: List[Dict[str, Any]], feature_cols: List[str]) -> None:
+        os.makedirs(RESULTS_DIR, exist_ok=True)
+        try:
+            full_path = os.path.join(RESULTS_DIR, "backtest_results_full.csv")
+            df_res.to_csv(full_path, index=False)
+            logger.info(f"Saved full results: {full_path}")
+
+            if col_summary_rows:
+                summary_path = os.path.join(RESULTS_DIR, "backtest_column_summary.csv")
+                pd.DataFrame(col_summary_rows).to_csv(summary_path, index=False)
+                logger.info(f"Saved column summary: {summary_path}")
+
+            if len(df_res) > 20:
+                rolling_path = os.path.join(RESULTS_DIR, "backtest_rolling_accuracy.csv")
+                DataExporter._save_rolling_metrics(df_res, feature_cols, rolling_path)
+
+            deepdive_dir = os.path.join(RESULTS_DIR, "column_deep_dives")
+            os.makedirs(deepdive_dir, exist_ok=True)
+            for col in feature_cols:
+                col_keys = [k for k in df_res.columns if k.startswith(f'{col}_')]
+                if col_keys:
+                    col_df = df_res[['start_time', 'end_time'] + col_keys]
+                    col_df.to_csv(os.path.join(deepdive_dir, f"deepdive_{col}.csv"), index=False)
+            
+        except OSError as e:
+            logger.exception(f"I/O Error while saving results: {e}")
+
+    @staticmethod
+    def _save_rolling_metrics(df_res: pd.DataFrame, feature_cols: List[str], target_path: str) -> None:
+        rolling_df = pd.DataFrame()
+        rolling_df['start_time'] = df_res['start_time']
+        
+        # Calculate dynamic window and strictly enforce min_periods <= window_size
+        window_size = max(1, min(50, len(df_res) // 4))
+        min_periods = min(window_size, max(1, window_size // 2))
+
+        for col in feature_cols:
+            acc_key, corr_key = f'{col}_acc', f'{col}_corr'
+            if acc_key in df_res.columns:
+                rolling_df[f'{col}_rolling_acc'] = df_res[acc_key].rolling(
+                    window=window_size, min_periods=min_periods).mean() * 100
+            if corr_key in df_res.columns:
+                rolling_df[f'{col}_rolling_corr'] = df_res[corr_key].rolling(
+                    window=window_size, min_periods=min_periods).mean()
+
+        rolling_df.to_csv(target_path, index=False)
+
+
+class ReportingEngine:
+    """Manages the generation of terminal output and metrics summarization."""
+    
+    @staticmethod
+    def print_detailed_report(results: List[Dict[str, Any]], feature_cols: List[str]) -> None:
+        if not results:
+            logger.warning("No results generated to report.")
+            return
+
+        df_res = pd.DataFrame(results)
+        logger.info(f"Generated {len(results)} samples across {len(feature_cols)} feature columns.")
+        
+        col_summary_rows = []
+
+        # ── 1. Print Detailed Column-by-Column Deep Dives ──
+        for idx, col in enumerate(feature_cols):
+            corr_key, acc_key = f'{col}_corr', f'{col}_acc'
+            if corr_key not in df_res.columns:
+                continue
+                
+            cat = _get_column_category(col)
+            corr_vals = df_res[corr_key].dropna()
+            acc_vals = df_res[acc_key].dropna() if acc_key in df_res.columns else pd.Series(dtype=float)
+
+            mean_corr = corr_vals.mean() if not corr_vals.empty else 0.0
+            mean_acc = acc_vals.mean() * 100 if not acc_vals.empty else np.nan
+            verdict = _get_column_verdict(mean_acc, mean_corr, cat)
+            
+            # Print the deep dive log
+            logger.info(f"[{idx + 1}/{len(feature_cols)}] DEEP DIVE: {col.upper():<8} ({cat:<8}) - Accuracy: {mean_acc:>6.2f}% | Verdict: {verdict}")
+
+            col_summary_rows.append({
+                'column': col,
+                'category': cat,
+                'accuracy_%': mean_acc,
+                'mean_corr': mean_corr,
+                'n_samples': len(corr_vals),
+                'n_directional': len(acc_vals),
+                'verdict': verdict,
+            })
+
+        # ── 2. Print Summary Table ──
+        logger.info("=" * 85)
+        logger.info(f"{'COLUMN':<15} | {'CATEGORY':<10} | {'DIR. ACCURACY':<15} | {'CORRELATION':<12} | {'VERDICT'}")
+        logger.info("-" * 85)
+        
+        for row in col_summary_rows:
+            acc_str = f"{row['accuracy_%']:.2f}%" if not np.isnan(row['accuracy_%']) else "N/A"
+            corr_str = f"{row['mean_corr']:.4f}"
+            
+            logger.info(f"{row['column'].upper():<15} | {row['category']:<10} | {acc_str:<15} | {corr_str:<12} | {row['verdict']}")
+        logger.info("=" * 85)
+
+        # ── 3. Print Category Aggregates ──
+        overall_acc = df_res['avg_acc_all'].mean() * 100 if 'avg_acc_all' in df_res.columns else np.nan
+        price_acc = df_res['avg_acc_price'].mean() * 100 if 'avg_acc_price' in df_res.columns else np.nan
+        va_acc = df_res['avg_acc_va'].mean() * 100 if 'avg_acc_va' in df_res.columns else np.nan
+
+        logger.info("--- CATEGORY AGGREGATES ---")
+        logger.info(f"Avg Accuracy [ALL COLUMNS]:   {overall_acc:.2f}%" if not np.isnan(overall_acc) else "Avg Accuracy [ALL COLUMNS]:   N/A")
+        logger.info(f"Avg Accuracy [PRICE ONLY]:    {price_acc:.2f}%" if not np.isnan(price_acc) else "Avg Accuracy [PRICE ONLY]:    N/A")
+        logger.info(f"Avg Accuracy [VOL/AMT ONLY]:  {va_acc:.2f}%" if not np.isnan(va_acc) else "Avg Accuracy [VOL/AMT ONLY]:  N/A")
+        logger.info("=====================================================================================")
+
+        DataExporter.save_results(df_res, col_summary_rows, feature_cols)
+
+# =============================================================================
+# Main Execution
+# =============================================================================
+
+def main() -> None:
+    logger.info("Initializing Nos FULL-SCALE INSTITUTIONAL MULTI-COLUMN BACKTEST")
+
+    if not os.path.exists(CONFIG_PATH):
+        logger.error(f"Config not found: {CONFIG_PATH}")
+        return
+
+    config = CustomFinetuneConfig(CONFIG_PATH)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
+    logger.info(f"Loaded config parameters: Lookback={config.lookback_window}, Forecast={config.predict_window}, BatchSize={config.batch_size}, Device={device}")
+
+    try:
+        tokenizer_path = config.finetuned_tokenizer_path if os.path.exists(config.finetuned_tokenizer_path) else config.tokenizer_best_model_path
+        tokenizer = NosTokenizer.from_pretrained(tokenizer_path)
+        model = Nos.from_pretrained(config.basemodel_best_model_path).to(device)
+
+        predictor = NosPredictor(
+            model=model,
+            tokenizer=tokenizer,
+            device=str(device),
+            max_context=config.max_context,
+            clip=config.clip
+        )
+        logger.info("Models loaded successfully.")
+    except Exception as e:
+        logger.exception("Failed to load models.")
+        return
+
+    logger.info(f"Loading dataset from: {config.data_path}")
+    full_df = pd.read_csv(config.data_path)
+    full_df['timestamps'] = pd.to_datetime(full_df['timestamps'])
+
+    if 'volume' not in full_df.columns:
+        full_df['volume'] = 0.0
+    if 'amount' not in full_df.columns:
+        full_df['amount'] = full_df['volume'] * full_df[['open', 'high', 'low', 'close']].mean(axis=1) if 'volume' in full_df.columns else 0.0
+
+    feature_cols = get_all_feature_cols(full_df)
+    
+    if len(feature_cols) != tokenizer.d_in:
+        logger.error(f"FATAL: Tokenizer expects {tokenizer.d_in} features, found {len(feature_cols)}. Exiting.")
+        return
+
+    train_end = int(len(full_df) * config.train_ratio)
+    val_df = full_df.iloc[train_end:].reset_index(drop=True)
+    val_df[feature_cols] = val_df[feature_cols].ffill().fillna(0.0)
+
+    logger.info("Generating backtest windows...")
+    tasks = []
+    max_start = len(val_df) - config.lookback_window - config.predict_window
+
+    for start_idx in range(0, max_start + 1, config.predict_window):
+        hist_end = start_idx + config.lookback_window
+        future_end = hist_end + config.predict_window
+
+        ctx = val_df.iloc[start_idx:hist_end].copy().reset_index(drop=True)
+        tgt = val_df.iloc[hist_end:future_end].copy().reset_index(drop=True)
+
+        if len(ctx) == config.lookback_window and len(tgt) == config.predict_window:
+            tasks.append({
+                'context': ctx,
+                'x_ts': ctx['timestamps'].reset_index(drop=True),
+                'y_ts': tgt['timestamps'].reset_index(drop=True),
+                'truth': tgt,
+            })
+
+    if not tasks:
+        logger.warning("No scenarios generated. Exiting.")
+        return
+
+    logger.info(f"Running inference on {len(tasks)} tasks.")
+    results, errors = [], 0
+
+    for i in tqdm(range(0, len(tasks), config.batch_size), desc="Backtesting"):
+        batch_tasks = tasks[i: i + config.batch_size]
+        
+        try:
+            preds_batch = predictor.predict_batch(
+                df_list=[t['context'] for t in batch_tasks],
+                x_timestamp_list=[t['x_ts'] for t in batch_tasks],
+                y_timestamp_list=[t['y_ts'] for t in batch_tasks],
+                pred_len=config.predict_window,
+                T=0.01, top_k=0, top_p=0.99, sample_count=1, verbose=False
+            )
+
+            for j, pred_df in enumerate(preds_batch):
+                try:
+                    res = compute_metrics_all_columns(batch_tasks[j], pred_df, feature_cols)
+                    if res: results.append(res)
+                except ValueError as ve:
+                    errors += 1
+                    if errors <= 5: logger.exception(f"Metric calculation error in task {i + j}: {ve}")
+                    
+        except RuntimeError as re:
+            errors += 1
+            if errors <= 5: logger.exception(f"Batch prediction error at index {i}: {re}")
+
+    if errors > 0:
+        logger.warning(f"Encountered {errors} total errors during prediction pipeline.")
+
+    logger.info("Generating reports...")
+    ReportingEngine.print_detailed_report(results, feature_cols)
 
 if __name__ == "__main__":
     main()

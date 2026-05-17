@@ -293,8 +293,10 @@ class DataExporter:
     def _save_rolling_metrics(df_res: pd.DataFrame, feature_cols: List[str], target_path: str) -> None:
         rolling_df = pd.DataFrame()
         rolling_df['start_time'] = df_res['start_time']
-        window_size = min(50, len(df_res) // 4)
-        min_periods = max(10, window_size // 2)
+        
+        # Calculate dynamic window and strictly enforce min_periods <= window_size
+        window_size = max(1, min(50, len(df_res) // 4))
+        min_periods = min(window_size, max(1, window_size // 2))
 
         for col in feature_cols:
             acc_key, corr_key = f'{col}_acc', f'{col}_corr'

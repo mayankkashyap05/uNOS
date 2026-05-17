@@ -1,3 +1,4 @@
+- backtest_results/
 - configs/
 - data/1d.csv
 - finetuned/
@@ -11,6 +12,7 @@
 - finetune_base_model.py
 - finetune_tokenizer.py
 - train_sequential.py
+- full_scale_backtest.py
 - requirements.txt
 - CLAUDE.md
 

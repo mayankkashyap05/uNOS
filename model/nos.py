@@ -507,10 +507,16 @@ class NosPredictor:
         x_time_df = calc_time_stamps(x_timestamp)
         y_time_df = calc_time_stamps(y_timestamp)
 
-        # ── PROFESSIONAL UPGRADE: Store last absolute price & convert to Log Returns ──
-        last_abs_prices = df[self.price_cols].iloc[-1].values
+        # ── CAPTURE LAST ABSOLUTE CLOSE BEFORE MUTATING ──
+        last_abs_close = df['close'].iloc[-1]
 
-        df[self.price_cols] = np.log(df[self.price_cols] / df[self.price_cols].shift(1))
+        # ── LEAK-FREE STRUCTURAL RETURNS ──
+        abs_open = df['open'].copy()
+        df['open'] = np.log(df['open'] / df['close'].shift(1))
+        df['high'] = np.log(df['high'] / abs_open)
+        df['low'] = np.log(df['low'] / abs_open)
+        df['close'] = np.log(df['close'] / abs_open)
+        
         df[self.price_cols] = df[self.price_cols].replace([np.inf, -np.inf], np.nan).fillna(0.0)
 
         x = df[self.price_cols + [self.vol_col, self.amt_vol]].values.astype(np.float32)
@@ -528,25 +534,39 @@ class NosPredictor:
         y_stamp = y_stamp[np.newaxis, :]
 
         preds = self.generate(x, x_stamp, y_stamp, pred_len, T, top_k, top_p, sample_count, verbose)
-
         preds = preds.squeeze(0)
 
-        # Un-normalize Z-score (these are now predicted Log Returns)
+        # Un-normalize Z-score (these are now predicted Structural Log Returns)
         preds = preds * (x_std + 1e-5) + x_mean
 
-        # ── PROFESSIONAL UPGRADE: Reconstruct absolute prices ──
-        num_price_cols = len(self.price_cols)
-        pred_log_returns = preds[:, :num_price_cols]
+        # ── COMPLEX INTRA-BAR RECONSTRUCTION ──
+        pred_open_ret = preds[:, 0]
+        pred_high_ret = preds[:, 1]
+        pred_low_ret = preds[:, 2]
+        pred_close_ret = preds[:, 3]
 
-        # Formula: P_t = P_0 * exp(cumsum(R_log))
-        cum_log_returns = np.cumsum(pred_log_returns, axis=0)
-        pred_abs_prices = last_abs_prices * np.exp(cum_log_returns)
+        # 1. Absolute Close is the cumulative sum of (Open_Ret + Close_Ret)
+        cum_close_returns = np.cumsum(pred_open_ret + pred_close_ret, axis=0)
+        pred_abs_close = last_abs_close * np.exp(cum_close_returns)
 
-        # Overwrite the log return columns with the newly reconstructed absolute prices
-        preds[:, :num_price_cols] = pred_abs_prices
+        # 2. Absolute Open is Previous_Close * exp(Open_Ret)
+        shifted_close = np.roll(pred_abs_close, 1)
+        shifted_close[0] = last_abs_close
+        pred_abs_open = shifted_close * np.exp(pred_open_ret)
+
+        # 3. Absolute High/Low are Open * exp(High/Low_Ret)
+        pred_abs_high = pred_abs_open * np.exp(pred_high_ret)
+        pred_abs_low = pred_abs_open * np.exp(pred_low_ret)
+
+        # Overwrite log returns with absolute prices
+        preds[:, 0] = pred_abs_open
+        preds[:, 1] = pred_abs_high
+        preds[:, 2] = pred_abs_low
+        preds[:, 3] = pred_abs_close
 
         pred_df = pd.DataFrame(preds, columns=self.price_cols + [self.vol_col, self.amt_vol], index=y_timestamp)
         return pred_df
+
 
     def predict_batch(self, df_list, x_timestamp_list, y_timestamp_list, pred_len, T=1.0, top_k=0, top_p=0.9, sample_count=1, verbose=True):
         if not isinstance(df_list, (list, tuple)) or not isinstance(x_timestamp_list, (list, tuple)) or not isinstance(y_timestamp_list, (list, tuple)):
@@ -556,33 +576,18 @@ class NosPredictor:
 
         num_series = len(df_list)
 
-        x_list = []
-        x_stamp_list = []
-        y_stamp_list = []
-        means = []
-        stds = []
-        seq_lens = []
-        y_lens = []
-
-        # ── Store last absolute prices for the entire batch ──
-        last_abs_prices_list = []
+        x_list, x_stamp_list, y_stamp_list = [], [], []
+        means, stds, seq_lens, y_lens = [], [], [], []
+        last_abs_close_list = []
 
         for i in range(num_series):
-            df = df_list[i]
-            if not isinstance(df, pd.DataFrame):
-                raise ValueError(f"Input at index {i} is not a pandas DataFrame.")
-            if not all(col in df.columns for col in self.price_cols):
-                raise ValueError(f"DataFrame at index {i} is missing price columns {self.price_cols}.")
-
-            df = df.copy()
+            df = df_list[i].copy()
+            
             if self.vol_col not in df.columns:
                 df[self.vol_col] = 0.0
                 df[self.amt_vol] = 0.0
             if self.amt_vol not in df.columns and self.vol_col in df.columns:
                 df[self.amt_vol] = df[self.vol_col] * df[self.price_cols].mean(axis=1)
-
-            if df[self.price_cols + [self.vol_col, self.amt_vol]].isnull().values.any():
-                raise ValueError(f"DataFrame at index {i} contains NaN values in price or volume columns.")
 
             x_timestamp = x_timestamp_list[i]
             y_timestamp = y_timestamp_list[i]
@@ -590,20 +595,21 @@ class NosPredictor:
             x_time_df = calc_time_stamps(x_timestamp)
             y_time_df = calc_time_stamps(y_timestamp)
 
-            # ── Capture absolute price, then convert dataframe to Log Returns ──
-            last_abs_prices_list.append(df[self.price_cols].iloc[-1].values)
+            # ── CAPTURE LAST ABSOLUTE CLOSE BEFORE MUTATING ──
+            last_abs_close_list.append(df['close'].iloc[-1])
 
-            df[self.price_cols] = np.log(df[self.price_cols] / df[self.price_cols].shift(1))
+            # ── LEAK-FREE STRUCTURAL RETURNS ──
+            abs_open = df['open'].copy()
+            df['open'] = np.log(df['open'] / df['close'].shift(1))
+            df['high'] = np.log(df['high'] / abs_open)
+            df['low'] = np.log(df['low'] / abs_open)
+            df['close'] = np.log(df['close'] / abs_open)
+            
             df[self.price_cols] = df[self.price_cols].replace([np.inf, -np.inf], np.nan).fillna(0.0)
 
             x = df[self.price_cols + [self.vol_col, self.amt_vol]].values.astype(np.float32)
             x_stamp = x_time_df.values.astype(np.float32)
             y_stamp = y_time_df.values.astype(np.float32)
-
-            if x.shape[0] != x_stamp.shape[0]:
-                raise ValueError(f"Inconsistent lengths at index {i}: x has {x.shape[0]} vs x_stamp has {x_stamp.shape[0]}.")
-            if y_stamp.shape[0] != pred_len:
-                raise ValueError(f"y_timestamp length at index {i} should equal pred_len={pred_len}, got {y_stamp.shape[0]}.")
 
             recent_x = x[-self.max_context:] if x.shape[0] > self.max_context else x
             x_mean, x_std = np.mean(recent_x, axis=0), np.std(recent_x, axis=0)
@@ -620,11 +626,6 @@ class NosPredictor:
             seq_lens.append(x_norm.shape[0])
             y_lens.append(y_stamp.shape[0])
 
-        if len(set(seq_lens)) != 1:
-            raise ValueError(f"Parallel prediction requires all series to have consistent historical lengths, got: {seq_lens}")
-        if len(set(y_lens)) != 1:
-            raise ValueError(f"Parallel prediction requires all series to have consistent prediction lengths, got: {y_lens}")
-
         x_batch = np.stack(x_list, axis=0).astype(np.float32)
         x_stamp_batch = np.stack(x_stamp_list, axis=0).astype(np.float32)
         y_stamp_batch = np.stack(y_stamp_list, axis=0).astype(np.float32)
@@ -632,21 +633,38 @@ class NosPredictor:
         preds = self.generate(x_batch, x_stamp_batch, y_stamp_batch, pred_len, T, top_k, top_p, sample_count, verbose)
 
         pred_dfs = []
-        num_price_cols = len(self.price_cols)
-
         for i in range(num_series):
-            # Un-normalize Z-score (Log Returns)
+            # Un-normalize Z-score
             preds_i = preds[i] * (stds[i] + 1e-5) + means[i]
 
-            # ── Reconstruct absolute prices for this specific batch item ──
-            pred_log_returns = preds_i[:, :num_price_cols]
-            cum_log_returns = np.cumsum(pred_log_returns, axis=0)
-            pred_abs_prices = last_abs_prices_list[i] * np.exp(cum_log_returns)
+            # ── COMPLEX INTRA-BAR RECONSTRUCTION ──
+            pred_open_ret = preds_i[:, 0]
+            pred_high_ret = preds_i[:, 1]
+            pred_low_ret = preds_i[:, 2]
+            pred_close_ret = preds_i[:, 3]
 
-            preds_i[:, :num_price_cols] = pred_abs_prices
+            last_close = last_abs_close_list[i]
+
+            # 1. Absolute Close
+            cum_close_returns = np.cumsum(pred_open_ret + pred_close_ret, axis=0)
+            pred_abs_close = last_close * np.exp(cum_close_returns)
+
+            # 2. Absolute Open
+            shifted_close = np.roll(pred_abs_close, 1)
+            shifted_close[0] = last_close
+            pred_abs_open = shifted_close * np.exp(pred_open_ret)
+
+            # 3. Absolute High/Low
+            pred_abs_high = pred_abs_open * np.exp(pred_high_ret)
+            pred_abs_low = pred_abs_open * np.exp(pred_low_ret)
+
+            # Overwrite log returns with absolute prices
+            preds_i[:, 0] = pred_abs_open
+            preds_i[:, 1] = pred_abs_high
+            preds_i[:, 2] = pred_abs_low
+            preds_i[:, 3] = pred_abs_close
 
             pred_df = pd.DataFrame(preds_i, columns=self.price_cols + [self.vol_col, self.amt_vol], index=y_timestamp_list[i])
             pred_dfs.append(pred_df)
 
         return pred_dfs
-

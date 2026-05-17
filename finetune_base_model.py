@@ -93,7 +93,7 @@ class CustomKlineDataset(Dataset):
         cache_stamp = f"{self.data_path}.{self.data_type}.stamp.npy"
         lock_path   = f"{self.data_path}.{self.data_type}.lock"
 
-        # Fast path: lock-free check for 99% of workers (cache already exists)
+        # Fast path: lock-free check for 99% of workers
         if os.path.exists(cache_x) and os.path.exists(cache_stamp):
             self.x_data     = np.load(cache_x,     mmap_mode='r')
             self.stamp_data = np.load(cache_stamp, mmap_mode='r')
@@ -101,7 +101,6 @@ class CustomKlineDataset(Dataset):
 
         from filelock import FileLock
         with FileLock(lock_path, timeout=600):
-            # Double-check inside lock
             if os.path.exists(cache_x) and os.path.exists(cache_stamp):
                 self.x_data     = np.load(cache_x,     mmap_mode='r')
                 self.stamp_data = np.load(cache_stamp, mmap_mode='r')
@@ -122,9 +121,19 @@ class CustomKlineDataset(Dataset):
             if df.isnull().any().any():
                 df = df.ffill()
 
-            # ── PROFESSIONAL UPGRADE: Log Returns ──
+            # ── PROFESSIONAL UPGRADE: Leak-Free Structural Returns ──
             price_cols = ['open', 'high', 'low', 'close']
-            df[price_cols] = np.log(df[price_cols] / df[price_cols].shift(1))
+            
+            # Store absolute open to calculate intra-bar dynamics correctly
+            abs_open = df['open'].copy()
+            
+            # 1. Open: Overnight return relative to previous Close
+            df['open'] = np.log(df['open'] / df['close'].shift(1))
+            
+            # 2. High, Low, Close: Intra-bar returns relative to CURRENT Open
+            df['high'] = np.log(df['high'] / abs_open)
+            df['low'] = np.log(df['low'] / abs_open)
+            df['close'] = np.log(df['close'] / abs_open)
 
             # Clean up the NaN created by shift on row 0, and any infinites
             df[price_cols] = df[price_cols].replace([np.inf, -np.inf], np.nan).fillna(0.0)

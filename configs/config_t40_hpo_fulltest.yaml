@@ -1,36 +1,35 @@
 data:
-  data_path: "data/1d.csv"
-  lookback_window: 90
-  predict_window: 14
-  max_context: 90
+  data_path: "data/4h.csv"
+  lookback_window: 512      # ~85 days of historical 4H context (power of 2 optimized)
+  predict_window: 48        # 8 days of forward prediction (48 * 4 hours)
+  max_context: 512
   clip: 5.0
   train_ratio: 0.8
   val_ratio: 0.2
   test_ratio: 0.0
 
 training:
-  # Increased epochs because larger batch sizes mean fewer steps per epoch
-  tokenizer_epochs: 50
-  basemodel_epochs: 30
+  # Reduced epochs because 1 epoch now processes 6x more data than the 1D dataset
+  tokenizer_epochs: 30
+  basemodel_epochs: 20
   
-  # Base default pushed higher for T4 16GB VRAM
-  batch_size: 128
-  log_interval: 10
+  # Drastically reduced base batch_size to survive 16GB VRAM with a 512 context length
+  batch_size: 32
+  log_interval: 20
 
-  # T4 has strong DMA, keeping 4 workers is optimal for data feeding
   num_workers: 4
   pin_memory: true
   persistent_workers: true
   seed: 42
 
-  tokenizer_learning_rate: 0.0005
-  predictor_learning_rate: 0.0001
+  tokenizer_learning_rate: 0.0003
+  predictor_learning_rate: 0.00005
 
   adam_beta1: 0.9
   adam_beta2: 0.95
   adam_weight_decay: 0.1
 
-  accumulation_steps: 1
+  accumulation_steps: 2     # Increased to maintain effective batch size
 
   tokenizer_pct_start: 0.05
   tokenizer_div_factor: 10.0
@@ -43,7 +42,7 @@ training:
 model_paths:
   pretrained_tokenizer: "models/nos_tokenizer_2k"
   pretrained_predictor: "models/nos_mini"
-  exp_name: "1d_t4_hpo"
+  exp_name: "4h_t4_hpo"
   base_path: "finetuned"
   base_save_path: ""
   finetuned_tokenizer: ""
@@ -51,8 +50,8 @@ model_paths:
   basemodel_save_name: "basemodel"
 
 experiment:
-  name: "Nos_1d_T4_HPO"
-  description: "T4 16GB Optimized HPO for 5-Year Daily Data"
+  name: "Nos_4h_T4_HPO"
+  description: "T4 16GB Optimized HPO for 4-Hour Market Data"
   use_comet: false
   train_tokenizer: true
   train_basemodel: true
@@ -65,67 +64,66 @@ device:
 # ── Hyperparameter Search Space ──────────────────────────────────
 hpo:
   enabled: true                    
-  n_trials: 10                      
+  n_trials: 15                      # Slightly higher trials to map the new temporal dynamics
   direction: "minimize"            
   sampler: "tpe"                   
   pruner: "hyperband"
 
-  # Local SQLite path to prevent OneDrive lock corruption
-  storage: "sqlite:///C:/Temp/nos_t40_hpo.db?timeout=60"
-  study_name: "nos_finetune_1d_hpo"
+  # Updated DB path to prevent overwriting the 1D study
+  storage: "sqlite:///C:/Temp/nos_t40_4h_hpo.db?timeout=60"
+  study_name: "nos_finetune_4h_hpo"
 
   optimize_tokenizer: true
   optimize_basemodel: true
 
-  # 1D datasets pass quickly; 5 epochs gives Hyperband enough data to prune accurately
-  hpo_tokenizer_epochs: 5
-  hpo_basemodel_epochs: 5
+  # 4H dataset is large; 3 epochs is enough for Hyperband to prune bad trajectories
+  hpo_tokenizer_epochs: 3
+  hpo_basemodel_epochs: 3
 
   search_space:
     # ── Tokenizer ──────────────────────────────────────────────
     tokenizer_learning_rate:
       type: float
-      low: 5.0e-5    # Shifted up to accommodate larger batch sizes
-      high: 5.0e-3
+      low: 5.0e-5
+      high: 3.0e-3
       log: true
 
     # ── Predictor ──────────────────────────────────────────────
     predictor_learning_rate:
       type: float
-      low: 5.0e-6    # Shifted up to accommodate larger batch sizes
-      high: 5.0e-4
+      low: 1.0e-6
+      high: 1.0e-4
       log: true
 
     # ── Shared Optimizer ───────────────────────────────────────
     adam_weight_decay:
       type: float
-      low: 0.01      # Raised floor to force stronger regularization on small dataset
-      high: 0.3
+      low: 0.01
+      high: 0.2
       log: true
 
     # ── Batch & Accumulation ───────────────────────────────────
     batch_size:
       type: categorical
-      # T4 can easily handle 256 on nos_mini. 
-      # 256 is the absolute ceiling for a 1,800 row dataset (~7 steps/epoch)
-      choices: [64, 128, 256]
+      # Shifted down. 128 or 256 will cause immediate OOM with seq_len=512 on a T4.
+      choices: [16, 32, 64]
 
     accumulation_steps:
       type: categorical
-      # Keep at 1 or 2 to avoid reducing steps-per-epoch too severely
-      choices: [1, 2]
+      # Allows HPO to simulate larger batch sizes (e.g., 32 batch * 4 accum = 128 effective)
+      choices: [1, 2, 4]
 
     # ── Scheduler ─────────────────────────────────────────────
     tokenizer_pct_start:
       type: float
       low: 0.05
-      high: 0.20
+      high: 0.15
       log: false
 
     basemodel_pct_start:
       type: float
       low: 0.05
-      high: 0.20
+      high: 0.15
       log: false
 
     tokenizer_div_factor:
@@ -136,17 +134,17 @@ hpo:
       type: categorical
       choices: [10.0, 25.0, 50.0]
 
-    # ── Dropout (Crucial for smaller 5-yr datasets) ────────────
+    # ── Dropout ────────────────────────────────────────────────
     ffn_dropout_p:
       type: float
-      low: 0.1       # Force at least 10% dropout to prevent memorization
-      high: 0.4
+      low: 0.05      # Lowered floor: 4H has 6x more data, inherently reducing overfitting
+      high: 0.3
       log: false
 
     resid_dropout_p:
       type: float
-      low: 0.1       # Force at least 10% dropout to prevent memorization
-      high: 0.3
+      low: 0.05      # Lowered floor
+      high: 0.25
       log: false
 
     # ── BSQ Loss Weights ──────────────────────────────────────
@@ -156,7 +154,7 @@ hpo:
       high: 0.2
       log: true
 
-    bsq_gamma:       # ADDED: Crucial for preventing codebook collapse in T4 high-batch mode
+    bsq_gamma:
       type: float
       low: 0.8
       high: 2.0
